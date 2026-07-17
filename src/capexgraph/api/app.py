@@ -7,8 +7,10 @@ from pydantic import BaseModel, Field
 
 from capexgraph import __version__
 from capexgraph.domain import ResearchRun, RunMode, RunStatus, StepCheckpoint
-from capexgraph.runtime import RunStore, WorkflowExecutor
-from capexgraph.workflows import create_run, load_run
+from capexgraph.providers import ProviderName
+from capexgraph.research import build_executor_for_run
+from capexgraph.runtime import RunStore
+from capexgraph.workflows import create_run, load_run, save_run
 
 app = FastAPI(
     title="CapexGraph API",
@@ -30,9 +32,16 @@ class RunRequest(BaseModel):
     as_of_date: date | None = None
 
 
+class ThemeRunRequest(RunRequest):
+    provider: ProviderName | None = None
+    execute: bool = False
+    max_attempts: int = Field(default=2, ge=1, le=10)
+
+
 class ExecuteRequest(BaseModel):
     until: str | None = None
     max_attempts: int = Field(default=2, ge=1, le=10)
+    provider: ProviderName | None = None
 
 
 @app.get("/api/health")
@@ -51,8 +60,21 @@ def meta() -> dict[str, object]:
 
 
 @app.post("/api/v1/runs/theme", response_model=ResearchRun)
-def create_theme_run(request: RunRequest) -> ResearchRun:
-    return create_run(RunMode.THEME, request.subject, request.market, request.as_of_date)
+def create_theme_run(request: ThemeRunRequest) -> ResearchRun:
+    run = create_run(RunMode.THEME, request.subject, request.market, request.as_of_date)
+    if request.provider is not None:
+        run.manifest["model_provider"] = request.provider.value
+        run = save_run(run)
+    if not request.execute:
+        return run
+    try:
+        return build_executor_for_run(
+            run,
+            provider=request.provider,
+            max_attempts=request.max_attempts,
+        ).execute(run.id)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/v1/runs/anchor", response_model=ResearchRun)
@@ -86,25 +108,39 @@ def get_checkpoints(run_id: str) -> list[StepCheckpoint]:
 @app.post("/api/v1/runs/{run_id}/execute", response_model=ResearchRun)
 def execute_run(run_id: str, request: ExecuteRequest) -> ResearchRun:
     try:
-        return WorkflowExecutor(max_attempts=request.max_attempts).execute(
+        run = load_run(run_id)
+        if run is None:
+            raise KeyError(f"Research run not found: {run_id}")
+        return build_executor_for_run(
+            run,
+            provider=request.provider,
+            max_attempts=request.max_attempts,
+        ).execute(
             run_id,
             until=request.until,
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
+    except (ValueError, RuntimeError) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.post("/api/v1/runs/{run_id}/resume", response_model=ResearchRun)
 def resume_run(run_id: str, request: ExecuteRequest) -> ResearchRun:
     try:
-        return WorkflowExecutor(max_attempts=request.max_attempts).execute(
+        run = load_run(run_id)
+        if run is None:
+            raise KeyError(f"Research run not found: {run_id}")
+        return build_executor_for_run(
+            run,
+            provider=request.provider,
+            max_attempts=request.max_attempts,
+        ).execute(
             run_id,
             until=request.until,
             retry_failed=True,
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except ValueError as error:
+    except (ValueError, RuntimeError) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error

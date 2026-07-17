@@ -26,18 +26,23 @@ The project is independent from `serenity-bottleneck-hunter`. That skill remains
 
 ## Repository status
 
-CapexGraph is **pre-alpha**. The initial scaffold provides:
+CapexGraph is **pre-alpha**. The current vertical slice provides:
 
 - typed research-domain models;
 - evidence requirements for supply-chain edges;
-- Theme and Anchor run creation and execution;
+- a seven-stage Theme Scan agent workflow;
+- typed, schema-validated agent outputs;
+- code-enforced node, edge, evidence, candidate, and ranking integrity;
+- a curated no-key A-share semiconductor-wafer golden demo;
+- an optional OpenAI Responses API provider;
+- Theme and Anchor run creation plus resumable execution;
 - SQLite run state plus per-step JSON checkpoints;
 - automatic retry and checkpoint resume;
 - FastAPI endpoints;
 - a React/Vite research cockpit shell;
 - tests and CI.
 
-It does not yet produce investment recommendations or execute trades.
+It produces research priorities for human review. It does not produce autonomous investment recommendations or execute trades.
 
 ## Quick start
 
@@ -49,15 +54,29 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 
 capexgraph info
+capexgraph demo
 capexgraph theme "A股半导体硅片" --market CN
 capexgraph anchor "603986" --market CN --execute
-capexgraph run <run-id> --until graph
+capexgraph run <theme-run-id> --provider openai --until graph
 capexgraph resume <run-id>
 capexgraph runs
 capexgraph serve
 ```
 
 API documentation is available at `http://127.0.0.1:8000/docs`.
+
+`capexgraph demo` needs no API key. It executes a frozen public-source evidence pack dated `2025-04-29`; it is a reproducible product demo, not a current sector report.
+
+### Optional OpenAI provider
+
+```powershell
+python -m pip install -e ".[dev,openai]"
+$env:OPENAI_API_KEY = "..."
+$env:CAPEXGRAPH_MODEL = "your-structured-output-capable-model"
+capexgraph theme "AI数据中心电力" --provider openai --execute
+```
+
+CapexGraph uses the Responses API with native Pydantic parsing. Model-proposed sources have not yet been independently fetched and verified, so their edges and candidates are forcibly stored as `low` confidence. The live retrieval and filing-validation layer is the next milestone.
 
 ### Web cockpit
 
@@ -97,7 +116,19 @@ POST /api/v1/runs/{id}/resume
 GET  /api/v1/runs/{id}/checkpoints
 ```
 
-M2 handlers deliberately produce runtime-only checkpoints. They prove retry and resume semantics without pretending that the real research agents already exist.
+Create and execute the no-key golden run in one request:
+
+```json
+{
+  "subject": "A股半导体硅片",
+  "market": "CN",
+  "as_of_date": "2025-04-29",
+  "provider": "fixture",
+  "execute": true
+}
+```
+
+Theme Scan stages are `intake → census → graph → audit → score → debate → decision`. Every stage is resumable and writes a durable checkpoint.
 
 ## Design principles
 
@@ -105,9 +136,9 @@ M2 handlers deliberately produce runtime-only checkpoints. They prove retry and 
 - **No relationship without provenance.** Medium/high-confidence graph edges require evidence IDs.
 - **Runs are inspectable assets.** Intermediate outputs are preserved, not hidden behind a final report.
 - **Research, not execution.** Live brokerage integration is intentionally outside the MVP.
-- **Progressive setup.** One model key is enough for the future standalone runtime; premium data keys remain optional.
+- **Progressive setup.** The golden demo needs no key; live model providers and premium data remain optional.
 
-See [MVP plan](docs/MVP.md) and [architecture](docs/ARCHITECTURE.md).
+See [Theme Scan](docs/THEME_SCAN.md), [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).
 
 ## Disclaimer
 

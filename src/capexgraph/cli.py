@@ -11,8 +11,10 @@ from rich.table import Table
 
 from capexgraph import __version__
 from capexgraph.domain import ResearchRun, RunMode, RunStatus
-from capexgraph.runtime import RunStore, WorkflowExecutor
-from capexgraph.workflows import create_run, load_run
+from capexgraph.providers import ProviderName
+from capexgraph.research import build_executor_for_run
+from capexgraph.runtime import RunStore
+from capexgraph.workflows import create_run, load_run, save_run
 
 app = typer.Typer(
     name="capexgraph",
@@ -49,14 +51,26 @@ def _create(
     market: str,
     as_of: str | None,
     execute: bool,
+    provider: ProviderName | None = None,
 ) -> None:
+    if mode == RunMode.THEME and execute and provider is None:
+        raise typer.BadParameter(
+            "Theme Scan execution requires --provider fixture or --provider openai"
+        )
     try:
         as_of_date = date.fromisoformat(as_of) if as_of else None
     except ValueError as error:
         raise typer.BadParameter("--as-of must use YYYY-MM-DD") from error
     run = create_run(mode, subject, market, as_of_date)
+    if provider is not None:
+        run.manifest["model_provider"] = provider.value
+        run = save_run(run)
     if execute:
-        run = WorkflowExecutor().execute(run.id)
+        try:
+            run = build_executor_for_run(run, provider=provider).execute(run.id)
+        except (KeyError, ValueError, RuntimeError) as error:
+            console.print(f"[red]{error}[/red]")
+            raise typer.Exit(1) from error
     _show_run(run, "CapexGraph run created")
 
 
@@ -72,9 +86,13 @@ def theme(
     market: Annotated[str, typer.Option("--market", "-m")] = "CN",
     as_of: Annotated[str | None, typer.Option("--as-of", help="Research date: YYYY-MM-DD")] = None,
     execute: Annotated[bool, typer.Option("--execute", "-x")] = False,
+    provider: Annotated[
+        ProviderName | None,
+        typer.Option("--provider", help="Structured research provider: fixture or openai"),
+    ] = None,
 ) -> None:
     """Create a Theme Scan research run."""
-    _create(RunMode.THEME, subject, market, as_of, execute)
+    _create(RunMode.THEME, subject, market, as_of, execute, provider)
 
 
 @app.command()
@@ -88,16 +106,40 @@ def anchor(
     _create(RunMode.ANCHOR, subject, market, as_of, execute)
 
 
+@app.command()
+def demo() -> None:
+    """Run the no-key A-share semiconductor-wafer golden case."""
+    _create(
+        RunMode.THEME,
+        "A股半导体硅片",
+        "CN",
+        "2025-04-29",
+        True,
+        ProviderName.FIXTURE,
+    )
+
+
 @app.command("run")
 def run_command(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
     until: Annotated[str | None, typer.Option("--until", help="Stop after this step key")] = None,
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
+    provider: Annotated[
+        ProviderName | None,
+        typer.Option("--provider", help="Provider override for a Theme Scan"),
+    ] = None,
 ) -> None:
     """Execute pending workflow steps."""
     try:
-        run = WorkflowExecutor(max_attempts=attempts).execute(run_id, until=until)
-    except (KeyError, ValueError) as error:
+        run = load_run(run_id)
+        if run is None:
+            raise KeyError(f"Research run not found: {run_id}")
+        run = build_executor_for_run(
+            run,
+            provider=provider,
+            max_attempts=attempts,
+        ).execute(run_id, until=until)
+    except (KeyError, ValueError, RuntimeError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_run(run, "Workflow execution")
@@ -110,15 +152,26 @@ def resume(
     run_id: Annotated[str, typer.Argument(help="Failed or interrupted research run ID")],
     until: Annotated[str | None, typer.Option("--until", help="Stop after this step key")] = None,
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
+    provider: Annotated[
+        ProviderName | None,
+        typer.Option("--provider", help="Provider override for a Theme Scan"),
+    ] = None,
 ) -> None:
     """Resume from the latest completed checkpoint."""
     try:
-        run = WorkflowExecutor(max_attempts=attempts).execute(
+        run = load_run(run_id)
+        if run is None:
+            raise KeyError(f"Research run not found: {run_id}")
+        run = build_executor_for_run(
+            run,
+            provider=provider,
+            max_attempts=attempts,
+        ).execute(
             run_id,
             until=until,
             retry_failed=True,
         )
-    except (KeyError, ValueError) as error:
+    except (KeyError, ValueError, RuntimeError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_run(run, "Workflow resumed")

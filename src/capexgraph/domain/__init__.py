@@ -14,6 +14,7 @@ from capexgraph.domain.models import (
     StepStatus,
     SupplyChainEdge,
     SupplyChainNode,
+    Trigger,
     Verdict,
 )
 
@@ -31,5 +32,6 @@ __all__ = [
     "StepCheckpoint",
     "SupplyChainEdge",
     "SupplyChainNode",
+    "Trigger",
     "Verdict",
 ]
