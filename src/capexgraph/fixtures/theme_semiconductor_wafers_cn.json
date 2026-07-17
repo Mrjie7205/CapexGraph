@@ -1,0 +1,307 @@
+{
+  "fixture": {
+    "id": "golden-a-share-semiconductor-wafers-v1",
+    "subject": "A股半导体硅片",
+    "curation_note": "Frozen public-source demo pack. It is reproducible, not a live sector update."
+  },
+  "outputs": {
+    "ThemeBoundaryOutput": {
+      "scope": "A股半导体硅材料样本，覆盖集成电路用抛光片、外延片，以及刻蚀设备用大直径硅材料。",
+      "investment_question": "哪些上市公司位于验证周期长、替代难度较高的硅材料环节，值得进入后续基本面与估值复核？",
+      "included_layers": [
+        "集成电路用硅抛光片与外延片",
+        "300mm大硅片产业化",
+        "刻蚀设备用大直径硅材料"
+      ],
+      "excluded_topics": [
+        "光伏硅片",
+        "未上市公司",
+        "实时股价与交易建议"
+      ],
+      "capex_drivers": [
+        "晶圆厂扩产与国产供应链认证",
+        "300mm产品放量",
+        "等离子刻蚀设备装机与耗材更换"
+      ],
+      "research_questions": [
+        "已披露产品是否进入量产或客户认证阶段？",
+        "扩产能否转化为利用率、收入与现金流？",
+        "特色硅材料是否具有更强的规格壁垒与客户黏性？"
+      ]
+    },
+    "PlayerCensusOutput": {
+      "nodes": [
+        {
+          "id": "company-nsig",
+          "label": "沪硅产业",
+          "node_type": "company",
+          "ticker": "688126",
+          "market": "SSE STAR",
+          "layer": "300mm及特色半导体硅片"
+        },
+        {
+          "id": "company-lionmicro",
+          "label": "立昂微",
+          "node_type": "company",
+          "ticker": "605358",
+          "market": "SSE",
+          "layer": "6-12英寸硅抛光片与外延片"
+        },
+        {
+          "id": "company-gritek",
+          "label": "有研硅",
+          "node_type": "company",
+          "ticker": "688432",
+          "market": "SSE STAR",
+          "layer": "硅抛光片与刻蚀设备用硅材料"
+        },
+        {
+          "id": "company-thinkon",
+          "label": "神工股份",
+          "node_type": "company",
+          "ticker": "688233",
+          "market": "SSE STAR",
+          "layer": "刻蚀用大直径硅材料与硅零部件"
+        },
+        {
+          "id": "demand-wafer-fabs",
+          "label": "集成电路晶圆厂",
+          "node_type": "demand_segment",
+          "ticker": null,
+          "market": "CN",
+          "layer": "晶圆制造"
+        },
+        {
+          "id": "demand-etch-components",
+          "label": "刻蚀设备硅零部件链",
+          "node_type": "demand_segment",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "半导体设备耗材"
+        }
+      ],
+      "coverage_notes": [
+        "这是用于验证工作流的精选样本，不代表完整A股硅片股票池。",
+        "公司节点与产品层由公开公司披露或公司官网建立。"
+      ],
+      "unresolved_entities": [
+        "其他兼营半导体硅材料的A股公司需在实时扫描中补齐。"
+      ]
+    },
+    "ThemeGraphOutput": {
+      "additional_nodes": [],
+      "evidence": [
+        {
+          "id": "evidence-nsig-products",
+          "title": "沪硅产业官网：大尺寸硅片业务",
+          "kind": "company_disclosure",
+          "source_url": "https://nsig.com/",
+          "published_at": null,
+          "excerpt": "公司官网介绍其300mm硅片已实现规模化销售，部分产品通过国内主流半导体客户认证。"
+        },
+        {
+          "id": "evidence-lionmicro-2024",
+          "title": "立昂微2024年年度报告摘要",
+          "kind": "company_disclosure",
+          "source_url": "https://paper.cnstock.com/html/2025-04/29/content_2059347.htm",
+          "published_at": "2025-04-29",
+          "excerpt": "年度报告摘要披露公司硅片业务覆盖6-12英寸，并列示12英寸硅片已进入多家境内外晶圆制造客户供应链。"
+        },
+        {
+          "id": "evidence-gritek-review",
+          "title": "有研硅科创板审核回复：刻蚀设备用硅材料",
+          "kind": "company_disclosure",
+          "source_url": "https://static.sse.com.cn/stock/information/c/202206/346a73a3d1de42c8b6fc82791093c4d1.pdf",
+          "published_at": null,
+          "excerpt": "公司披露其刻蚀设备用硅材料已产业化，并进入国际刻蚀设备零部件厂商供应链。"
+        },
+        {
+          "id": "evidence-thinkon-products",
+          "title": "神工股份官网：大直径硅材料产品",
+          "kind": "company_disclosure",
+          "source_url": "https://www.thinkon-cn.com/product/13/",
+          "published_at": null,
+          "excerpt": "公司官网将大直径硅材料列为主营产品，并说明其用于晶圆加工刻蚀环节的关键硅部件。"
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-nsig-to-fabs",
+          "source": "company-nsig",
+          "target": "demand-wafer-fabs",
+          "relationship": "supplies",
+          "product": "300mm半导体硅片",
+          "basis": "公司官网披露规模化销售及客户认证进展。",
+          "confidence": "high",
+          "evidence_ids": ["evidence-nsig-products"]
+        },
+        {
+          "id": "edge-lionmicro-to-fabs",
+          "source": "company-lionmicro",
+          "target": "demand-wafer-fabs",
+          "relationship": "supplies",
+          "product": "6-12英寸硅抛光片与外延片",
+          "basis": "年度报告摘要披露产品范围与已进入的晶圆制造客户供应链。",
+          "confidence": "high",
+          "evidence_ids": ["evidence-lionmicro-2024"]
+        },
+        {
+          "id": "edge-gritek-to-etch",
+          "source": "company-gritek",
+          "target": "demand-etch-components",
+          "relationship": "supplies",
+          "product": "刻蚀设备用大直径硅材料",
+          "basis": "科创板审核回复披露产业化与客户供应链进入情况。",
+          "confidence": "high",
+          "evidence_ids": ["evidence-gritek-review"]
+        },
+        {
+          "id": "edge-thinkon-to-etch",
+          "source": "company-thinkon",
+          "target": "demand-etch-components",
+          "relationship": "supplies",
+          "product": "刻蚀用大直径硅材料",
+          "basis": "公司官方产品页说明产品类别与刻蚀环节用途。",
+          "confidence": "high",
+          "evidence_ids": ["evidence-thinkon-products"]
+        }
+      ],
+      "graph_gaps": [
+        "冻结证据包没有覆盖最新产能利用率、价格、毛利率和现金流。",
+        "未将公开客户名单自动展开为逐客户关系边。"
+      ]
+    },
+    "EvidenceAuditOutput": {
+      "findings": [
+        {
+          "edge_id": "edge-nsig-to-fabs",
+          "verdict": "accept",
+          "rationale": "公司官网直接支持产品、量产与客户认证信息。"
+        },
+        {
+          "edge_id": "edge-lionmicro-to-fabs",
+          "verdict": "accept",
+          "rationale": "年度报告摘要直接支持产品范围与供应链进入信息。"
+        },
+        {
+          "edge_id": "edge-gritek-to-etch",
+          "verdict": "accept",
+          "rationale": "交易所审核回复直接支持产品产业化和供应链关系。"
+        },
+        {
+          "edge_id": "edge-thinkon-to-etch",
+          "verdict": "accept",
+          "rationale": "公司官方产品页直接支持产品与应用环节。"
+        }
+      ],
+      "source_warnings": [
+        "立昂微来源为年度报告摘要页面，正式使用前应回链交易所PDF原文。",
+        "有研硅审核回复时间较早，需要最新定期报告复核持续性。",
+        "没有发布日期的公司官网页面必须记录抓取时间和内容哈希后再用于动态监控。"
+      ],
+      "audit_summary": "四条关系均有公开来源支持，但时效性与经营量化数据仍不足以形成投资结论。"
+    },
+    "BottleneckScoreOutput": {
+      "candidates": [
+        {
+          "node_id": "company-nsig",
+          "verdict": "watch",
+          "thesis": "300mm硅片规模化与客户认证构成核心观察点，但必须用利用率、单价和亏损收窄验证规模能否转化为经济回报。",
+          "archetypes": ["大尺寸平台", "国产认证"],
+          "risks": ["扩产后的供需与价格压力", "折旧和研发投入压制盈利", "客户认证转量产节奏不确定"],
+          "invalidation": ["出货增长长期不能改善利用率与现金流", "关键规格认证停滞或流失"],
+          "triggers": [],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-lionmicro",
+          "verdict": "watch",
+          "thesis": "从硅片到芯片的一体化平台和12英寸客户覆盖值得跟踪，但扩产项目回报与行业价格仍是主要约束。",
+          "archetypes": ["一体化平台", "12英寸爬坡"],
+          "risks": ["大尺寸硅片规模效益不足", "行业量增价减", "多业务资本开支分散"],
+          "invalidation": ["12英寸项目持续延期且客户放量不足", "固定成本增长快于硅片收入"],
+          "triggers": [],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-gritek",
+          "verdict": "watch",
+          "thesis": "刻蚀设备用特色硅材料的规格与客户验证壁垒可能高于标准化产品，但旧披露必须由最新收入结构与客户集中度复核。",
+          "archetypes": ["特色材料", "刻蚀耗材"],
+          "risks": ["证据时效性不足", "客户集中度", "下游资本开支周期"],
+          "invalidation": ["特色材料收入或毛利持续弱化", "核心客户认证优势被替代"],
+          "triggers": [],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-thinkon",
+          "verdict": "watch",
+          "thesis": "刻蚀用大直径硅材料与硅零部件位于设备耗材链，具备规格升级与复购逻辑，但需要订单、产能利用率和客户结构证据。",
+          "archetypes": ["设备耗材", "材料到零部件延伸"],
+          "risks": ["全球刻蚀需求波动", "海外客户与贸易环境", "扩产兑现风险"],
+          "invalidation": ["大直径硅材料需求恢复未传导至收入", "零部件业务无法形成规模"],
+          "triggers": [],
+          "confidence": "medium"
+        }
+      ],
+      "ranking_method": "仅按关系证据强度、产品替代难度和待验证经营杠杆排序；未纳入股价、估值和实时财务数据。",
+      "data_gaps": [
+        "最新分产品收入、毛利率与产能利用率",
+        "客户认证转量产的时间序列",
+        "估值、价格动量与市场预期差"
+      ]
+    },
+    "DebateOutput": {
+      "reviews": [
+        {
+          "node_id": "company-nsig",
+          "bull_case": ["300mm规模化与客户认证是进入先进晶圆制造供应链的必要基础。"],
+          "bear_case": ["重资产扩产若遇到价格下行，规模可能先转化为折旧压力。"],
+          "unresolved_questions": ["新增产能的利用率、ASP和现金回报何时改善？"]
+        },
+        {
+          "node_id": "company-lionmicro",
+          "bull_case": ["多尺寸产品与内部器件业务可能提供客户和工艺协同。"],
+          "bear_case": ["平台化也会带来资本配置复杂度和多项目爬坡压力。"],
+          "unresolved_questions": ["12英寸外延片扩产的订单与回报率是否达到计划？"]
+        },
+        {
+          "node_id": "company-gritek",
+          "bull_case": ["刻蚀用特色硅材料具备规格、纯度和客户验证壁垒。"],
+          "bear_case": ["旧审核材料无法单独证明当前竞争力与盈利持续性。"],
+          "unresolved_questions": ["特色材料最新收入、毛利与客户集中度如何变化？"]
+        },
+        {
+          "node_id": "company-thinkon",
+          "bull_case": ["从大直径材料向硅零部件延伸可提高单客价值和产业链位置。"],
+          "bear_case": ["耗材需求仍受晶圆厂资本开支、开工率与库存周期影响。"],
+          "unresolved_questions": ["零部件放量能否抵消材料业务的周期波动？"]
+        }
+      ],
+      "cross_candidate_observations": [
+        "标准硅片更依赖产能利用率与客户认证转量产，刻蚀硅材料更依赖规格壁垒与复购。",
+        "没有估值和盈利趋势时，只能形成研究优先级，不能形成交易优先级。"
+      ]
+    },
+    "DecisionOutput": {
+      "research_status": "needs_review",
+      "summary": "该冻结样本确认了两类可继续深挖的硅材料路径：300mm与多尺寸晶圆供应，以及刻蚀设备用特色硅材料。现阶段四家公司均为观察对象，不构成买入建议。",
+      "ranked_node_ids": [
+        "company-gritek",
+        "company-thinkon",
+        "company-nsig",
+        "company-lionmicro"
+      ],
+      "limitations": [
+        "这是可复现的黄金演示数据，不是2026年7月的实时板块报告。",
+        "没有接入实时行情、估值、最新财务和公告增量。",
+        "排序仅代表下一步研究优先级，不代表收益预期或买卖评级。"
+      ],
+      "next_actions": [
+        "抓取并核验四家公司最新年度与季度报告。",
+        "补齐分产品收入、产能利用率、毛利率、经营现金流和扩产进度。",
+        "加入估值与价格动量后再进行交易层讨论。"
+      ]
+    }
+  }
+}

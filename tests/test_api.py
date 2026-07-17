@@ -39,6 +39,32 @@ async def test_create_theme_run(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.anyio
+async def test_create_and_execute_fixture_theme_run(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/v1/runs/theme",
+            json={
+                "subject": "A股半导体硅片",
+                "market": "CN",
+                "as_of_date": "2025-04-29",
+                "provider": "fixture",
+                "execute": True,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "needs_review"
+        assert payload["manifest"]["model_provider"] == "fixture"
+        assert len(payload["candidates"]) == 4
+        assert (tmp_path / payload["id"] / "decision.json").is_file()
+
+
+@pytest.mark.anyio
 async def test_execute_and_resume_endpoints(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
     async with AsyncClient(

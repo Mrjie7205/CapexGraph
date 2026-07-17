@@ -2,23 +2,25 @@ import { FormEvent, useMemo, useState } from "react";
 import { createRun, type ResearchRun, type RunMode } from "./api";
 
 const DEMO_STEPS = [
-  { label: "Define scope", agent: "Theme Analyst", state: "done" },
-  { label: "Build player census", agent: "Universe Analyst", state: "done" },
-  { label: "Map supply chain", agent: "Chain Mapper", state: "live" },
+  { label: "Define scope", agent: "Theme Analyst", state: "wait" },
+  { label: "Build player census", agent: "Universe Analyst", state: "wait" },
+  { label: "Map supply chain", agent: "Chain Mapper", state: "wait" },
   { label: "Audit evidence", agent: "Evidence Auditor", state: "wait" },
+  { label: "Score bottlenecks", agent: "Bottleneck Analyst", state: "wait" },
+  { label: "Bull / bear review", agent: "Research Team", state: "wait" },
   { label: "Issue verdict", agent: "Research Manager", state: "wait" },
 ];
 
 const DEMO_EDGES = [
-  { from: "石英坩埚", to: "单晶硅片", product: "High-purity consumable", confidence: "HIGH", sources: 3 },
-  { from: "CMP材料", to: "晶圆制造", product: "Polishing slurry", confidence: "HIGH", sources: 4 },
-  { from: "长晶设备", to: "硅片扩产", product: "Crystal growth system", confidence: "MED", sources: 2 },
+  { from: "沪硅产业", to: "集成电路晶圆厂", product: "300mm半导体硅片", confidence: "HIGH", sources: 1 },
+  { from: "有研硅", to: "刻蚀设备硅零部件链", product: "刻蚀设备用大直径硅材料", confidence: "HIGH", sources: 1 },
+  { from: "神工股份", to: "刻蚀设备硅零部件链", product: "刻蚀用大直径硅材料", confidence: "HIGH", sources: 1 },
 ];
 
 const DEMO_CANDIDATES = [
-  { symbol: "688019", name: "安集科技", verdict: "CANDIDATE", alpha: "+6.8%", stage: "启动" },
-  { symbol: "688126", name: "沪硅产业", verdict: "WATCH", alpha: "+1.4%", stage: "震荡" },
-  { symbol: "603688", name: "石英股份", verdict: "REVIEW", alpha: "—", stage: "待审" },
+  { symbol: "688432", name: "有研硅", verdict: "WATCH", alpha: "—", stage: "演示" },
+  { symbol: "688233", name: "神工股份", verdict: "WATCH", alpha: "—", stage: "演示" },
+  { symbol: "688126", name: "沪硅产业", verdict: "WATCH", alpha: "—", stage: "演示" },
 ];
 
 function App() {
@@ -37,6 +39,33 @@ function App() {
     }));
   }, [created]);
 
+  const displayedEdges = useMemo(() => {
+    if (!created) return DEMO_EDGES;
+    const nodes = new Map(created.nodes.map((node) => [node.id, node.label]));
+    return created.edges.map((edge) => ({
+      from: nodes.get(edge.source) ?? edge.source,
+      to: nodes.get(edge.target) ?? edge.target,
+      product: edge.product,
+      confidence: edge.confidence.toUpperCase(),
+      sources: edge.evidence_ids.length,
+    }));
+  }, [created]);
+
+  const displayedCandidates = useMemo(() => {
+    if (!created) return DEMO_CANDIDATES;
+    const nodes = new Map(created.nodes.map((node) => [node.id, node]));
+    return created.candidates.map((candidate) => {
+      const node = nodes.get(candidate.node_id);
+      return {
+        symbol: node?.ticker ?? "—",
+        name: node?.label ?? candidate.node_id,
+        verdict: candidate.verdict.toUpperCase(),
+        alpha: "—",
+        stage: "待审",
+      };
+    });
+  }, [created]);
+
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!subject.trim()) return;
@@ -46,6 +75,24 @@ function App() {
       setCreated(await createRun(mode, subject.trim()));
     } catch {
       setError("API尚未启动。先运行 capexgraph serve；当前界面继续展示演示数据。");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runDemo() {
+    setBusy(true);
+    setError("");
+    setMode("theme");
+    setSubject("A股半导体硅片");
+    try {
+      setCreated(await createRun("theme", "A股半导体硅片", {
+        provider: "fixture",
+        execute: true,
+        asOfDate: "2025-04-29",
+      }));
+    } catch {
+      setError("API尚未启动。先运行 capexgraph serve，再执行无 Key 黄金演示。");
     } finally {
       setBusy(false);
     }
@@ -92,8 +139,11 @@ function App() {
             <label htmlFor="subject">{mode === "theme" ? "Investment theme" : "Ticker or company"}</label>
             <div className="subject-row">
               <input id="subject" value={subject} onChange={(event) => setSubject(event.target.value)} />
-              <button className="launch" disabled={busy}>{busy ? "Creating…" : "Launch ↗"}</button>
+              <button className="launch" disabled={busy}>{busy ? "Creating…" : "Create ↗"}</button>
             </div>
+            <button className="demo-launch" type="button" disabled={busy} onClick={runDemo}>
+              Run no-key golden demo · 无需 API Key
+            </button>
             {created && <p className="run-success">Run created · {created.id}</p>}
             {error && <p className="run-error">{error}</p>}
           </form>
@@ -101,15 +151,15 @@ function App() {
       </section>
 
       <section className="stats" aria-label="Research statistics">
-        <article><span>Active run</span><strong>01</strong><small>{created?.subject ?? "A股半导体硅片"}</small></article>
-        <article><span>Grounded edges</span><strong>38</strong><small>84% medium confidence+</small></article>
-        <article><span>Evidence items</span><strong>126</strong><small>11 awaiting review</small></article>
-        <article><span>Tracked alpha</span><strong className="positive">+7.2%</strong><small>vs theme benchmark</small></article>
+        <article><span>Active run</span><strong>{created ? "01" : "—"}</strong><small>{created?.subject ?? "No run selected"}</small></article>
+        <article><span>Grounded edges</span><strong>{created?.edges.length ?? "—"}</strong><small>{created ? "schema + evidence checked" : "run demo to populate"}</small></article>
+        <article><span>Evidence items</span><strong>{created?.evidence.length ?? "—"}</strong><small>{created ? "source ledger" : "run demo to populate"}</small></article>
+        <article><span>Research status</span><strong>{created ? "REVIEW" : "—"}</strong><small>{created?.status ?? "not executed"}</small></article>
       </section>
 
       <section className="workbench" id="runs">
         <article className="pipeline panel">
-          <div className="panel-title"><span>Current run / Workflow</span><b>{created ? "CREATED" : "RUNNING"}</b></div>
+          <div className="panel-title"><span>Current run / Workflow</span><b>{created?.status ?? "PREVIEW"}</b></div>
           <div className="run-title">
             <div><small>{created?.mode === "anchor" ? "ANCHOR SCAN" : "THEME SCAN"}</small><h2>{created?.subject ?? "A股半导体硅片"}</h2></div>
             <span className="run-id">{created?.id ?? "CG-20260717-001"}</span>
@@ -126,7 +176,7 @@ function App() {
         </article>
 
         <article className="graph-card panel" id="graph">
-          <div className="panel-title"><span>Graph / Live topology</span><b>38 EDGES</b></div>
+          <div className="panel-title"><span>Graph / Topology</span><b>{created?.edges.length ?? "PREVIEW"} EDGES</b></div>
           <div className="graph-canvas">
             <svg viewBox="0 0 640 300" aria-label="Demo supply-chain graph">
               <defs><filter id="soft"><feGaussianBlur stdDeviation="1.8" /></filter></defs>
@@ -148,19 +198,20 @@ function App() {
       <section className="lower-grid">
         <article className="ledger panel" id="ledger">
           <div className="panel-title"><span>Evidence ledger</span><button>Review all →</button></div>
-          {DEMO_EDGES.map((edge) => (
+          {displayedEdges.map((edge) => (
             <div className="evidence-row" key={`${edge.from}-${edge.to}`}>
               <div className="confidence">{edge.confidence}</div>
               <div><strong>{edge.from} <i>→</i> {edge.to}</strong><small>{edge.product}</small></div>
               <span>{edge.sources} sources</span>
             </div>
           ))}
+          {created && displayedEdges.length === 0 && <p className="empty-state">Run created; execute it to generate grounded edges.</p>}
         </article>
 
         <article className="radar panel" id="radar">
           <div className="panel-title"><span>Opportunity radar</span><button>Open tracker →</button></div>
           <div className="radar-head"><span>Symbol</span><span>Verdict</span><span>Stage</span><span>Alpha</span></div>
-          {DEMO_CANDIDATES.map((candidate) => (
+          {displayedCandidates.map((candidate) => (
             <div className="candidate-row" key={candidate.symbol}>
               <div><strong>{candidate.symbol}</strong><small>{candidate.name}</small></div>
               <span className={`verdict ${candidate.verdict.toLowerCase()}`}>{candidate.verdict}</span>
@@ -168,6 +219,7 @@ function App() {
               <b>{candidate.alpha}</b>
             </div>
           ))}
+          {created && displayedCandidates.length === 0 && <p className="empty-state">No candidates until the scoring step completes.</p>}
         </article>
       </section>
 

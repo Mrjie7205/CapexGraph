@@ -13,7 +13,7 @@ from capexgraph.domain import (
     StepCheckpoint,
     StepStatus,
 )
-from capexgraph.runtime.artifacts import atomic_write_text
+from capexgraph.runtime.artifacts import atomic_write_json, atomic_write_text
 from capexgraph.runtime.store import RunStore, runs_dir
 
 StepHandler = Callable[[ResearchRun, PipelineStep], dict[str, Any]]
@@ -118,6 +118,22 @@ class WorkflowExecutor:
         self.store.save_run(run)
         run_dir = runs_dir() / run.id
         atomic_write_text(run_dir / "state.json", run.model_dump_json(indent=2))
+        atomic_write_json(
+            run_dir / "manifest.json",
+            run.model_dump(
+                mode="json",
+                include={
+                    "id",
+                    "mode",
+                    "subject",
+                    "market",
+                    "as_of_date",
+                    "created_at",
+                    "updated_at",
+                    "manifest",
+                },
+            ),
+        )
         return run
 
     def _checkpoint(

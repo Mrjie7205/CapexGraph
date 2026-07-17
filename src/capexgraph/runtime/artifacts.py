@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
+from typing import Any
 
 
 def atomic_write_text(path: Path, content: str) -> None:
@@ -10,3 +12,11 @@ def atomic_write_text(path: Path, content: str) -> None:
     temporary = path.with_name(f".{path.name}.tmp")
     temporary.write_text(content, encoding="utf-8")
     os.replace(temporary, path)
+
+
+def atomic_write_json(path: Path, payload: Any) -> None:
+    """Serialize a portable JSON artifact and replace it atomically."""
+    atomic_write_text(
+        path,
+        json.dumps(payload, ensure_ascii=False, indent=2, default=str),
+    )
