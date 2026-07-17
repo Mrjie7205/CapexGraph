@@ -2,13 +2,15 @@
 
 **Evidence-first supply-chain investment research.**
 
-CapexGraph turns an investment theme, a market anchor, or a catalyst into an auditable research run: a grounded supply-chain graph, candidate verdicts, invalidation conditions, and forward tracking.
+CapexGraph turns an investment theme or market anchor into an auditable research run: a grounded
+supply-chain graph, candidate verdicts, invalidation conditions, and forward tracking.
 
-> 证据优先的供应链投资研究系统：从主题或热门个股出发，构建可审计的产业链图谱，寻找尚未充分定价的瓶颈环节，并持续验证判断。
+> 证据优先的供应链投资研究系统：从主题或热门个股出发，构建可审计的产业链图谱，寻找值得继续验证的瓶颈环节和相邻标的，并持续记录判断是否兑现。
 
 ## Why CapexGraph
 
-Most financial agent projects start with a ticker and end with a buy/sell opinion. CapexGraph starts one level earlier:
+Most financial agent projects start with a ticker and end with a buy/sell opinion. CapexGraph
+starts one level earlier:
 
 1. Where is capital expenditure flowing?
 2. Which supply-chain relationships are actually evidenced?
@@ -16,77 +18,65 @@ Most financial agent projects start with a ticker and end with a buy/sell opinio
 4. What has the market already priced in?
 5. What would prove the thesis wrong?
 
-The project is independent from `serenity-bottleneck-hunter`. That skill remains a self-contained, low-friction project; CapexGraph is a separate professional research system.
+The project is independent from `serenity-bottleneck-hunter`. That skill remains a self-contained,
+low-friction project; CapexGraph is a separate professional research system.
 
-## MVP research modes
+## MVP capabilities
 
-- **Theme Scan** — theme → player census → supply-chain graph → bottleneck candidates.
-- **Anchor Scan** — hot stock → 360° upstream/downstream map → overlooked neighbours.
-- **Research Cockpit** — evidence review, run history, triggers, stage changes, and alpha scorecards.
+CapexGraph `0.2.0` is an **alpha research workspace** with:
 
-## Repository status
-
-CapexGraph is **pre-alpha**. The current vertical slice provides:
-
-- typed research-domain models;
-- evidence requirements for supply-chain edges;
-- a seven-stage Theme Scan agent workflow;
-- typed, schema-validated agent outputs;
-- code-enforced node, edge, evidence, candidate, and ranking integrity;
-- a curated no-key A-share semiconductor-wafer golden demo;
+- seven-stage Theme and Anchor Scan agent workflows;
+- typed, schema-validated outputs and code-enforced integrity checks;
+- curated no-key semiconductor-wafer and 兆易创新 golden cases;
 - an optional OpenAI Responses API provider;
-- Theme and Anchor run creation plus resumable execution;
-- SQLite run state plus per-step JSON checkpoints;
-- automatic retry and checkpoint resume;
-- FastAPI endpoints;
-- a React/Vite research cockpit shell;
-- tests and CI.
+- resumable foreground or background execution with SQLite checkpoints;
+- SSRF-safe HTML/PDF evidence capture, hashing, and explicit review;
+- deterministic ticker identity, no-key market snapshots, and financial imports;
+- a React/Vite Cockpit with run history, polling, dynamic graphs, and evidence review;
+- candidate/benchmark tracking, alpha scorecards, triggers, and stage boards;
+- self-contained HTML research reports;
+- tests, multi-version CI, Windows bootstrap, and container setup.
 
-It produces research priorities for human review. It does not produce autonomous investment recommendations or execute trades.
+It produces research priorities for human review. It does not produce autonomous investment
+recommendations or execute trades.
 
 ## Quick start
 
-### Python and API
-
 ```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+.\scripts\bootstrap.ps1
 
-capexgraph info
-capexgraph demo
-capexgraph theme "A股半导体硅片" --market CN
-capexgraph anchor "603986" --market CN --execute
-capexgraph run <theme-run-id> --provider openai --until graph
-capexgraph resume <run-id>
-capexgraph runs
-capexgraph serve
+.\.venv\Scripts\python.exe -m capexgraph.cli info
+.\.venv\Scripts\python.exe -m capexgraph.cli demo
+.\.venv\Scripts\python.exe -m capexgraph.cli demo-anchor
+.\.venv\Scripts\python.exe -m capexgraph.cli serve
 ```
 
 API documentation is available at `http://127.0.0.1:8000/docs`.
 
-`capexgraph demo` needs no API key. It executes a frozen public-source evidence pack dated `2025-04-29`; it is a reproducible product demo, not a current sector report.
+The two demo commands need no API key. They execute frozen, public-source evidence packs and are
+reproducible product demos, not current investment reports.
 
 ### Optional OpenAI provider
 
 ```powershell
-python -m pip install -e ".[dev,openai]"
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,openai]"
 $env:OPENAI_API_KEY = "..."
 $env:CAPEXGRAPH_MODEL = "your-structured-output-capable-model"
-capexgraph theme "AI数据中心电力" --provider openai --execute
+.\.venv\Scripts\python.exe -m capexgraph.cli theme "AI数据中心电力" --provider openai --execute
 ```
 
-CapexGraph uses the Responses API with native Pydantic parsing. Model-proposed sources have not yet been independently fetched and verified, so their edges and candidates are forcibly stored as `low` confidence. The live retrieval and filing-validation layer is the next milestone.
+Model-proposed sources remain `low` confidence until the source is captured, hash-verified, and
+explicitly reviewed. The model cannot promote an unreviewed claim by wording it confidently.
 
-### Web cockpit
+### Web Cockpit
 
 ```powershell
-cd apps\web
-npm install
-npm run dev
+.\scripts\dev.ps1
 ```
 
-Open `http://127.0.0.1:5173`.
+Open `http://127.0.0.1:5173`. The Cockpit creates Theme or Anchor runs, executes them in the
+background, polls progress, resumes failures, renders the real graph, reviews captured evidence,
+and manages forward tracking.
 
 ## Research artifact contract
 
@@ -97,14 +87,43 @@ manifest.json       input, versions, providers, timestamps
 state.json          resumable workflow state
 graph.json          nodes, grounded edges, confidence
 evidence.json       source ledger
+financials.json     source-linked comparison for Anchor Scan
 candidates.json     verdicts, risks, invalidation, triggers
 decision.json       final structured decision
+report.html         self-contained portable research report
 checkpoints/        one durable artifact per completed/failed step
 ```
 
-SQLite at `runs/capexgraph.db` is the local system of record. JSON artifacts remain human-readable and portable. Set `CAPEXGRAPH_STATE_DB` to move the database.
+SQLite at `runs/capexgraph.db` is the local system of record. JSON artifacts remain human-readable
+and portable. Set `CAPEXGRAPH_STATE_DB` to move the database.
 
-## Runtime API
+## Common commands
+
+```powershell
+# Research
+capexgraph theme "A股半导体硅片" --provider fixture --execute
+capexgraph anchor "603986" --provider fixture --execute
+capexgraph run <run-id> --provider openai --until graph
+capexgraph resume <run-id>
+
+# Live evidence and market data
+capexgraph ticker resolve 兆易创新
+capexgraph evidence collect <run-id> <url> --id filing-1 --title "Filing"
+capexgraph evidence review <run-id> filing-1
+capexgraph market snapshot <run-id> 603986
+
+# Forward tracking and reports
+capexgraph tracking add <run-id> <node-id>
+capexgraph tracking snapshot <tracked-id> --live
+capexgraph tracking list
+capexgraph report render <run-id>
+```
+
+CapexGraph records candidate and benchmark prices on a common market date, then reports since-call
+return, benchmark return, and arithmetic alpha. It does not backfill an imaginary call price from
+later data.
+
+## API surface
 
 ```text
 POST /api/v1/runs/theme
@@ -114,21 +133,24 @@ GET  /api/v1/runs/{id}
 POST /api/v1/runs/{id}/execute
 POST /api/v1/runs/{id}/resume
 GET  /api/v1/runs/{id}/checkpoints
+GET  /api/v1/runs/{id}/artifacts/{filename}
+POST /api/v1/runs/{id}/tracking
+GET  /api/v1/tracking
+POST /api/v1/tracking/{id}/snapshots
+GET  /api/v1/runs/{id}/report
 ```
 
-Create and execute the no-key golden run in one request:
+Theme Scan stages are `intake → census → graph → audit → score → debate → decision`. Anchor Scan
+stages are `intake → cause → graph → audit → compare → debate → decision`. Every stage is resumable
+and writes a durable checkpoint.
 
-```json
-{
-  "subject": "A股半导体硅片",
-  "market": "CN",
-  "as_of_date": "2025-04-29",
-  "provider": "fixture",
-  "execute": true
-}
+## Container
+
+```powershell
+docker compose up --build
 ```
 
-Theme Scan stages are `intake → census → graph → audit → score → debate → decision`. Every stage is resumable and writes a durable checkpoint.
+This starts the API on `http://127.0.0.1:8000` and persists the SQLite workspace in a named volume.
 
 ## Design principles
 
@@ -136,9 +158,11 @@ Theme Scan stages are `intake → census → graph → audit → score → debat
 - **No relationship without provenance.** Medium/high-confidence graph edges require evidence IDs.
 - **Runs are inspectable assets.** Intermediate outputs are preserved, not hidden behind a final report.
 - **Research, not execution.** Live brokerage integration is intentionally outside the MVP.
-- **Progressive setup.** The golden demo needs no key; live model providers and premium data remain optional.
+- **Progressive setup.** Golden cases need no key; live model and premium data providers remain optional.
 
-See [Theme Scan](docs/THEME_SCAN.md), [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).
+See [Theme Scan](docs/THEME_SCAN.md), [Anchor Scan](docs/ANCHOR_SCAN.md),
+[live research tools](docs/LIVE_RESEARCH.md), [forward tracking](docs/MONITORING.md),
+[MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).
 
 ## Disclaimer
 

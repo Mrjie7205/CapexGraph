@@ -24,28 +24,45 @@ Stable Pydantic contracts for runs, companies, evidence, graph edges, candidates
 
 Resumable state machines coordinate research stages. SQLite is the system of record for runs and checkpoints; each step also writes a portable JSON artifact. An interrupted or failed run skips completed checkpoints when resumed.
 
-M3 plugs Theme, Universe, Chain, Evidence, Bottleneck, Debate, and Research Manager agents into the M2 persistence contract. Every agent returns a Pydantic model; deterministic code then validates references and materializes domain objects and artifacts.
+Theme Scan plugs Theme, Universe, Chain, Evidence, Bottleneck, Debate, and Research Manager
+agents into the persistence contract. Anchor Scan substitutes identity, repricing-cause, neighbour,
+and financial-comparison specialists. Every agent returns a Pydantic model; deterministic code
+validates references and materializes domain objects and artifacts.
 
 ### Tools and providers
 
 Provider interfaces prevent the workflow from depending on one model vendor. The built-in fixture provider loads a curated evidence pack and needs no key. The optional OpenAI provider uses structured Responses API output and is loaded only when selected.
 
-Tools will own ticker identity, adjusted prices, financial calculations, official filing retrieval, content hashing, and report validation. Those live retrieval tools are not part of M3.
+Tools own ticker identity, adjusted prices, financial imports, SSRF-safe public source retrieval,
+content hashing, and report rendering. The built-in market adapter is no-key and best-effort;
+production deployments can replace it behind the same interface.
 
 ### Evidence trust boundary
 
 ```text
-curated fixture → schema validation → medium/high confidence allowed
-model proposal  → schema validation → forced low confidence → retrieval review required
+curated fixture       → schema validation → medium/high confidence allowed
+model proposal        → schema validation → forced low confidence
+captured source       → hash verification → explicit human review
+reviewed model claim  → medium/high confidence may be preserved
 ```
 
-An evidence ID proves provenance inside a run; it does not prove the underlying URL was fetched. Only providers marked `curated` may currently preserve medium/high-confidence claims. This prevents a model-generated citation from being mistaken for verified evidence.
+An evidence ID proves provenance inside a run. `captured` means bytes were downloaded and hashed;
+`reviewed` means a human approved that unchanged capture. It still does not make every possible
+interpretation of the source true. Curated fixtures and claims backed entirely by reviewed captures
+may preserve medium/high confidence.
+
+### Forward tracking
+
+Tracking tables share the SQLite workspace while remaining separate from immutable run artifacts.
+A tracked candidate stores the original call date, candidate price, benchmark price, thesis,
+invalidation text, and structured triggers. Later paired snapshots calculate return and alpha.
+Trigger events are append-only and acknowledgement never deletes event history.
 
 ### Applications
 
-- FastAPI exposes research runs and evidence.
-- React/Vite provides the Research Cockpit.
-- CLI supports local and batch workflows.
+- FastAPI exposes runs, evidence review, artifacts, tracking, and HTML reports.
+- React/Vite provides the live Research Cockpit and stage board.
+- CLI supports local, batch, tracking, and portable-report workflows.
 
 ## Runtime lifecycle
 

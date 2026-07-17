@@ -1,0 +1,226 @@
+{
+  "fixture": {
+    "id": "golden-anchor-gigadevice-cn-v1",
+    "subject": "兆易创新",
+    "as_of_date": "2026-04-23",
+    "curation_note": "Frozen public-source anchor demo. Peer edges describe disclosed product overlap, not customer or supplier relationships."
+  },
+  "outputs": {
+    "AnchorIdentityOutput": {
+      "anchor": {
+        "id": "company-gigadevice",
+        "label": "兆易创新",
+        "node_type": "company",
+        "ticker": "603986.SH",
+        "market": "SSE",
+        "layer": "存储器与MCU设计"
+      },
+      "products": ["NOR Flash", "SLC NAND Flash", "利基型DRAM", "MCU", "传感器", "模拟芯片"],
+      "role": "Fabless芯片设计平台，锚点产品覆盖代码型闪存、利基存储与MCU。",
+      "evidence": [
+        {
+          "id": "evidence-gigadevice-2025",
+          "title": "兆易创新2025年年度报告",
+          "kind": "filing",
+          "source_url": "https://static.cninfo.com.cn/finalpage/2026-03-31/1225061352.PDF",
+          "published_at": "2026-03-31",
+          "excerpt": "报告披露公司代码603986，主要业务为存储器、微控制器、传感器和模拟芯片；存储产品包括NOR Flash、SLC NAND Flash和利基型DRAM。"
+        }
+      ],
+      "unresolved_questions": ["各产品线最新库存、价格和客户结构需要季度数据继续验证。"]
+    },
+    "RepricingCauseOutput": {
+      "drivers": [
+        {
+          "title": "存储周期向上与产品价量改善",
+          "basis": "年报将2025年增长归因于存储行业周期向上、供需结构优化和产品价量齐升。",
+          "evidence_ids": ["evidence-gigadevice-2025"],
+          "confidence": "high",
+          "priced_in_risk": "经营改善不等于当前估值仍有空间，必须另行加入价格与估值数据。"
+        },
+        {
+          "title": "产品矩阵扩展",
+          "basis": "年报披露定制化存储、较高算力MCU、AI MCU与模拟产品拓展。",
+          "evidence_ids": ["evidence-gigadevice-2025"],
+          "confidence": "high",
+          "priced_in_risk": "新品放量和利润贡献未在冻结样本中拆分。"
+        }
+      ],
+      "evidence": [],
+      "market_context": "冻结样本只解释截至2025年报的经营重估来源，不使用事后股价倒推叙事。",
+      "data_gaps": ["实时估值", "2026年季度价格与库存", "分产品盈利贡献"]
+    },
+    "AnchorGraphOutput": {
+      "neighbours": [
+        {"id": "company-puya", "label": "普冉股份", "node_type": "company", "ticker": "688766.SH", "market": "SSE STAR", "layer": "非易失性存储与MCU"},
+        {"id": "company-dosilicon", "label": "东芯股份", "node_type": "company", "ticker": "688110.SH", "market": "SSE STAR", "layer": "中小容量存储芯片"},
+        {"id": "company-hengshuo", "label": "恒烁股份", "node_type": "company", "ticker": "688416.SH", "market": "SSE STAR", "layer": "NOR Flash与MCU"}
+      ],
+      "evidence": [
+        {
+          "id": "evidence-puya-2025-overview",
+          "title": "上交所：科创板集成电路企业2025年报观察",
+          "kind": "government",
+          "source_url": "https://www.sse.com.cn/cpc/cpctheme/4th20thcpc/4th20thcpcgcxx/c/c_20260413_10815020.shtml",
+          "published_at": "2026-04-13",
+          "excerpt": "上交所文章披露普冉股份推进存储+战略，2025年营业收入23.20亿元，同比增长28.62%。"
+        },
+        {
+          "id": "evidence-dosilicon-2025-board",
+          "title": "东芯股份第三届董事会第九次会议决议公告",
+          "kind": "filing",
+          "source_url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-04-23/688110_20260423_P3O3.pdf",
+          "published_at": "2026-04-23",
+          "excerpt": "董事会审议通过东芯股份2025年年度报告及摘要；本冻结包未从报告正文抽取财务指标。"
+        },
+        {
+          "id": "evidence-hengshuo-2025-summary",
+          "title": "恒烁股份2025年年度报告摘要",
+          "kind": "filing",
+          "source_url": "https://www.sse.com.cn/disclosure/listedinfo/announcement/c/new/2026-04-18/688416_20260418_WI77.pdf",
+          "published_at": "2026-04-18",
+          "excerpt": "摘要披露2025年营业收入4.746亿元，同比增长27.49%，经营现金流1.093亿元，亏损幅度同比收窄。"
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-puya-peer-gigadevice",
+          "source": "company-puya",
+          "target": "company-gigadevice",
+          "relationship": "peer",
+          "product": "非易失性存储与MCU产品重叠",
+          "basis": "公开披露显示双方均处于存储芯片与MCU设计赛道；这不是客户或供应商关系。",
+          "confidence": "medium",
+          "evidence_ids": ["evidence-puya-2025-overview", "evidence-gigadevice-2025"]
+        },
+        {
+          "id": "edge-dosilicon-peer-gigadevice",
+          "source": "company-dosilicon",
+          "target": "company-gigadevice",
+          "relationship": "peer",
+          "product": "中小容量存储芯片赛道",
+          "basis": "冻结包只保留行业分类推断，未提取足以支持更强关系的产品原文。",
+          "confidence": "low",
+          "evidence_ids": []
+        },
+        {
+          "id": "edge-hengshuo-peer-gigadevice",
+          "source": "company-hengshuo",
+          "target": "company-gigadevice",
+          "relationship": "peer",
+          "product": "NOR Flash与MCU产品重叠",
+          "basis": "两家公司披露的核心产品存在重叠；这不是客户或供应商关系。",
+          "confidence": "medium",
+          "evidence_ids": ["evidence-hengshuo-2025-summary", "evidence-gigadevice-2025"]
+        }
+      ],
+      "graph_gaps": ["未建立未经年报直接披露的长鑫客户或供应商边。", "东芯产品重叠边需要补抓2025年报正文后复核。"]
+    },
+    "EvidenceAuditOutput": {
+      "findings": [
+        {"edge_id": "edge-puya-peer-gigadevice", "verdict": "accept", "rationale": "来源足以支持同赛道与产品组合重叠，但不支持商业往来。"},
+        {"edge_id": "edge-dosilicon-peer-gigadevice", "verdict": "downgrade", "rationale": "仅保留低置信行业分类推断，下一轮必须补年报产品原文。"},
+        {"edge_id": "edge-hengshuo-peer-gigadevice", "verdict": "accept", "rationale": "公开披露足以支持NOR Flash与MCU同赛道比较，不支持商业往来。"}
+      ],
+      "source_warnings": ["普冉来源为上交所年报综述而非报告全文。", "东芯冻结包没有财务正文。", "peer边不代表供应商、客户或两跳受益关系。"],
+      "audit_summary": "三条边仅构成可比较邻居集合；没有一条被解释为兆易创新的客户或供应商。"
+    },
+    "NeighbourComparisonOutput": {
+      "comparisons": [
+        {
+          "node_id": "company-gigadevice",
+          "period_end": "2025-12-31",
+          "revenue_growth_pct": 25.12,
+          "gross_margin_pct": 40.21,
+          "rd_ratio_pct": null,
+          "operating_cashflow_cny_mn": 2128.5,
+          "profit_signal": "归母净利润16.48亿元，同比增长49.47%。",
+          "source_evidence_ids": ["evidence-gigadevice-2025"],
+          "missing_metrics": ["冻结包未抽取研发投入占比"]
+        },
+        {
+          "node_id": "company-puya",
+          "period_end": "2025-12-31",
+          "revenue_growth_pct": 28.62,
+          "gross_margin_pct": null,
+          "rd_ratio_pct": null,
+          "operating_cashflow_cny_mn": null,
+          "profit_signal": "上交所综述确认收入创历史新高，但冻结包未抽取利润与现金流。",
+          "source_evidence_ids": ["evidence-puya-2025-overview"],
+          "missing_metrics": ["毛利率", "研发投入占比", "经营现金流", "归母净利润"]
+        },
+        {
+          "node_id": "company-dosilicon",
+          "period_end": "2025-12-31",
+          "revenue_growth_pct": null,
+          "gross_margin_pct": null,
+          "rd_ratio_pct": null,
+          "operating_cashflow_cny_mn": null,
+          "profit_signal": "已确认年报披露，但本冻结包没有提取可核验指标。",
+          "source_evidence_ids": ["evidence-dosilicon-2025-board"],
+          "missing_metrics": ["收入增速", "毛利率", "研发投入占比", "经营现金流", "净利润"]
+        },
+        {
+          "node_id": "company-hengshuo",
+          "period_end": "2025-12-31",
+          "revenue_growth_pct": 27.49,
+          "gross_margin_pct": null,
+          "rd_ratio_pct": 24.2,
+          "operating_cashflow_cny_mn": 109.32,
+          "profit_signal": "归母净亏损0.995亿元，较2024年亏损收窄。",
+          "source_evidence_ids": ["evidence-hengshuo-2025-summary"],
+          "missing_metrics": ["毛利率"]
+        }
+      ],
+      "candidates": [
+        {
+          "node_id": "company-puya",
+          "verdict": "watch",
+          "thesis": "收入增速高于锚点且存储+产品扩张值得深挖，但利润、现金流和估值尚未补齐。",
+          "archetypes": ["锚点同赛道邻居", "小市值产品扩张"],
+          "risks": ["指标缺口大", "存储周期反转", "价格竞争"],
+          "invalidation": ["收入增长未转化为利润和现金流", "产品扩张持续压低回报"],
+          "triggers": [{"metric": "revenue_growth_pct", "operator": ">=", "value": 25, "note": "下一期仍需保持可验证的收入扩张"}],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-hengshuo",
+          "verdict": "watch",
+          "thesis": "收入、现金流和亏损收窄形成修复样本，但尚未完成盈利拐点。",
+          "archetypes": ["经营修复", "同产品弹性"],
+          "risks": ["仍处亏损", "研发费用率高", "小规模波动"],
+          "invalidation": ["经营现金流重新转负", "收入改善不能推动季度盈亏平衡"],
+          "triggers": [{"metric": "operating_cashflow_cny_mn", "operator": ">", "value": 0, "note": "下一年度经营现金流保持为正"}],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-dosilicon",
+          "verdict": "watch",
+          "thesis": "产品邻接可能有研究价值，但当前冻结包证据不足，只能列入补证清单。",
+          "archetypes": ["待补证邻居"],
+          "risks": ["财务指标缺失", "关系证据弱", "周期波动"],
+          "invalidation": ["补抓年报后产品重叠或经营修复不成立"],
+          "triggers": [],
+          "confidence": "low"
+        }
+      ],
+      "ranking_method": "按公开关系证据、经营改善和数据完整度形成下一步研究优先级；不含股价、估值或收益预测。",
+      "data_gaps": ["普冉完整利润与现金流", "东芯2025年报正文", "全部邻居实时估值与价格动量"]
+    },
+    "DebateOutput": {
+      "reviews": [
+        {"node_id": "company-puya", "bull_case": ["收入增速略高于锚点，产品扩张可能带来经营弹性。"], "bear_case": ["缺少利润和现金流时，收入增长的质量无法判断。"], "unresolved_questions": ["增长来自销量、价格还是并表，毛利与现金回款如何？"]},
+        {"node_id": "company-hengshuo", "bull_case": ["收入增长、现金流转正和亏损收窄同时出现。"], "bear_case": ["公司仍亏损，研发强度和规模效应可能延后盈亏平衡。"], "unresolved_questions": ["季度是否已接近稳定盈利，毛利率修复能否持续？"]},
+        {"node_id": "company-dosilicon", "bull_case": ["同属中小容量存储赛道，周期改善可能提供弹性。"], "bear_case": ["当前证据包甚至不足以做可靠财务横比。"], "unresolved_questions": ["2025年收入、毛利、现金流和产品结构分别如何？"]}
+      ],
+      "cross_candidate_observations": ["锚点强势只能产生邻居研究假设，不能替代邻居自身的利润与现金流验证。", "数据完整度本身应影响排序置信度。"]
+    },
+    "DecisionOutput": {
+      "research_status": "needs_review",
+      "summary": "黄金案例把兆易创新的经营重估拆成可核验原因，并得到三个产品邻居。普冉优先补齐盈利质量，恒烁优先验证盈亏平衡，东芯先补证；这是一份研究队列，不是买入排序。",
+      "ranked_node_ids": ["company-puya", "company-hengshuo", "company-dosilicon"],
+      "limitations": ["冻结在2025年报披露窗口。", "没有实时行情、估值与2026年季度数据。", "没有把未证实的长鑫关系写入图谱。"],
+      "next_actions": ["抓取普冉和东芯2025年报全文并人工复核。", "补齐三家邻居的毛利、净利、经营现金流和库存。", "加入实时价格与估值后再讨论交易层优先级。"]
+    }
+  }
+}
