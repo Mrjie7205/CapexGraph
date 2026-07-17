@@ -117,8 +117,21 @@ def create_theme_run(request: ThemeRunRequest) -> ResearchRun:
 
 
 @app.post("/api/v1/runs/anchor", response_model=ResearchRun)
-def create_anchor_run(request: RunRequest) -> ResearchRun:
-    return create_run(RunMode.ANCHOR, request.subject, request.market, request.as_of_date)
+def create_anchor_run(request: ThemeRunRequest) -> ResearchRun:
+    run = create_run(RunMode.ANCHOR, request.subject, request.market, request.as_of_date)
+    if request.provider is not None:
+        run.manifest["model_provider"] = request.provider.value
+        run = save_run(run)
+    if not request.execute:
+        return run
+    try:
+        return build_executor_for_run(
+            run,
+            provider=request.provider,
+            max_attempts=request.max_attempts,
+        ).execute(run.id)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/v1/runs", response_model=list[ResearchRun])

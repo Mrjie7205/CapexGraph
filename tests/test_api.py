@@ -74,7 +74,7 @@ async def test_execute_and_resume_endpoints(tmp_path, monkeypatch) -> None:
         created = (
             await client.post(
                 "/api/v1/runs/anchor",
-                json={"subject": "兆易创新", "market": "CN"},
+                json={"subject": "兆易创新", "market": "CN", "provider": "fixture"},
             )
         ).json()
 
@@ -95,3 +95,29 @@ async def test_execute_and_resume_endpoints(tmp_path, monkeypatch) -> None:
         checkpoints = await client.get(f"/api/v1/runs/{created['id']}/checkpoints")
         assert checkpoints.status_code == 200
         assert len(checkpoints.json()) == len(resumed.json()["pipeline"])
+
+
+@pytest.mark.anyio
+async def test_create_and_execute_fixture_anchor_run(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/v1/runs/anchor",
+            json={
+                "subject": "603986",
+                "market": "CN",
+                "as_of_date": "2026-04-23",
+                "provider": "fixture",
+                "execute": True,
+            },
+        )
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "needs_review"
+        assert payload["manifest"]["anchor_node_id"] == "company-gigadevice"
+        assert len(payload["candidates"]) == 3
+        assert (tmp_path / payload["id"] / "financials.json").is_file()

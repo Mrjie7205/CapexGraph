@@ -72,9 +72,9 @@ def _create(
     execute: bool,
     provider: ProviderName | None = None,
 ) -> None:
-    if mode == RunMode.THEME and execute and provider is None:
+    if mode in {RunMode.THEME, RunMode.ANCHOR} and execute and provider is None:
         raise typer.BadParameter(
-            "Theme Scan execution requires --provider fixture or --provider openai"
+            f"{mode.value.title()} Scan execution requires --provider fixture or --provider openai"
         )
     try:
         as_of_date = date.fromisoformat(as_of) if as_of else None
@@ -120,9 +120,13 @@ def anchor(
     market: Annotated[str, typer.Option("--market", "-m")] = "CN",
     as_of: Annotated[str | None, typer.Option("--as-of", help="Research date: YYYY-MM-DD")] = None,
     execute: Annotated[bool, typer.Option("--execute", "-x")] = False,
+    provider: Annotated[
+        ProviderName | None,
+        typer.Option("--provider", help="Structured research provider: fixture or openai"),
+    ] = None,
 ) -> None:
     """Create an Anchor Scan research run."""
-    _create(RunMode.ANCHOR, subject, market, as_of, execute)
+    _create(RunMode.ANCHOR, subject, market, as_of, execute, provider)
 
 
 @app.command()
@@ -138,6 +142,19 @@ def demo() -> None:
     )
 
 
+@app.command("demo-anchor")
+def demo_anchor() -> None:
+    """Run the no-key 兆易创新 Anchor Scan golden case."""
+    _create(
+        RunMode.ANCHOR,
+        "兆易创新",
+        "CN",
+        "2026-04-23",
+        True,
+        ProviderName.FIXTURE,
+    )
+
+
 @app.command("run")
 def run_command(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
@@ -145,7 +162,7 @@ def run_command(
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Provider override for a Theme Scan"),
+        typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
     ] = None,
 ) -> None:
     """Execute pending workflow steps."""
@@ -173,7 +190,7 @@ def resume(
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Provider override for a Theme Scan"),
+        typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
     ] = None,
 ) -> None:
     """Resume from the latest completed checkpoint."""

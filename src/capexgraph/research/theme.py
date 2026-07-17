@@ -139,9 +139,7 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "captured_evidence instead of redefining those evidence items.",
                 {
                     "census": run.manifest["agent_outputs"]["census"],
-                    "captured_evidence": [
-                        item.model_dump(mode="json") for item in run.evidence
-                    ],
+                    "captured_evidence": [item.model_dump(mode="json") for item in run.evidence],
                 },
             ),
         )
@@ -166,9 +164,7 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 and evidence_by_id[evidence_id].status == EvidenceStatus.REVIEWED
                 for evidence_id in proposal.evidence_ids
             )
-            claim_is_grounded = (
-                model.evidence_policy == EvidencePolicy.CURATED or reviewed_sources
-            )
+            claim_is_grounded = model.evidence_policy == EvidencePolicy.CURATED or reviewed_sources
             payload["metadata"] = {
                 "evidence_policy": model.evidence_policy.value,
                 "verification_required": not claim_is_grounded,
@@ -360,12 +356,11 @@ def build_executor_for_run(
     if run.mode != RunMode.THEME:
         return WorkflowExecutor(max_attempts=max_attempts)
     if not selected:
-        raise ValueError(
-            "Theme Scan execution requires --provider fixture or --provider openai"
-        )
+        raise ValueError("Theme Scan execution requires --provider fixture or --provider openai")
     model = create_research_model(
         selected,
         subject=run.subject,
+        mode="theme",
         model=os.getenv("CAPEXGRAPH_MODEL"),
     )
     return WorkflowExecutor(

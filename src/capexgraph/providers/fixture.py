@@ -5,11 +5,13 @@ from importlib.resources import files
 
 from capexgraph.providers.base import EvidencePolicy, StructuredOutput
 
-SUPPORTED_SUBJECTS = {
+THEME_SUBJECTS = {
     "a股半导体硅片",
     "a股半导体硅片板块",
     "半导体硅片",
 }
+
+ANCHOR_SUBJECTS = {"兆易创新", "603986", "603986.sh"}
 
 
 class FixtureResearchModel:
@@ -19,13 +21,20 @@ class FixtureResearchModel:
     model_name = "golden-a-share-semiconductor-wafers-v1"
     evidence_policy = EvidencePolicy.CURATED
 
-    def __init__(self, subject: str) -> None:
+    def __init__(self, subject: str, *, mode: str = "theme") -> None:
         normalized = subject.strip().lower()
-        if normalized not in SUPPORTED_SUBJECTS:
-            supported = "、".join(sorted(SUPPORTED_SUBJECTS))
+        subjects = THEME_SUBJECTS if mode == "theme" else ANCHOR_SUBJECTS
+        if normalized not in subjects:
+            supported = "、".join(sorted(subjects))
             raise ValueError(f"Fixture provider only supports: {supported}")
-        fixture_path = files("capexgraph.fixtures").joinpath("theme_semiconductor_wafers_cn.json")
+        filename = (
+            "theme_semiconductor_wafers_cn.json"
+            if mode == "theme"
+            else "anchor_gigadevice_cn.json"
+        )
+        fixture_path = files("capexgraph.fixtures").joinpath(filename)
         self._payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+        self.model_name = self._payload["fixture"]["id"]
 
     def generate(
         self,
