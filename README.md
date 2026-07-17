@@ -160,7 +160,11 @@ This starts the API on `http://127.0.0.1:8000` and persists the SQLite workspace
 - **Research, not execution.** Live brokerage integration is intentionally outside the MVP.
 - **Progressive setup.** Golden cases need no key; live model and premium data providers remain optional.
 
-See [Theme Scan](docs/THEME_SCAN.md), [Anchor Scan](docs/ANCHOR_SCAN.md),
+New contributors and coding agents should start with [AGENTS.md](AGENTS.md),
+[current status](docs/CURRENT_STATUS.md), and the [roadmap](ROADMAP.md).
+
+See [project context](docs/PROJECT_CONTEXT.md), [accepted decisions](docs/DECISIONS.md),
+[Theme Scan](docs/THEME_SCAN.md), [Anchor Scan](docs/ANCHOR_SCAN.md),
 [live research tools](docs/LIVE_RESEARCH.md), [forward tracking](docs/MONITORING.md),
 [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).
 

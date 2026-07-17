@@ -40,7 +40,13 @@ $env:OPENAI_API_KEY = "..."
 $env:CAPEXGRAPH_MODEL = "your-model"
 ```
 
-M3 does not give the model a trusted filing or web retrieval tool. Its proposed evidence remains useful as a research queue, but CapexGraph forces all resulting edges and candidates to low confidence until a later retrieval stage independently validates them.
+The OpenAI adapter does not search or fetch sources on its own. Model-proposed evidence remains a
+research queue and resulting claims are forced to low confidence. A user can capture HTML/PDF
+sources with the live evidence tools, verify their hashes, and explicitly review them. A claim may
+preserve medium/high confidence only when all of its cited captured sources are reviewed and
+unchanged; review still does not guarantee the interpretation is correct.
+
+See `docs/LIVE_RESEARCH.md` for the capture and review contract.
 
 ## Deterministic integrity checks
 

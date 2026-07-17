@@ -2,6 +2,13 @@
 
 All notable changes to CapexGraph are documented here.
 
+## Unreleased
+
+- added a repository-owned cross-session handoff contract: agent guide, forward roadmap, project
+  context, current status, accepted decisions, documentation drift checks, and PR checklist;
+- clarified that Catalyst Scan is reserved/scaffolded rather than shipped;
+- updated Theme Scan documentation for the M4 evidence capture and review boundary.
+
 ## 0.2.0 — 2026-07-17
 
 - added SSRF-safe HTML/PDF evidence capture, hashing, and explicit review;

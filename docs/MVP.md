@@ -1,4 +1,7 @@
-# MVP plan
+# Completed MVP plan
+
+This document records the milestones delivered in `v0.2.0`. It is historical, not the forward
+backlog. See `ROADMAP.md` and `docs/CURRENT_STATUS.md` for the next work.
 
 ## Definition of done
 
@@ -29,6 +32,9 @@ A new user can create a Theme Scan and an Anchor Scan, inspect grounded relation
 - reinforcement learning;
 - private tweet datasets or proprietary research artifacts.
 
-## M3 boundary
+## Historical M3 boundary
 
-The Theme Scan golden case is curated and reproducible. The OpenAI adapter validates structure but does not independently retrieve or verify sources; code therefore downgrades model-proposed relationships and candidates to low confidence. Live evidence acquisition is M4, not an implied capability of M3.
+At M3, the Theme Scan golden case was curated and reproducible while model proposals were forced
+to low confidence. M4 subsequently added URL-based evidence capture, hashing, explicit review,
+ticker identity, market snapshots, and financial imports. Automatic source discovery is still not
+implemented; see the current boundaries in `docs/CURRENT_STATUS.md`.
