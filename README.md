@@ -56,6 +56,8 @@ python -m pip install -e ".[dev]"
 capexgraph info
 capexgraph demo
 capexgraph theme "A股半导体硅片" --market CN
+capexgraph ticker resolve 兆易创新
+capexgraph market snapshot <run-id> 603986
 capexgraph anchor "603986" --market CN --execute
 capexgraph run <theme-run-id> --provider openai --until graph
 capexgraph resume <run-id>
@@ -138,7 +140,7 @@ Theme Scan stages are `intake → census → graph → audit → score → debat
 - **Research, not execution.** Live brokerage integration is intentionally outside the MVP.
 - **Progressive setup.** The golden demo needs no key; live model providers and premium data remain optional.
 
-See [Theme Scan](docs/THEME_SCAN.md), [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).
+See [Theme Scan](docs/THEME_SCAN.md), [live research tools](docs/LIVE_RESEARCH.md), [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).
 
 ## Disclaimer
 

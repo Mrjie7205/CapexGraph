@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 from datetime import date
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -10,10 +11,20 @@ from rich.panel import Panel
 from rich.table import Table
 
 from capexgraph import __version__
-from capexgraph.domain import ResearchRun, RunMode, RunStatus
+from capexgraph.domain import EvidenceKind, ResearchRun, RunMode, RunStatus
 from capexgraph.providers import ProviderName
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import RunStore
+from capexgraph.tools import (
+    EvidencePack,
+    EvidenceSourceRequest,
+    TickerResolver,
+    capture_market_snapshot,
+    collect_evidence_for_run,
+    collect_evidence_pack,
+    review_run_evidence,
+)
+from capexgraph.tools.financials import attach_financial_metrics
 from capexgraph.workflows import create_run, load_run, save_run
 
 app = typer.Typer(
@@ -21,6 +32,14 @@ app = typer.Typer(
     help="Evidence-first supply-chain investment research.",
     no_args_is_help=True,
 )
+evidence_app = typer.Typer(help="Capture and review research evidence.", no_args_is_help=True)
+ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
+market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
+financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
+app.add_typer(evidence_app, name="evidence")
+app.add_typer(ticker_app, name="ticker")
+app.add_typer(market_app, name="market")
+app.add_typer(financials_app, name="financials")
 console = Console()
 
 if sys.platform == "win32":
@@ -213,6 +232,105 @@ def show(run_id: Annotated[str, typer.Argument(help="Research run ID")]) -> None
         console.print(f"[red]Research run not found: {run_id}[/red]")
         raise typer.Exit(1)
     _show_run(run)
+
+
+@evidence_app.command("collect")
+def evidence_collect(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    url: Annotated[str, typer.Argument(help="Public HTML or PDF URL")],
+    evidence_id: Annotated[str, typer.Option("--id", help="Stable evidence ID")],
+    title: Annotated[str, typer.Option("--title")],
+    kind: Annotated[EvidenceKind, typer.Option("--kind")] = EvidenceKind.COMPANY_DISCLOSURE,
+    published_at: Annotated[str | None, typer.Option("--published-at")] = None,
+    publisher: Annotated[str | None, typer.Option("--publisher")] = None,
+) -> None:
+    """Capture a public source and attach its hash to a run."""
+    try:
+        source = EvidenceSourceRequest(
+            id=evidence_id,
+            title=title,
+            kind=kind,
+            url=url,
+            published_at=date.fromisoformat(published_at) if published_at else None,
+            publisher=publisher,
+        )
+        document = collect_evidence_for_run(run_id, source)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(
+        f"[green]Captured[/green] {document.evidence.id} · "
+        f"{document.byte_count} bytes · sha256 {document.evidence.source_hash}"
+    )
+
+
+@evidence_app.command("pack")
+def evidence_pack(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False, resolve_path=True)],
+) -> None:
+    """Capture every source in a JSON evidence pack."""
+    try:
+        pack = EvidencePack.model_validate_json(path.read_text(encoding="utf-8"))
+        documents = collect_evidence_pack(run_id, pack)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Captured[/green] {len(documents)} evidence sources")
+
+
+@evidence_app.command("review")
+def evidence_review(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    evidence_id: Annotated[str, typer.Argument(help="Evidence ID")],
+    reject: Annotated[bool, typer.Option("--reject", help="Reject instead of approve")] = False,
+) -> None:
+    """Approve a hash-verified capture for use in grounded claims."""
+    try:
+        evidence = review_run_evidence(run_id, evidence_id, approved=not reject)
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"{evidence.id} · [bold]{evidence.status.value}[/bold]")
+
+
+@ticker_app.command("resolve")
+def ticker_resolve(query: Annotated[str, typer.Argument(help="Ticker, name, or alias")]) -> None:
+    """Resolve a canonical, registry-backed ticker identity."""
+    try:
+        identity = TickerResolver().resolve(query)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=identity.model_dump(mode="json"))
+
+
+@market_app.command("snapshot")
+def market_snapshot(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    ticker: Annotated[str, typer.Argument(help="Ticker or registered company name")],
+) -> None:
+    """Fetch adjusted daily history and attach a market snapshot to a run."""
+    try:
+        snapshot = capture_market_snapshot(run_id, ticker)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=snapshot.model_dump(mode="json"))
+
+
+@financials_app.command("import")
+def financials_import(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False, resolve_path=True)],
+) -> None:
+    """Import normalized, evidence-linked financial metrics from CSV."""
+    try:
+        metrics = attach_financial_metrics(run_id, path)
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Imported[/green] {len(metrics)} financial metrics")
 
 
 @app.command()

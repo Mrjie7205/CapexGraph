@@ -46,6 +46,13 @@ class EvidenceKind(StrEnum):
     INDUSTRY_INFERENCE = "industry_inference"
 
 
+class EvidenceStatus(StrEnum):
+    PROPOSED = "proposed"
+    CAPTURED = "captured"
+    REVIEWED = "reviewed"
+    REJECTED = "rejected"
+
+
 class RelationshipType(StrEnum):
     SUPPLIES = "supplies"
     CUSTOMER = "customer"
@@ -70,6 +77,53 @@ class Evidence(BaseModel):
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     excerpt: str = ""
     source_hash: str | None = None
+    publisher: str | None = None
+    content_type: str | None = None
+    local_path: str | None = None
+    status: EvidenceStatus = EvidenceStatus.PROPOSED
+
+
+class TickerIdentity(BaseModel):
+    ticker: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    exchange: str = Field(min_length=2)
+    currency: str = Field(min_length=3, max_length=3)
+    aliases: list[str] = Field(default_factory=list)
+    source_url: HttpUrl | None = None
+
+
+class MarketBar(BaseModel):
+    date: date
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: float | None = None
+
+
+class MarketSnapshot(BaseModel):
+    ticker: str
+    as_of_date: date
+    price: float = Field(gt=0)
+    currency: str = Field(min_length=3, max_length=3)
+    provider: str
+    ret_1m_pct: float | None = None
+    ret_3m_pct: float | None = None
+    range_pos_6mo_pct: float | None = None
+    pct_off_6mo_high: float | None = None
+    above_sma50: bool | None = None
+    stage: str = "unknown"
+    source_url: HttpUrl | None = None
+
+
+class FinancialMetric(BaseModel):
+    ticker: str = Field(min_length=1)
+    metric: str = Field(min_length=1)
+    period_end: date
+    value: float
+    unit: str = Field(min_length=1)
+    source_evidence_id: str | None = None
 
 
 class SupplyChainNode(BaseModel):

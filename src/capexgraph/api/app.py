@@ -3,13 +3,31 @@ from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
-from capexgraph.domain import ResearchRun, RunMode, RunStatus, StepCheckpoint
+from capexgraph.domain import (
+    Evidence,
+    EvidenceKind,
+    FinancialMetric,
+    MarketSnapshot,
+    ResearchRun,
+    RunMode,
+    RunStatus,
+    StepCheckpoint,
+    TickerIdentity,
+)
 from capexgraph.providers import ProviderName
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import RunStore
+from capexgraph.tools import (
+    EvidenceSourceRequest,
+    TickerResolver,
+    capture_market_snapshot,
+    collect_evidence_for_run,
+    review_run_evidence,
+)
+from capexgraph.tools.financials import attach_financial_metric_items
 from capexgraph.workflows import create_run, load_run, save_run
 
 app = FastAPI(
@@ -42,6 +60,27 @@ class ExecuteRequest(BaseModel):
     until: str | None = None
     max_attempts: int = Field(default=2, ge=1, le=10)
     provider: ProviderName | None = None
+
+
+class EvidenceCollectRequest(BaseModel):
+    id: str = Field(min_length=1, max_length=120)
+    title: str = Field(min_length=1, max_length=300)
+    kind: EvidenceKind = EvidenceKind.COMPANY_DISCLOSURE
+    url: HttpUrl
+    published_at: date | None = None
+    publisher: str | None = Field(default=None, max_length=120)
+
+
+class EvidenceReviewRequest(BaseModel):
+    approved: bool
+
+
+class MarketCaptureRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=80)
+
+
+class FinancialMetricsRequest(BaseModel):
+    items: list[FinancialMetric] = Field(min_length=1, max_length=5000)
 
 
 @app.get("/api/health")
@@ -103,6 +142,65 @@ def get_checkpoints(run_id: str) -> list[StepCheckpoint]:
     if load_run(run_id) is None:
         raise HTTPException(status_code=404, detail="Research run not found")
     return RunStore().list_checkpoints(run_id)
+
+
+@app.post("/api/v1/runs/{run_id}/evidence/collect", response_model=Evidence)
+def collect_run_evidence(run_id: str, request: EvidenceCollectRequest) -> Evidence:
+    try:
+        document = collect_evidence_for_run(
+            run_id,
+            EvidenceSourceRequest(**request.model_dump()),
+        )
+        return document.evidence
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/evidence/{evidence_id}/review", response_model=Evidence)
+def review_evidence(
+    run_id: str,
+    evidence_id: str,
+    request: EvidenceReviewRequest,
+) -> Evidence:
+    try:
+        return review_run_evidence(run_id, evidence_id, approved=request.approved)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/market", response_model=MarketSnapshot)
+def capture_run_market(run_id: str, request: MarketCaptureRequest) -> MarketSnapshot:
+    try:
+        return capture_market_snapshot(run_id, request.ticker)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/financials", response_model=list[FinancialMetric])
+def attach_run_financials(
+    run_id: str,
+    request: FinancialMetricsRequest,
+) -> list[FinancialMetric]:
+    try:
+        return attach_financial_metric_items(run_id, request.items)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/tickers/resolve", response_model=TickerIdentity)
+def resolve_ticker(query: Annotated[str, Query(min_length=1, max_length=80)]) -> TickerIdentity:
+    try:
+        return TickerResolver().resolve(query)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.post("/api/v1/runs/{run_id}/execute", response_model=ResearchRun)

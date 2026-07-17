@@ -9,6 +9,7 @@ from capexgraph.domain import (
     Candidate,
     Confidence,
     Evidence,
+    EvidenceStatus,
     PipelineStep,
     ResearchRun,
     RunMode,
@@ -134,8 +135,14 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
             user_prompt=_prompt(
                 run,
                 "Map only supply-chain relationships supported by cited evidence. Unverified "
-                "source suggestions are not proof and must remain low confidence.",
-                {"census": run.manifest["agent_outputs"]["census"]},
+                "source suggestions are not proof and must remain low confidence. Reuse IDs from "
+                "captured_evidence instead of redefining those evidence items.",
+                {
+                    "census": run.manifest["agent_outputs"]["census"],
+                    "captured_evidence": [
+                        item.model_dump(mode="json") for item in run.evidence
+                    ],
+                },
             ),
         )
         _merge_nodes(run, output.additional_nodes)
@@ -150,14 +157,24 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         run.evidence = list(evidence.values())
 
         edges: list[SupplyChainEdge] = []
+        evidence_by_id = {item.id: item for item in run.evidence}
         for proposal in output.edges:
             payload = proposal.model_dump()
             payload["as_of_date"] = run.as_of_date
+            reviewed_sources = bool(proposal.evidence_ids) and all(
+                evidence_by_id.get(evidence_id)
+                and evidence_by_id[evidence_id].status == EvidenceStatus.REVIEWED
+                for evidence_id in proposal.evidence_ids
+            )
+            claim_is_grounded = (
+                model.evidence_policy == EvidencePolicy.CURATED or reviewed_sources
+            )
             payload["metadata"] = {
                 "evidence_policy": model.evidence_policy.value,
-                "verification_required": model.evidence_policy != EvidencePolicy.CURATED,
+                "verification_required": not claim_is_grounded,
+                "reviewed_sources": reviewed_sources,
             }
-            if model.evidence_policy != EvidencePolicy.CURATED:
+            if not claim_is_grounded:
                 payload["confidence"] = Confidence.LOW
             edges.append(SupplyChainEdge(**payload))
         run.edges = edges
