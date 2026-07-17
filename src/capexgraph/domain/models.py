@@ -126,14 +126,28 @@ class PipelineStep(BaseModel):
     agent: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
+    attempts: int = Field(default=0, ge=0)
     message: str = ""
+    error: str = ""
+
+
+class StepCheckpoint(BaseModel):
+    run_id: str
+    step_key: str
+    status: StepStatus
+    attempt: int = Field(ge=0)
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    message: str = ""
+    error: str = ""
+    output: dict[str, Any] = Field(default_factory=dict)
 
 
 class ResearchRun(BaseModel):
     id: str
     mode: RunMode
-    subject: str
-    market: str
+    subject: str = Field(min_length=1)
+    market: str = Field(min_length=2)
     as_of_date: date
     status: RunStatus = RunStatus.CREATED
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

@@ -30,8 +30,9 @@ CapexGraph is **pre-alpha**. The initial scaffold provides:
 
 - typed research-domain models;
 - evidence requirements for supply-chain edges;
-- Theme and Anchor run creation;
-- persisted run artifacts;
+- Theme and Anchor run creation and execution;
+- SQLite run state plus per-step JSON checkpoints;
+- automatic retry and checkpoint resume;
 - FastAPI endpoints;
 - a React/Vite research cockpit shell;
 - tests and CI.
@@ -49,7 +50,10 @@ python -m pip install -e ".[dev]"
 
 capexgraph info
 capexgraph theme "A股半导体硅片" --market CN
-capexgraph anchor "603986" --market CN
+capexgraph anchor "603986" --market CN --execute
+capexgraph run <run-id> --until graph
+capexgraph resume <run-id>
+capexgraph runs
 capexgraph serve
 ```
 
@@ -76,7 +80,24 @@ graph.json          nodes, grounded edges, confidence
 evidence.json       source ledger
 candidates.json     verdicts, risks, invalidation, triggers
 decision.json       final structured decision
+checkpoints/        one durable artifact per completed/failed step
 ```
+
+SQLite at `runs/capexgraph.db` is the local system of record. JSON artifacts remain human-readable and portable. Set `CAPEXGRAPH_STATE_DB` to move the database.
+
+## Runtime API
+
+```text
+POST /api/v1/runs/theme
+POST /api/v1/runs/anchor
+GET  /api/v1/runs
+GET  /api/v1/runs/{id}
+POST /api/v1/runs/{id}/execute
+POST /api/v1/runs/{id}/resume
+GET  /api/v1/runs/{id}/checkpoints
+```
+
+M2 handlers deliberately produce runtime-only checkpoints. They prove retry and resume semantics without pretending that the real research agents already exist.
 
 ## Design principles
 

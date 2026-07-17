@@ -6,8 +6,8 @@ A new user can create a Theme Scan and an Anchor Scan, inspect grounded relation
 
 ## Milestones
 
-1. **Foundation** — package, API, web shell, domain schema, CI.
-2. **Run engine** — manifests, state, retries, checkpoint resume.
+1. **Foundation ✅** — package, API, web shell, domain schema, CI.
+2. **Run engine ✅** — SQLite state, bounded retries, JSON checkpoints, resume.
 3. **Theme Scan** — census, evidence graph, bottleneck scoring, report.
 4. **Anchor Scan** — 360° chain map, financial deep dive, neighbour ranking.
 5. **Cockpit** — run creation, progress, evidence review, opportunity radar.
