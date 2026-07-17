@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import os
 from datetime import UTC, date, datetime
-from pathlib import Path
 from uuid import uuid4
 
 from capexgraph import __version__
-from capexgraph.domain import PipelineStep, ResearchRun, RunMode, StepStatus
+from capexgraph.domain import PipelineStep, ResearchRun, RunMode
+from capexgraph.runtime.artifacts import atomic_write_text
+from capexgraph.runtime.store import RunStore, runs_dir
 
 PIPELINES: dict[RunMode, list[tuple[str, str, str]]] = {
     RunMode.THEME: [
@@ -36,10 +36,6 @@ PIPELINES: dict[RunMode, list[tuple[str, str, str]]] = {
 }
 
 
-def _runs_dir() -> Path:
-    return Path(os.getenv("CAPEXGRAPH_RUNS_DIR", "runs")).resolve()
-
-
 def create_run(
     mode: RunMode,
     subject: str,
@@ -53,11 +49,9 @@ def create_run(
             key=key,
             label=label,
             agent=agent,
-            status=StepStatus.COMPLETED if index == 0 else StepStatus.PENDING,
-            completed_at=now if index == 0 else None,
-            message="Run contract created" if index == 0 else "",
+            message="Awaiting execution",
         )
-        for index, (key, label, agent) in enumerate(PIPELINES[mode])
+        for key, label, agent in PIPELINES[mode]
     ]
     run = ResearchRun(
         id=run_id,
@@ -77,16 +71,16 @@ def create_run(
 
 
 def save_run(run: ResearchRun) -> ResearchRun:
-    run_dir = _runs_dir() / run.id
-    run_dir.mkdir(parents=True, exist_ok=True)
+    RunStore().save_run(run)
+    run_dir = runs_dir() / run.id
     payload = run.model_dump_json(indent=2)
-    (run_dir / "state.json").write_text(payload, encoding="utf-8")
-    (run_dir / "manifest.json").write_text(
+    atomic_write_text(run_dir / "state.json", payload)
+    atomic_write_text(
+        run_dir / "manifest.json",
         ResearchRun.model_validate_json(payload).model_dump_json(
             indent=2,
             include={"id", "mode", "subject", "market", "as_of_date", "created_at", "manifest"},
         ),
-        encoding="utf-8",
     )
     return run
 
@@ -94,7 +88,12 @@ def save_run(run: ResearchRun) -> ResearchRun:
 def load_run(run_id: str) -> ResearchRun | None:
     if not run_id or any(char in run_id for char in ("/", "\\", "..")):
         return None
-    path = _runs_dir() / run_id / "state.json"
+    stored = RunStore().load_run(run_id)
+    if stored is not None:
+        return stored
+    path = runs_dir() / run_id / "state.json"
     if not path.is_file():
         return None
-    return ResearchRun.model_validate_json(path.read_text(encoding="utf-8"))
+    run = ResearchRun.model_validate_json(path.read_text(encoding="utf-8"))
+    RunStore().save_run(run)
+    return run

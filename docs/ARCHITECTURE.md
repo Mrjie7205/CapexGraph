@@ -22,7 +22,9 @@ Stable Pydantic contracts for runs, companies, evidence, graph edges, candidates
 
 ### Workflow
 
-Resumable state machines coordinate research stages. The MVP begins with deterministic scaffolds; agent nodes and checkpoint persistence land incrementally.
+Resumable state machines coordinate research stages. SQLite is the system of record for runs and checkpoints; each step also writes a portable JSON artifact. An interrupted or failed run skips completed checkpoints when resumed.
+
+M2 uses deterministic runtime handlers to verify execution semantics. Theme, Chain, Evidence, Financial, and Research Manager agents replace those handlers in M3 without changing the persistence contract.
 
 ### Tools and providers
 
@@ -33,6 +35,15 @@ Tools own ticker identity, adjusted prices, financial calculations, official fil
 - FastAPI exposes research runs and evidence.
 - React/Vite provides the Research Cockpit.
 - CLI supports local and batch workflows.
+
+## Runtime lifecycle
+
+```text
+created → running → needs_review
+              ↘ failed → resume → running
+```
+
+Each execution receives a bounded automatic retry budget. Manual resume grants a fresh retry budget but preserves the lifetime attempt count and all completed checkpoints.
 
 ## Repository boundary
 
