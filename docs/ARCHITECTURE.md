@@ -5,7 +5,7 @@ CapexGraph separates probabilistic research from deterministic verification.
 ```text
 Web / CLI / Python API
         ↓
-Research workflow (Theme / Anchor / Catalyst)
+Research workflow (Theme / Anchor; Catalyst reserved)
         ↓
 Specialist agents sharing typed state
         ↓
@@ -28,6 +28,10 @@ Theme Scan plugs Theme, Universe, Chain, Evidence, Bottleneck, Debate, and Resea
 agents into the persistence contract. Anchor Scan substitutes identity, repricing-cause, neighbour,
 and financial-comparison specialists. Every agent returns a Pydantic model; deterministic code
 validates references and materializes domain objects and artifacts.
+
+Theme and Anchor are the implemented research workflows. Catalyst exists only as a reserved enum
+and pipeline scaffold so its future artifact shape can remain compatible; it must not fall through
+to runtime-only scaffold handlers and be presented as completed research.
 
 ### Tools and providers
 

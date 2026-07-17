@@ -1,0 +1,103 @@
+# CapexGraph agent guide
+
+This file applies to the entire repository. It is the automatic entry point for a new coding
+session. Do not assume access to prior chats, local Codex memory, or the private Serenity
+repository.
+
+## Mission
+
+CapexGraph is an evidence-first supply-chain investment research workspace. It helps a human
+analyst discover an opportunity, verify relationships, form a falsifiable judgment, and track
+whether that judgment plays out. It produces research priorities, not autonomous investment
+advice or trades.
+
+## Read before changing code
+
+Read these files in order:
+
+1. `docs/CURRENT_STATUS.md` — what is actually shipped and what is not;
+2. `ROADMAP.md` — the next approved priorities and acceptance criteria;
+3. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
+4. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
+5. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
+6. the workflow-specific document under `docs/`; and
+7. `CONTRIBUTING.md` — validation and documentation contract.
+
+When documentation and code disagree, verify the implementation and tests, fix the documentation
+in the same change, and record material design changes in `docs/DECISIONS.md`.
+
+## Non-negotiable boundaries
+
+- Agents judge; deterministic code verifies tickers, dates, prices, calculations, references, and
+  schema integrity.
+- A relationship is not a fact without provenance. Medium/high-confidence edges require evidence.
+- `captured` means bytes were downloaded and hashed. `reviewed` means a human approved the same
+  unchanged capture. Neither status makes every interpretation of a source true.
+- Product overlap is a `peer` relationship. Never promote it into a customer, supplier, or
+  beneficiary claim without direct evidence.
+- Golden fixtures are frozen, dated product demos. Never describe them as current research.
+- Keep CapexGraph runtime-independent from `serenity-bottleneck-hunter` and private Serenity data.
+  Ideas and fact-correctness fixes may be ported deliberately; imports, submodules, private paths,
+  and automatic synchronization are prohibited.
+- Do not add brokerage execution, autonomous portfolio actions, fabricated alpha, fake progress,
+  or placeholder research presented as complete.
+- Preserve the local-first, no-key golden path. Optional model/data providers may add setup, but
+  must not make the fixtures or core inspection workflow require an API key.
+- Treat remote evidence as hostile input and preserve the SSRF and download-boundary controls.
+
+## Repository map
+
+```text
+src/capexgraph/domain/       typed system-of-record contracts
+src/capexgraph/runtime/      SQLite runs, checkpoints, retries, resume
+src/capexgraph/research/     Theme and Anchor agent workflows
+src/capexgraph/providers/    fixture and optional model adapters
+src/capexgraph/tools/        evidence, identity, market, financial tools
+src/capexgraph/tracking/     snapshots, triggers, scorecards, stages
+src/capexgraph/api/          FastAPI application
+apps/web/                    React/Vite Research Cockpit
+docs/                        product, architecture, workflow, and status docs
+tests/                       executable behavior and handoff contract
+```
+
+`RunMode.CATALYST` is reserved and scaffolded, not implemented research functionality. Do not
+advertise it as shipped until its roadmap acceptance criteria and tests are complete.
+
+## Working method
+
+1. Start from an item in `ROADMAP.md` or a scoped user request.
+2. Inspect the actual code path and tests before proposing architecture.
+3. State any assumption that changes evidence semantics, provider trust, or repository boundaries.
+4. Implement the smallest end-to-end vertical slice with durable artifacts and failure states.
+5. Add or update tests proportional to risk.
+6. Update `docs/CURRENT_STATUS.md`, `CHANGELOG.md`, and relevant workflow docs when capability
+   changes. Update `ROADMAP.md` when an item moves or its acceptance criteria change.
+7. Run the required checks below before handoff.
+
+## Required checks
+
+```powershell
+.\.venv\Scripts\python.exe -m ruff check .
+.\.venv\Scripts\python.exe -m pytest
+Push-Location apps\web
+npm run build
+Pop-Location
+```
+
+For packaging or release changes, also build a wheel:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip wheel . --no-deps --wheel-dir dist
+```
+
+## Definition of done
+
+A change is not complete merely because an endpoint or UI shell exists. It is complete when:
+
+- the real user path works without editing implementation files;
+- state and artifacts survive restart where persistence is expected;
+- failure and resume behavior is visible;
+- evidence and confidence rules are enforced by code;
+- tests and production web build pass;
+- docs distinguish shipped behavior from planned behavior; and
+- the current-status and roadmap handoff remains accurate for the next session.
