@@ -1,8 +1,10 @@
+import json
 from datetime import date
 from typing import Annotated
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
@@ -20,6 +22,7 @@ from capexgraph.domain import (
 from capexgraph.providers import ProviderName
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import RunStore
+from capexgraph.runtime.store import runs_dir
 from capexgraph.tools import (
     EvidenceSourceRequest,
     TickerResolver,
@@ -60,6 +63,7 @@ class ExecuteRequest(BaseModel):
     until: str | None = None
     max_attempts: int = Field(default=2, ge=1, le=10)
     provider: ProviderName | None = None
+    background: bool = False
 
 
 class EvidenceCollectRequest(BaseModel):
@@ -157,6 +161,32 @@ def get_checkpoints(run_id: str) -> list[StepCheckpoint]:
     return RunStore().list_checkpoints(run_id)
 
 
+ARTIFACT_ALLOWLIST = {
+    "graph.json",
+    "evidence.json",
+    "financials.json",
+    "candidates.json",
+    "decision.json",
+    "manifest.json",
+}
+
+
+@app.get("/api/v1/runs/{run_id}/artifacts/{filename}")
+def get_run_artifact(run_id: str, filename: str) -> JSONResponse:
+    if load_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    if filename not in ARTIFACT_ALLOWLIST:
+        raise HTTPException(status_code=404, detail="Artifact is not exposed")
+    path = runs_dir() / run_id / filename
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found")
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as error:
+        raise HTTPException(status_code=409, detail="Artifact is invalid JSON") from error
+    return JSONResponse(payload)
+
+
 @app.post("/api/v1/runs/{run_id}/evidence/collect", response_model=Evidence)
 def collect_run_evidence(run_id: str, request: EvidenceCollectRequest) -> Evidence:
     try:
@@ -216,12 +246,50 @@ def resolve_ticker(query: Annotated[str, Query(min_length=1, max_length=80)]) ->
         raise HTTPException(status_code=404, detail=str(error)) from error
 
 
+def _background_execute(
+    run_id: str,
+    provider: ProviderName | None,
+    max_attempts: int,
+    until: str | None,
+    retry_failed: bool,
+) -> None:
+    run = load_run(run_id)
+    if run is None:
+        return
+    try:
+        build_executor_for_run(
+            run,
+            provider=provider,
+            max_attempts=max_attempts,
+        ).execute(run_id, until=until, retry_failed=retry_failed)
+    except Exception as error:  # noqa: BLE001 - persist background failures for the UI
+        current = load_run(run_id)
+        if current is not None:
+            current.status = RunStatus.FAILED
+            current.manifest["background_error"] = f"{type(error).__name__}: {error}"
+            save_run(current)
+
+
 @app.post("/api/v1/runs/{run_id}/execute", response_model=ResearchRun)
-def execute_run(run_id: str, request: ExecuteRequest) -> ResearchRun:
+def execute_run(
+    run_id: str,
+    request: ExecuteRequest,
+    background_tasks: BackgroundTasks,
+) -> ResearchRun:
     try:
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if request.background:
+            background_tasks.add_task(
+                _background_execute,
+                run_id,
+                request.provider,
+                request.max_attempts,
+                request.until,
+                False,
+            )
+            return run
         return build_executor_for_run(
             run,
             provider=request.provider,
@@ -237,11 +305,25 @@ def execute_run(run_id: str, request: ExecuteRequest) -> ResearchRun:
 
 
 @app.post("/api/v1/runs/{run_id}/resume", response_model=ResearchRun)
-def resume_run(run_id: str, request: ExecuteRequest) -> ResearchRun:
+def resume_run(
+    run_id: str,
+    request: ExecuteRequest,
+    background_tasks: BackgroundTasks,
+) -> ResearchRun:
     try:
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if request.background:
+            background_tasks.add_task(
+                _background_execute,
+                run_id,
+                request.provider,
+                request.max_attempts,
+                request.until,
+                True,
+            )
+            return run
         return build_executor_for_run(
             run,
             provider=request.provider,

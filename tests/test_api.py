@@ -121,3 +121,35 @@ async def test_create_and_execute_fixture_anchor_run(tmp_path, monkeypatch) -> N
         assert payload["manifest"]["anchor_node_id"] == "company-gigadevice"
         assert len(payload["candidates"]) == 3
         assert (tmp_path / payload["id"] / "financials.json").is_file()
+
+        artifact = await client.get(
+            f"/api/v1/runs/{payload['id']}/artifacts/decision.json"
+        )
+        assert artifact.status_code == 200
+        assert artifact.json()["research_status"] == "needs_review"
+
+
+@pytest.mark.anyio
+async def test_background_execute_is_pollable(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        created = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={
+                    "subject": "A股半导体硅片",
+                    "market": "CN",
+                    "provider": "fixture",
+                },
+            )
+        ).json()
+        queued = await client.post(
+            f"/api/v1/runs/{created['id']}/execute",
+            json={"provider": "fixture", "background": True},
+        )
+        assert queued.status_code == 200
+        polled = await client.get(f"/api/v1/runs/{created['id']}")
+        assert polled.json()["status"] == "needs_review"
