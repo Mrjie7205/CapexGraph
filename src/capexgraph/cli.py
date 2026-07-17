@@ -13,6 +13,7 @@ from rich.table import Table
 from capexgraph import __version__
 from capexgraph.domain import EvidenceKind, ResearchRun, RunMode, RunStatus
 from capexgraph.providers import ProviderName
+from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import RunStore
 from capexgraph.tools import (
@@ -25,6 +26,7 @@ from capexgraph.tools import (
     review_run_evidence,
 )
 from capexgraph.tools.financials import attach_financial_metrics
+from capexgraph.tracking import TrackingService, TrackingStage
 from capexgraph.workflows import create_run, load_run, save_run
 
 app = typer.Typer(
@@ -36,10 +38,16 @@ evidence_app = typer.Typer(help="Capture and review research evidence.", no_args
 ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
 market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
+tracking_app = typer.Typer(
+    help="Track candidates and evaluate forward evidence.", no_args_is_help=True
+)
+report_app = typer.Typer(help="Render portable research reports.", no_args_is_help=True)
 app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
 app.add_typer(financials_app, name="financials")
+app.add_typer(tracking_app, name="tracking")
+app.add_typer(report_app, name="report")
 console = Console()
 
 if sys.platform == "win32":
@@ -96,7 +104,7 @@ def _create(
 @app.command()
 def info() -> None:
     """Show runtime information."""
-    console.print(f"[bold]CapexGraph[/bold] {__version__} · evidence-first research · pre-alpha")
+    console.print(f"[bold]CapexGraph[/bold] {__version__} · evidence-first research · alpha")
 
 
 @app.command()
@@ -348,6 +356,129 @@ def financials_import(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(f"[green]Imported[/green] {len(metrics)} financial metrics")
+
+
+@tracking_app.command("add")
+def tracking_add(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    node_id: Annotated[str, typer.Argument(help="Candidate node ID")],
+    benchmark: Annotated[str, typer.Option("--benchmark")] = "000300.SH",
+    price: Annotated[float | None, typer.Option("--price", min=0.000001)] = None,
+    benchmark_price: Annotated[
+        float | None, typer.Option("--benchmark-price", min=0.000001)
+    ] = None,
+    as_of: Annotated[str | None, typer.Option("--as-of")] = None,
+    no_live: Annotated[bool, typer.Option("--no-live")] = False,
+) -> None:
+    """Add one run candidate to forward tracking."""
+    try:
+        item = TrackingService().track_run_candidate(
+            run_id,
+            node_id,
+            benchmark_ticker=benchmark,
+            call_date=date.fromisoformat(as_of) if as_of else None,
+            call_price=price,
+            call_benchmark_price=benchmark_price,
+            capture_live=not no_live,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Tracking[/green] {item.id} · {item.ticker} vs {item.benchmark_ticker}")
+
+
+@tracking_app.command("snapshot")
+def tracking_snapshot(
+    tracked_id: Annotated[str, typer.Argument(help="Tracked candidate ID")],
+    price: Annotated[float | None, typer.Option("--price", min=0.000001)] = None,
+    benchmark_price: Annotated[
+        float | None, typer.Option("--benchmark-price", min=0.000001)
+    ] = None,
+    as_of: Annotated[str | None, typer.Option("--as-of")] = None,
+    live: Annotated[bool, typer.Option("--live")] = False,
+) -> None:
+    """Capture a live or manual candidate/benchmark price pair."""
+    service = TrackingService()
+    try:
+        if live:
+            snapshot = service.capture_live_snapshot(tracked_id)
+        else:
+            if price is None or benchmark_price is None:
+                raise ValueError("Manual snapshot requires --price and --benchmark-price")
+            snapshot = service.add_snapshot(
+                tracked_id,
+                as_of_date=date.fromisoformat(as_of) if as_of else date.today(),
+                price=price,
+                benchmark_price=benchmark_price,
+            )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=snapshot.model_dump(mode="json"))
+
+
+@tracking_app.command("list")
+def tracking_list() -> None:
+    """Show forward scorecards with since-call alpha."""
+    table = Table(title="CapexGraph tracking scorecard")
+    table.add_column("ID")
+    table.add_column("Ticker")
+    table.add_column("Stage")
+    table.add_column("Return")
+    table.add_column("Benchmark")
+    table.add_column("Alpha")
+    table.add_column("Events")
+    for card in TrackingService().scoreboard():
+        latest = card.latest
+        table.add_row(
+            card.tracked.id,
+            card.tracked.ticker,
+            card.tracked.stage.value,
+            f"{latest.return_pct:+.2f}%" if latest else "—",
+            f"{latest.benchmark_return_pct:+.2f}%" if latest else "—",
+            f"{latest.alpha_pct:+.2f}%" if latest else "—",
+            str(len(card.events)),
+        )
+    console.print(table)
+
+
+@tracking_app.command("stage")
+def tracking_stage(
+    tracked_id: Annotated[str, typer.Argument()],
+    stage: Annotated[TrackingStage, typer.Argument()],
+) -> None:
+    """Move a candidate across the research stage board."""
+    try:
+        item = TrackingService().store.update_stage(tracked_id, stage)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"{item.id} · [bold]{item.stage.value}[/bold]")
+
+
+@tracking_app.command("ack")
+def tracking_ack(event_id: Annotated[int, typer.Argument(min=1)]) -> None:
+    """Acknowledge a fired structured trigger."""
+    try:
+        event = TrackingService().store.acknowledge_event(event_id)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"Acknowledged event {event.id} at {event.acknowledged_at}")
+
+
+@report_app.command("render")
+def report_render(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    output: Annotated[Path | None, typer.Option("--output", "-o")] = None,
+) -> None:
+    """Render a self-contained HTML research report."""
+    try:
+        path = render_run_report(run_id, output)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Rendered[/green] {path}")
 
 
 @app.command()

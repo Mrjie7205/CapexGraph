@@ -11,9 +11,9 @@ A new user can create a Theme Scan and an Anchor Scan, inspect grounded relation
 3. **Theme Scan core ✅** — structured agents, evidence graph, audit, bottleneck scoring, debate, decision artifacts, golden demo.
 4. **Live research tools ✅** — SSRF-safe web/PDF capture, content hashing, evidence review, ticker identity, no-key market snapshots, financial imports.
 5. **Anchor Scan ✅** — 360° chain map, financial deep dive, neighbour ranking.
-6. **Cockpit** — run execution, progress, graph/evidence review, opportunity radar.
-7. **Monitoring** — snapshots, structured triggers, invalidation, scorecard.
-8. **Release** — golden cases, Windows setup, documentation, report renderer.
+6. **Cockpit ✅** — run execution, progress, graph/evidence review, opportunity radar.
+7. **Monitoring ✅** — snapshots, structured triggers, invalidation, scorecard.
+8. **Release ✅** — golden cases, Windows setup, documentation, report renderer.
 
 ## Golden cases
 

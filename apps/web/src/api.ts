@@ -71,6 +71,30 @@ export interface DecisionArtifact {
   disclaimer: string;
 }
 
+export type TrackingStage = "research" | "watch" | "validated" | "triggered" | "invalidated" | "archived";
+
+export interface Scorecard {
+  tracked: {
+    id: string;
+    run_id: string;
+    node_id: string;
+    ticker: string;
+    label: string;
+    benchmark_ticker: string;
+    call_date: string;
+    stage: TrackingStage;
+  };
+  latest?: {
+    as_of_date: string;
+    return_pct: number;
+    benchmark_return_pct: number;
+    alpha_pct: number;
+  };
+  events: Array<{ id: number; metric: string; observed_value: number; acknowledged_at?: string }>;
+  snapshot_count: number;
+  days_tracked: number;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   if (!response.ok) {
@@ -133,4 +157,32 @@ export function reviewEvidence(
 
 export function getDecision(runId: string): Promise<DecisionArtifact> {
   return request(`/api/v1/runs/${runId}/artifacts/decision.json`);
+}
+
+export function listTracking(): Promise<Scorecard[]> {
+  return request("/api/v1/tracking");
+}
+
+export function trackCandidate(runId: string, nodeId: string): Promise<unknown> {
+  return request(`/api/v1/runs/${runId}/tracking`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ node_id: nodeId, capture_live: true }),
+  });
+}
+
+export function captureTrackingSnapshot(trackedId: string): Promise<unknown> {
+  return request(`/api/v1/tracking/${encodeURIComponent(trackedId)}/snapshots`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ capture_live: true }),
+  });
+}
+
+export function setTrackingStage(trackedId: string, stage: TrackingStage): Promise<unknown> {
+  return request(`/api/v1/tracking/${encodeURIComponent(trackedId)}/stage`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stage }),
+  });
 }

@@ -1,15 +1,21 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   createRun,
+  captureTrackingSnapshot,
   executeRun,
   getDecision,
   getRun,
   listRuns,
+  listTracking,
   reviewEvidence,
+  setTrackingStage,
+  trackCandidate,
   type DecisionArtifact,
   type Provider,
   type ResearchRun,
   type RunMode,
+  type Scorecard,
+  type TrackingStage,
 } from "./api";
 
 const FINAL_STATUSES = new Set(["needs_review", "completed", "failed", "cancelled"]);
@@ -90,6 +96,7 @@ function App() {
   const [runs, setRuns] = useState<ResearchRun[]>([]);
   const [selected, setSelected] = useState<ResearchRun | null>(null);
   const [decision, setDecision] = useState<DecisionArtifact | null>(null);
+  const [tracking, setTracking] = useState<Scorecard[]>([]);
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState("");
@@ -106,6 +113,7 @@ function App() {
 
   useEffect(() => {
     refreshRuns().catch(() => setError("API unavailable · run `capexgraph serve` first."));
+    listTracking().then(setTracking).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -203,9 +211,48 @@ function App() {
     }
   }
 
+  async function addToTracking(nodeId: string) {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      await trackCandidate(selected.id, nodeId);
+      setTracking(await listTracking());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Tracking failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function updateSnapshot(trackedId: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await captureTrackingSnapshot(trackedId);
+      setTracking(await listTracking());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Snapshot failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function moveStage(trackedId: string, stage: TrackingStage) {
+    try {
+      await setTrackingStage(trackedId, stage);
+      setTracking(await listTracking());
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Stage update failed");
+    }
+  }
+
   const completedSteps = selected?.pipeline.filter((step) => step.status === "completed").length ?? 0;
   const hasPending = selected?.pipeline.some((step) => ["pending", "failed"].includes(step.status)) ?? false;
   const nodes = new Map(selected?.nodes.map((node) => [node.id, node]) ?? []);
+  const trackedNodeIds = new Set(
+    tracking.filter((card) => card.tracked.run_id === selected?.id).map((card) => card.tracked.node_id),
+  );
 
   return (
     <main>
@@ -281,12 +328,20 @@ function App() {
 
         <article className="radar panel" id="radar">
           <div className="panel-title"><span>Research queue</span><b>{selected?.candidates.length ?? 0} CANDIDATES</b></div>
-          <div className="radar-head"><span>Symbol</span><span>Verdict</span><span>Confidence</span><span>Triggers</span></div>
-          {selected?.candidates.map((candidate) => { const node = nodes.get(candidate.node_id); return <div className="candidate-row" key={candidate.node_id}><div><strong>{node?.ticker ?? "—"}</strong><small>{node?.label ?? candidate.node_id}</small></div><span className={`verdict ${candidate.verdict}`}>{candidate.verdict}</span><span>{candidate.confidence}</span><b>{candidate.triggers.length}</b></div>; })}
+          <div className="radar-head"><span>Symbol</span><span>Verdict</span><span>Confidence</span><span>Track</span></div>
+          {selected?.candidates.map((candidate) => { const node = nodes.get(candidate.node_id); const isTracked = trackedNodeIds.has(candidate.node_id); return <div className="candidate-row" key={candidate.node_id}><div><strong>{node?.ticker ?? "—"}</strong><small>{node?.label ?? candidate.node_id}</small></div><span className={`verdict ${candidate.verdict}`}>{candidate.verdict}</span><span>{candidate.confidence}</span><button className="track-button" disabled={busy || isTracked} onClick={() => addToTracking(candidate.node_id)}>{isTracked ? "✓" : "+"}</button></div>; })}
           {selected && selected.candidates.length === 0 && <p className="empty-state">No candidates until the scoring or compare step completes.</p>}
           {!selected && <p className="empty-state">Research candidates will appear here.</p>}
           {decision && <div className="next-actions"><span>Next actions</span>{decision.next_actions.map((item) => <p key={item}>→ {item}</p>)}</div>}
         </article>
+      </section>
+
+      <section className="tracking-board panel" id="tracking">
+        <div className="panel-title"><span>Forward tracking / Stage board</span><b>{tracking.length} LIVE CARDS</b></div>
+        {tracking.length === 0 && <p className="empty-state">Track a candidate to establish its call price and benchmark baseline.</p>}
+        <div className="tracking-grid">
+          {tracking.map((card) => <article key={card.tracked.id}><div className="tracking-top"><span>{card.tracked.ticker}</span><select value={card.tracked.stage} onChange={(event) => moveStage(card.tracked.id, event.target.value as TrackingStage)}><option value="research">research</option><option value="watch">watch</option><option value="validated">validated</option><option value="triggered">triggered</option><option value="invalidated">invalidated</option><option value="archived">archived</option></select></div><h3>{card.tracked.label}</h3><div className="return-strip"><div><small>Return</small><strong>{card.latest ? `${card.latest.return_pct >= 0 ? "+" : ""}${card.latest.return_pct.toFixed(2)}%` : "—"}</strong></div><div><small>Benchmark</small><strong>{card.latest ? `${card.latest.benchmark_return_pct >= 0 ? "+" : ""}${card.latest.benchmark_return_pct.toFixed(2)}%` : "—"}</strong></div><div><small>Alpha</small><strong className={card.latest && card.latest.alpha_pct >= 0 ? "positive" : ""}>{card.latest ? `${card.latest.alpha_pct >= 0 ? "+" : ""}${card.latest.alpha_pct.toFixed(2)}%` : "—"}</strong></div></div><footer><span>{card.snapshot_count} snapshots · {card.events.length} events</span><button disabled={busy} onClick={() => updateSnapshot(card.tracked.id)}>Refresh prices</button></footer></article>)}
+        </div>
       </section>
 
       <footer><span>CapexGraph / local</span><p>Research infrastructure, not investment advice.</p><span>Evidence over narrative.</span></footer>

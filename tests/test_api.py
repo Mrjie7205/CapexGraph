@@ -153,3 +153,55 @@ async def test_background_execute_is_pollable(tmp_path, monkeypatch) -> None:
         assert queued.status_code == 200
         polled = await client.get(f"/api/v1/runs/{created['id']}")
         assert polled.json()["status"] == "needs_review"
+
+
+@pytest.mark.anyio
+async def test_tracking_and_report_endpoints(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        run = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={
+                    "subject": "A股半导体硅片",
+                    "market": "CN",
+                    "provider": "fixture",
+                    "execute": True,
+                },
+            )
+        ).json()
+        node_id = run["candidates"][0]["node_id"]
+        tracked = await client.post(
+            f"/api/v1/runs/{run['id']}/tracking",
+            json={
+                "node_id": node_id,
+                "call_date": "2025-04-29",
+                "call_price": 100,
+                "call_benchmark_price": 100,
+                "capture_live": False,
+            },
+        )
+        assert tracked.status_code == 200
+        tracked_id = tracked.json()["id"]
+
+        snapshot = await client.post(
+            f"/api/v1/tracking/{tracked_id}/snapshots",
+            json={
+                "as_of_date": "2025-05-29",
+                "price": 110,
+                "benchmark_price": 105,
+            },
+        )
+        assert snapshot.status_code == 200
+        assert snapshot.json()["alpha_pct"] == 5
+
+        scoreboard = await client.get("/api/v1/tracking")
+        assert scoreboard.status_code == 200
+        assert scoreboard.json()[0]["tracked"]["id"] == tracked_id
+
+        report = await client.get(f"/api/v1/runs/{run['id']}/report")
+        assert report.status_code == 200
+        assert "CapexGraph" in report.text

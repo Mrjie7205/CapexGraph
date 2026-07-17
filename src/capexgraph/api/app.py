@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
@@ -20,6 +20,7 @@ from capexgraph.domain import (
     TickerIdentity,
 )
 from capexgraph.providers import ProviderName
+from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import RunStore
 from capexgraph.runtime.store import runs_dir
@@ -31,6 +32,14 @@ from capexgraph.tools import (
     review_run_evidence,
 )
 from capexgraph.tools.financials import attach_financial_metric_items
+from capexgraph.tracking import (
+    Scorecard,
+    TrackedCandidate,
+    TrackingService,
+    TrackingSnapshot,
+    TrackingStage,
+    TriggerEvent,
+)
 from capexgraph.workflows import create_run, load_run, save_run
 
 app = FastAPI(
@@ -87,6 +96,26 @@ class FinancialMetricsRequest(BaseModel):
     items: list[FinancialMetric] = Field(min_length=1, max_length=5000)
 
 
+class TrackCandidateRequest(BaseModel):
+    node_id: str = Field(min_length=1)
+    benchmark_ticker: str = "000300.SH"
+    call_date: date | None = None
+    call_price: float | None = Field(default=None, gt=0)
+    call_benchmark_price: float | None = Field(default=None, gt=0)
+    capture_live: bool = True
+
+
+class TrackingSnapshotRequest(BaseModel):
+    as_of_date: date | None = None
+    price: float | None = Field(default=None, gt=0)
+    benchmark_price: float | None = Field(default=None, gt=0)
+    capture_live: bool = False
+
+
+class TrackingStageRequest(BaseModel):
+    stage: TrackingStage
+
+
 @app.get("/api/health")
 def health() -> dict[str, str | bool]:
     return {"ok": True, "name": "CapexGraph", "version": __version__}
@@ -97,7 +126,7 @@ def meta() -> dict[str, object]:
     return {
         "name": "CapexGraph",
         "version": __version__,
-        "status": "pre-alpha",
+        "status": "alpha",
         "modes": [mode.value for mode in RunMode],
     }
 
@@ -244,6 +273,93 @@ def resolve_ticker(query: Annotated[str, Query(min_length=1, max_length=80)]) ->
         return TickerResolver().resolve(query)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/tracking", response_model=TrackedCandidate)
+def track_run_candidate(run_id: str, request: TrackCandidateRequest) -> TrackedCandidate:
+    try:
+        return TrackingService().track_run_candidate(
+            run_id,
+            request.node_id,
+            benchmark_ticker=request.benchmark_ticker,
+            call_date=request.call_date,
+            call_price=request.call_price,
+            call_benchmark_price=request.call_benchmark_price,
+            capture_live=request.capture_live,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/tracking", response_model=list[Scorecard])
+def tracking_scoreboard() -> list[Scorecard]:
+    return TrackingService().scoreboard()
+
+
+@app.get("/api/v1/tracking/stages", response_model=dict[str, list[Scorecard]])
+def tracking_stage_board() -> dict[str, list[Scorecard]]:
+    return TrackingService().stage_board()
+
+
+@app.get("/api/v1/tracking/compare", response_model=dict[str, list[Scorecard]])
+def compare_tracked_runs() -> dict[str, list[Scorecard]]:
+    grouped: dict[str, list[Scorecard]] = {}
+    for card in TrackingService().scoreboard():
+        grouped.setdefault(card.tracked.run_id, []).append(card)
+    return grouped
+
+
+@app.post("/api/v1/tracking/{tracked_id}/snapshots", response_model=TrackingSnapshot)
+def add_tracking_snapshot(
+    tracked_id: str,
+    request: TrackingSnapshotRequest,
+) -> TrackingSnapshot:
+    service = TrackingService()
+    try:
+        if request.capture_live:
+            return service.capture_live_snapshot(tracked_id)
+        if request.price is None or request.benchmark_price is None:
+            raise ValueError("Manual snapshots require price and benchmark_price")
+        return service.add_snapshot(
+            tracked_id,
+            as_of_date=request.as_of_date or date.today(),
+            price=request.price,
+            benchmark_price=request.benchmark_price,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.patch("/api/v1/tracking/{tracked_id}/stage", response_model=TrackedCandidate)
+def update_tracking_stage(
+    tracked_id: str,
+    request: TrackingStageRequest,
+) -> TrackedCandidate:
+    try:
+        return TrackingService().store.update_stage(tracked_id, request.stage)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post("/api/v1/tracking/events/{event_id}/ack", response_model=TriggerEvent)
+def acknowledge_trigger_event(event_id: int) -> TriggerEvent:
+    try:
+        return TrackingService().store.acknowledge_event(event_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/v1/runs/{run_id}/report", response_class=HTMLResponse)
+def get_run_report(run_id: str) -> HTMLResponse:
+    try:
+        path = render_run_report(run_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    return HTMLResponse(path.read_text(encoding="utf-8"))
 
 
 def _background_execute(

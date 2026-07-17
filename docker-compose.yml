@@ -1,0 +1,15 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      CAPEXGRAPH_RUNS_DIR: /workspace/runs
+      CAPEXGRAPH_MODEL: ${CAPEXGRAPH_MODEL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+    volumes:
+      - capexgraph-runs:/workspace/runs
+    restart: unless-stopped
+
+volumes:
+  capexgraph-runs:
