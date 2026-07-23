@@ -1,0 +1,328 @@
+{
+  "fixture": {
+    "id": "golden-alphabet-q2-2026-ai-capex-v1",
+    "subject": "Alphabet Q2 2026 AI CapEx Transmission",
+    "curation_note": "Frozen first-party disclosure replay as of 2026-07-22. It validates research contracts, not live source discovery or autonomous analysis."
+  },
+  "outputs": {
+    "ThemeBoundaryOutput": {
+      "scope": "Alphabet's Q2 2026 disclosure as a demand-side anchor for AI infrastructure capital expenditure, covering only directly evidenced operating demand and infrastructure constraints.",
+      "investment_question": "Which infrastructure layers are directly supported as constrained or strategically important, and where must the system stop before naming external beneficiaries?",
+      "included_layers": [
+        "Google Cloud AI infrastructure demand",
+        "AI accelerator and server capacity",
+        "multi-site data-center networking",
+        "capital expenditure and cash-flow pressure"
+      ],
+      "excluded_topics": [
+        "Named external suppliers not established by the captured sources",
+        "Brokerage execution or personalized trade advice",
+        "Power and cooling vendor attribution without procurement evidence"
+      ],
+      "capex_drivers": [
+        "Google Cloud revenue growth and backlog",
+        "Model API token growth",
+        "Management's statement that AI demand remains supply constrained",
+        "Scaling accelerators across multiple data-center sites"
+      ],
+      "research_questions": [
+        "Does the disclosure prove a capacity bottleneck rather than merely high spending?",
+        "Which infrastructure layers are explicitly described by management?",
+        "Can any named public supplier relationship be established from these sources alone?",
+        "How much of headline EPS reflects operating performance versus equity-security gains?"
+      ]
+    },
+    "PlayerCensusOutput": {
+      "nodes": [
+        {
+          "id": "company-alphabet",
+          "label": "Alphabet Class A",
+          "node_type": "company",
+          "ticker": "GOOGL",
+          "market": "NASDAQ",
+          "layer": "Hyperscale cloud and AI platform"
+        },
+        {
+          "id": "demand-enterprise-ai",
+          "label": "Enterprise AI demand",
+          "node_type": "demand_segment",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "AI infrastructure and solutions demand"
+        },
+        {
+          "id": "bottleneck-ai-compute",
+          "label": "AI accelerator and server capacity",
+          "node_type": "bottleneck_layer",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "Compute infrastructure"
+        },
+        {
+          "id": "bottleneck-datacenter-network",
+          "label": "Multi-site data-center networking",
+          "node_type": "bottleneck_layer",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "Network and data-center infrastructure"
+        },
+        {
+          "id": "hypothesis-power-cooling",
+          "label": "Power and cooling capacity",
+          "node_type": "unverified_hypothesis",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "Data-center physical infrastructure"
+        }
+      ],
+      "coverage_notes": [
+        "The census deliberately uses demand and bottleneck layers instead of inventing a vendor list.",
+        "Alphabet is the disclosed spending and demand anchor; this is not a complete AI infrastructure universe."
+      ],
+      "unresolved_entities": [
+        "External accelerator, server, optical, electrical, cooling, and construction vendors require separate procurement or supplier evidence.",
+        "The captured sources name available accelerator platforms but do not establish a complete supplier relationship map."
+      ]
+    },
+    "ThemeGraphOutput": {
+      "additional_nodes": [],
+      "evidence": [
+        {
+          "id": "alphabet-q2-2026-earnings-release",
+          "title": "Alphabet Announces Second Quarter 2026 Results",
+          "kind": "filing",
+          "source_url": "https://s206.q4cdn.com/479360582/files/doc_financials/2026/q2/2026q2-alphabet-earnings-release.pdf",
+          "published_at": "2026-07-22",
+          "excerpt": "Alphabet reported $119.8 billion of revenue, $24.8 billion of Google Cloud revenue, $44.9 billion of purchases of property and equipment, and negative $5.9 billion of quarterly free cash flow."
+        },
+        {
+          "id": "alphabet-q2-2026-ceo-remarks",
+          "title": "Q2 2026 earnings call: Remarks from our CEO",
+          "kind": "transcript",
+          "source_url": "https://blog.google/company-news/inside-google/message-ceo/alphabet-earnings-q2-2026/",
+          "published_at": "2026-07-22",
+          "excerpt": "Management said Cloud revenue grew 82%, backlog reached $514 billion, model demand remained supply constrained, and Virgo Network connects accelerators across multiple data-center sites."
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-alphabet-serves-ai-demand",
+          "source": "company-alphabet",
+          "target": "demand-enterprise-ai",
+          "relationship": "supplies",
+          "product": "Google Cloud AI infrastructure and AI solutions",
+          "basis": "The release and CEO remarks attribute Cloud growth to enterprise AI infrastructure and solutions demand.",
+          "confidence": "high",
+          "evidence_ids": [
+            "alphabet-q2-2026-earnings-release",
+            "alphabet-q2-2026-ceo-remarks"
+          ]
+        },
+        {
+          "id": "edge-alphabet-depends-compute",
+          "source": "company-alphabet",
+          "target": "bottleneck-ai-compute",
+          "relationship": "depends_on",
+          "product": "AI accelerators and server capacity",
+          "basis": "Management disclosed rapidly rising model usage and explicitly described demand as supply constrained.",
+          "confidence": "high",
+          "evidence_ids": [
+            "alphabet-q2-2026-ceo-remarks"
+          ]
+        },
+        {
+          "id": "edge-compute-depends-network",
+          "source": "bottleneck-ai-compute",
+          "target": "bottleneck-datacenter-network",
+          "relationship": "depends_on",
+          "product": "Multi-site accelerator interconnect",
+          "basis": "Management described Virgo Network as connecting up to a million accelerators across multiple data-center sites.",
+          "confidence": "high",
+          "evidence_ids": [
+            "alphabet-q2-2026-ceo-remarks"
+          ]
+        }
+      ],
+      "graph_gaps": [
+        "The earnings release does not break capital expenditure into accelerators, servers, network, buildings, power, or cooling.",
+        "No captured source establishes named external suppliers or the revenue exposure of potential beneficiaries.",
+        "Power and cooling are economically plausible dependencies but remain unconnected hypotheses in this evidence pack."
+      ]
+    },
+    "EvidenceAuditOutput": {
+      "findings": [
+        {
+          "edge_id": "edge-alphabet-serves-ai-demand",
+          "verdict": "accept",
+          "rationale": "First-party financial and management disclosures directly support Cloud AI demand and service delivery."
+        },
+        {
+          "edge_id": "edge-alphabet-depends-compute",
+          "verdict": "accept",
+          "rationale": "Management directly stated that model demand is supply constrained and described the accelerator portfolio."
+        },
+        {
+          "edge_id": "edge-compute-depends-network",
+          "verdict": "accept",
+          "rationale": "Management directly tied the network design to connecting accelerators across multiple data-center sites."
+        }
+      ],
+      "source_warnings": [
+        "Backlog is a committed-demand indicator, not current-period revenue or supplier orders.",
+        "Capital expenditure is reported in aggregate and cannot be allocated to individual infrastructure layers from these sources.",
+        "A product or platform mention is not sufficient evidence of a customer-supplier relationship or beneficiary revenue."
+      ],
+      "audit_summary": "The disclosure supports strong AI demand, a compute-capacity constraint, and network scaling. It does not support a named external beneficiary graph."
+    },
+    "BottleneckScoreOutput": {
+      "candidates": [
+        {
+          "node_id": "bottleneck-ai-compute",
+          "verdict": "watch",
+          "thesis": "The strongest directly evidenced bottleneck is AI compute capacity: token usage is rising and management still describes demand as supply constrained.",
+          "archetypes": [
+            "Capacity bottleneck",
+            "Accelerator and server scaling"
+          ],
+          "risks": [
+            "Efficiency improvements can reduce compute required per query",
+            "Aggregate capital expenditure does not disclose vendor allocation",
+            "Capacity additions may catch up with demand"
+          ],
+          "invalidation": [
+            "Management no longer reports supply constraints while backlog and token growth decelerate",
+            "Capital expenditure remains high without corresponding Cloud growth or utilization"
+          ],
+          "triggers": [
+            {
+              "metric": "model_api_tokens_per_minute",
+              "operator": ">=",
+              "value": 22000000000,
+              "note": "Q2 2026 disclosed baseline"
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "node_id": "bottleneck-datacenter-network",
+          "verdict": "watch",
+          "thesis": "Connecting accelerator fleets across multiple data-center sites makes network scale decision-relevant, but no supplier or spending split is yet evidenced.",
+          "archetypes": [
+            "Scale-out network",
+            "Multi-site data-center fabric"
+          ],
+          "risks": [
+            "Internal architecture may not translate into an external public-company opportunity",
+            "The disclosure lacks network-specific capital expenditure",
+            "Vendor concentration and product mix are unknown"
+          ],
+          "invalidation": [
+            "Network scaling is not mentioned in subsequent disclosures",
+            "Accelerator deployment grows without corresponding interconnect investment evidence"
+          ],
+          "triggers": [],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-alphabet",
+          "verdict": "watch",
+          "thesis": "Cloud demand and operating income accelerated, but the quarter also demonstrates the cash-flow cost of capacity expansion and a headline EPS distorted by equity-security gains.",
+          "archetypes": [
+            "Demand anchor",
+            "Self-funded hyperscaler"
+          ],
+          "risks": [
+            "Free cash flow pressure from capital expenditure",
+            "Headline earnings distorted by non-operating equity gains",
+            "Returns on infrastructure spending may lag deployment"
+          ],
+          "invalidation": [
+            "Cloud growth and backlog decelerate while capital expenditure remains elevated",
+            "Operating returns fail to offset rising depreciation and infrastructure costs"
+          ],
+          "triggers": [
+            {
+              "metric": "free_cash_flow",
+              "operator": "<",
+              "value": 0,
+              "note": "Q2 2026 free cash flow was negative"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ],
+      "ranking_method": "Rank direct evidence of constraint first, then infrastructure dependence, then the spending anchor. No vendor, valuation, or price-momentum ranking is attempted.",
+      "data_gaps": [
+        "Capital expenditure split by equipment and facility category",
+        "Named vendor procurement and supplier revenue exposure",
+        "Deployment lead times, utilization, pricing, and incremental returns",
+        "Power, cooling, optical, storage, and construction evidence"
+      ]
+    },
+    "DebateOutput": {
+      "reviews": [
+        {
+          "node_id": "bottleneck-ai-compute",
+          "bull_case": [
+            "Supply-constrained demand and rapid token growth support continued capacity additions."
+          ],
+          "bear_case": [
+            "Model and hardware efficiency gains may weaken the link between token growth and hardware spending."
+          ],
+          "unresolved_questions": [
+            "Which accelerator and server categories receive the incremental capital expenditure?"
+          ]
+        },
+        {
+          "node_id": "bottleneck-datacenter-network",
+          "bull_case": [
+            "Multi-site accelerator fabrics become more important as clusters scale."
+          ],
+          "bear_case": [
+            "The architecture may be internally designed and the disclosed evidence gives no investable vendor exposure."
+          ],
+          "unresolved_questions": [
+            "What proportion of infrastructure capital expenditure is directed to network equipment and optical links?"
+          ]
+        },
+        {
+          "node_id": "company-alphabet",
+          "bull_case": [
+            "Cloud revenue and operating income growth show measurable monetization of AI infrastructure."
+          ],
+          "bear_case": [
+            "Negative quarterly free cash flow and a large non-operating equity gain complicate the headline earnings signal."
+          ],
+          "unresolved_questions": [
+            "How quickly will deployed infrastructure translate into durable free cash flow and returns on capital?"
+          ]
+        }
+      ],
+      "cross_candidate_observations": [
+        "The disclosure validates infrastructure demand more strongly than it validates any external supplier.",
+        "A spending increase is not enough to rank beneficiaries without procurement, product-mix, and revenue-exposure evidence."
+      ]
+    },
+    "DecisionOutput": {
+      "research_status": "needs_review",
+      "summary": "Alphabet Q2 2026 validates AI compute capacity and multi-site networking as research priorities, while explicitly stopping before named supplier attribution. Alphabet itself is a demand anchor whose operating strength must be separated from cash-flow pressure and the equity-gain distortion.",
+      "ranked_node_ids": [
+        "bottleneck-ai-compute",
+        "bottleneck-datacenter-network",
+        "company-alphabet"
+      ],
+      "limitations": [
+        "This is a frozen, human-curated replay of first-party materials, not autonomous live-source discovery.",
+        "The fixture validates schemas and evidence discipline but does not prove that a model can reproduce the judgment.",
+        "No named external supplier relationship is established by the two captured sources.",
+        "Imported financial facts are stored by the current system but are not yet automatically injected into Theme Scan."
+      ],
+      "next_actions": [
+        "Acquire filing-derived capital expenditure, depreciation, Cloud revenue, operating income, backlog, and free-cash-flow time series.",
+        "Search separate first-party procurement, supplier, and product disclosures before adding named beneficiaries.",
+        "Add official-source discovery and financial-fact context to the live non-fixture workflow.",
+        "Track whether supply-constraint language, Cloud backlog, and free cash flow change in subsequent quarters."
+      ]
+    }
+  }
+}

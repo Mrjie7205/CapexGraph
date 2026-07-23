@@ -9,3 +9,5 @@ ticker,name,market,exchange,currency,aliases,source_url
 688416.SH,恒烁股份,CN,SSE STAR,CNY,恒烁,http://www.sse.com.cn/assortment/stock/list/info/company/index.shtml?COMPANY_CODE=688416
 002371.SZ,北方华创,CN,SZSE,CNY,北方华创科技,https://www.szse.cn/certificate/individual/index.html?code=002371
 688019.SH,安集科技,CN,SSE STAR,CNY,安集,http://www.sse.com.cn/assortment/stock/list/info/company/index.shtml?COMPANY_CODE=688019
+GOOGL,Alphabet Class A,US,NASDAQ,USD,Alphabet Class A|Google Class A,https://www.sec.gov/edgar/browse/?CIK=1652044
+GOOG,Alphabet Class C,US,NASDAQ,USD,Alphabet|Alphabet Inc.|Google|Alphabet Class C,https://www.sec.gov/edgar/browse/?CIK=1652044

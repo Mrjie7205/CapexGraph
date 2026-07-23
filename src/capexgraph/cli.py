@@ -163,6 +163,19 @@ def demo_anchor() -> None:
     )
 
 
+@app.command("demo-alphabet-q2")
+def demo_alphabet_q2() -> None:
+    """Replay the frozen Alphabet Q2 2026 AI CapEx acceptance case."""
+    _create(
+        RunMode.THEME,
+        "Alphabet Q2 2026 AI CapEx Transmission",
+        "US",
+        "2026-07-22",
+        True,
+        ProviderName.FIXTURE,
+    )
+
+
 @app.command("run")
 def run_command(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],

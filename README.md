@@ -48,13 +48,16 @@ recommendations or execute trades.
 .\.venv\Scripts\python.exe -m capexgraph.cli info
 .\.venv\Scripts\python.exe -m capexgraph.cli demo
 .\.venv\Scripts\python.exe -m capexgraph.cli demo-anchor
+.\.venv\Scripts\python.exe -m capexgraph.cli demo-alphabet-q2
 .\.venv\Scripts\python.exe -m capexgraph.cli serve
 ```
 
 API documentation is available at `http://127.0.0.1:8000/docs`.
 
-The two demo commands need no API key. They execute frozen, public-source evidence packs and are
-reproducible product demos, not current investment reports.
+The demo commands need no API key. They execute frozen, public-source evidence packs and are
+reproducible product demos, not current investment reports. `demo-alphabet-q2` replays the dated
+Alphabet Q2 2026 AI CapEx acceptance case; its live-capture baseline and known gaps are documented
+under `cases/alphabet_q2_2026/`.
 
 ### Optional OpenAI provider
 
@@ -103,6 +106,7 @@ and portable. Set `CAPEXGRAPH_STATE_DB` to move the database.
 # Research
 capexgraph theme "A股半导体硅片" --provider fixture --execute
 capexgraph anchor "603986" --provider fixture --execute
+capexgraph demo-alphabet-q2
 capexgraph run <run-id> --provider openai --until graph
 capexgraph resume <run-id>
 

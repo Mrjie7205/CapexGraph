@@ -1,0 +1,12 @@
+ticker,metric,period_end,value,unit,source_evidence_id
+GOOGL,revenue,2026-06-30,119796,USD_million,alphabet-q2-2026-earnings-release
+GOOGL,revenue_yoy,2026-06-30,24,percent,alphabet-q2-2026-earnings-release
+GOOGL,google_cloud_revenue,2026-06-30,24768,USD_million,alphabet-q2-2026-earnings-release
+GOOGL,google_cloud_revenue_yoy,2026-06-30,82,percent,alphabet-q2-2026-earnings-release
+GOOGL,google_cloud_operating_income,2026-06-30,8814,USD_million,alphabet-q2-2026-earnings-release
+GOOGL,capital_expenditures,2026-06-30,44924,USD_million,alphabet-q2-2026-earnings-release
+GOOGL,free_cash_flow,2026-06-30,-5855,USD_million,alphabet-q2-2026-earnings-release
+GOOGL,equity_securities_gain,2026-06-30,99031,USD_million,alphabet-q2-2026-earnings-release
+GOOGL,equity_gain_eps_effect,2026-06-30,6.26,USD_per_share,alphabet-q2-2026-earnings-release
+GOOGL,cloud_backlog,2026-06-30,514000,USD_million,alphabet-q2-2026-ceo-remarks
+GOOGL,model_api_tokens_per_minute,2026-06-30,22000000000,tokens,alphabet-q2-2026-ceo-remarks

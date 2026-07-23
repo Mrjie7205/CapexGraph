@@ -1,9 +1,9 @@
 # Current status
 
-Last verified: 2026-07-17  
-Release: `v0.2.0` alpha  
-Main release commit: `ca2fe8f`  
-Next target: `v0.3 — Trustworthy live research`
+- Last verified: 2026-07-23
+- Release: `v0.2.0` alpha
+- Main release commit: `ca2fe8f`
+- Next target: `v0.3 — Trustworthy live research`
 
 This file is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
@@ -20,6 +20,21 @@ substantial change, and update it in the same pull request whenever shipped capa
 - dynamic run graph, evidence ledger, candidate queue, and decision display;
 - tracked call/benchmark baselines, subsequent snapshots, alpha, trigger events, and stage board;
 - self-contained HTML reports, Windows bootstrap, Docker configuration, and wheel release.
+
+## Unreleased acceptance work
+
+- added a dated Alphabet Q2 2026 AI CapEx frozen replay and first-party live-capture case;
+- added registry-backed `GOOGL` and `GOOG` identities;
+- preserved captured hash/review metadata when deterministic replay reuses the same evidence
+  identity; and
+- recorded the live baseline and remaining defects in
+  `cases/alphabet_q2_2026/ACCEPTANCE_REPORT.md`.
+
+This does not complete the v0.3 live vertical slice. Source discovery, automatic filing extraction,
+financial-fact prompt/report integration, and autonomous non-fixture execution remain open.
+
+The unreleased acceptance work is verified with Ruff, 35 passing Python tests, and a production
+Vite build.
 
 ## Verified at v0.2.0
 
