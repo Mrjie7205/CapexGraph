@@ -1,29 +1,28 @@
-# Alphabet Q2 2026 live acceptance case
+# Alphabet 2026年Q2实时验收案例
 
-This case exercises CapexGraph against a newly released, non-fixture disclosure.
+本案例使用刚发布的非Fixture公司披露，检验CapexGraph的真实工作路径。
 
-See `ACCEPTANCE_REPORT.md` for the first live baseline, observed defects, and research outcome.
+首次实时基线、已发现缺口和研究结论见`ACCEPTANCE_REPORT.md`。
 
-Subject:
+研究主题：
 
 ```text
-Alphabet Q2 2026 AI CapEx Transmission
+Alphabet 2026年Q2 AI资本开支传导
 ```
 
-The evidence pack contains only first-party Alphabet/Google materials. The normalized financial
-facts are transcribed from those materials and retain an evidence ID. The case is intended to test:
+证据包只包含Alphabet和Google一手材料。标准化财务指标均由这些材料转录，并保留
+证据ID。案例主要检验：
 
-- public PDF/HTML capture, hashing, and review;
-- period-, unit-, and evidence-linked financial facts;
-- separation of operating results from the large equity-securities gain;
-- Theme Scan mapping from AI infrastructure demand to bottleneck layers without inventing named
-  suppliers; and
-- honest failure states for missing provider configuration and unimplemented Catalyst Scan.
+- 公共PDF/HTML采集、哈希和审核；
+- 带期间、单位与来源的财务指标；
+- 主营经营表现与巨额股权证券收益的分离；
+- Theme Scan能否从AI基础设施需求映射到瓶颈层，同时避免虚构具名供应商；
+- 模型配置缺失和Catalyst Scan尚未实现时，系统能否如实暴露失败状态。
 
-Create the live run:
+创建实时运行：
 
 ```powershell
-$subject = "Alphabet Q2 2026 AI CapEx Transmission"
+$subject = "Alphabet 2026年Q2 AI资本开支传导"
 capexgraph theme $subject --market US --as-of 2026-07-22
 capexgraph evidence pack <run-id> .\cases\alphabet_q2_2026\evidence_pack.json
 capexgraph evidence review <run-id> alphabet-q2-2026-earnings-release
@@ -31,13 +30,12 @@ capexgraph evidence review <run-id> alphabet-q2-2026-ceo-remarks
 capexgraph financials import <run-id> .\cases\alphabet_q2_2026\financial_metrics.csv
 ```
 
-Run the no-key, deterministic replay:
+运行无需API Key的中文确定性回放：
 
 ```powershell
 capexgraph demo-alphabet-q2
 ```
 
-Running Theme Scan still requires an explicit structured-output provider. The current OpenAI
-provider requires `OPENAI_API_KEY` and `CAPEXGRAPH_MODEL`; it does not discover sources itself.
-This acceptance case must not be advertised as a completed model-generated report when those
-requirements are absent.
+Theme Scan的非Fixture执行仍需要明确的结构化输出Provider。当前OpenAI Provider要求
+配置`OPENAI_API_KEY`和`CAPEXGRAPH_MODEL`，并且不会自主发现信源。在没有完成这些
+条件时，不得把该案例描述成模型自主生成的实时报告。

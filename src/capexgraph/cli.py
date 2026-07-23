@@ -168,7 +168,7 @@ def demo_alphabet_q2() -> None:
     """Replay the frozen Alphabet Q2 2026 AI CapEx acceptance case."""
     _create(
         RunMode.THEME,
-        "Alphabet Q2 2026 AI CapEx Transmission",
+        "Alphabet 2026年Q2 AI资本开支传导",
         "US",
         "2026-07-22",
         True,

@@ -7,6 +7,7 @@ import httpx
 
 from capexgraph.domain import EvidenceStatus, RunMode, RunStatus
 from capexgraph.providers import ProviderName
+from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.tools.evidence import (
     EvidenceCollector,
@@ -20,7 +21,7 @@ from capexgraph.workflows import create_run
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE_DIR = ROOT / "cases" / "alphabet_q2_2026"
-SUBJECT = "Alphabet Q2 2026 AI CapEx Transmission"
+SUBJECT = "Alphabet 2026年Q2 AI资本开支传导"
 
 
 def public_resolver(*_args):
@@ -79,8 +80,9 @@ def test_alphabet_q2_frozen_replay_preserves_evidence_boundaries(
     assert power_edges == []
 
     decision = json.loads((tmp_path / run.id / "decision.json").read_text(encoding="utf-8"))
-    assert "not yet automatically injected" in " ".join(decision["limitations"])
-    assert "No named external supplier relationship" in " ".join(decision["limitations"])
+    limitations = " ".join(decision["limitations"])
+    assert "尚未自动注入Theme Scan推理上下文" in limitations
+    assert "没有建立任何具名外部供应商关系" in limitations
 
 
 def test_alphabet_q2_capture_review_financials_and_replay(
@@ -117,6 +119,13 @@ def test_alphabet_q2_capture_review_financials_and_replay(
     assert all(
         edge.metadata["reviewed_sources"] is True for edge in completed.edges
     )
+    report_path = render_run_report(completed.id)
+    report = report_path.read_text(encoding="utf-8")
+    assert '<html lang="zh-CN">' in report
+    assert "AI加速器与服务器容量" in report
+    assert "04 / 财务与经营指标" in report
+    assert "Google Cloud收入同比" in report
+    assert "仅供研究和教育，不构成投资建议。" in report
 
 
 def test_alphabet_ticker_identity_is_registry_backed() -> None:

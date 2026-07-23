@@ -29,7 +29,7 @@ The run produces:
 ### Fixture
 
 `--provider fixture` accepts the golden semiconductor-wafer subject and the dated
-`Alphabet Q2 2026 AI CapEx Transmission` acceptance subject. Their public sources and expected
+`Alphabet 2026年Q2 AI资本开支传导` acceptance subject. Their public sources and expected
 outputs were manually curated, so audited edges may retain medium or high confidence. The Alphabet
 case additionally verifies that a newly captured source can retain its hash and review state when
 the deterministic replay proposes the same stable evidence identity.

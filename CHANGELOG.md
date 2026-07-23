@@ -15,6 +15,8 @@ All notable changes to CapexGraph are documented here.
   the same stable evidence identity;
 - added frozen-response integration coverage that prevents aggregate CapEx or product mentions
   from becoming unsupported named-supplier claims.
+- added Chinese report localization for Chinese subjects, including workflow labels, evidence
+  states, confidence, financial metrics, units, risks, limitations, and disclaimers.
 
 ## 0.2.0 — 2026-07-17
 

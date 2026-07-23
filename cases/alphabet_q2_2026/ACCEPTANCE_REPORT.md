@@ -1,137 +1,125 @@
-# Alphabet Q2 2026 acceptance report
+# Alphabet 2026年Q2系统验收报告
 
-Run date: 2026-07-23  
-Disclosure date: 2026-07-22  
-Live run ID: `20260723-theme-89e5570f`  
-Subject: `Alphabet Q2 2026 AI CapEx Transmission`
+- 运行日期：2026-07-23
+- 财报发布日期：2026-07-22
+- 首次实时运行ID：`20260723-theme-89e5570f`
+- 中文报告运行ID：`20260723-theme-64cf6c2d`
+- 研究主题：`Alphabet 2026年Q2 AI资本开支传导`
 
-## Outcome
+## 验收结论
 
-The case passed CapexGraph's evidence, provenance, financial-import, deterministic replay, and
-market-snapshot paths. It did not pass as an autonomous live research run.
+本案例通过了CapexGraph的证据采集、来源追溯、财务指标导入、确定性回放和市场快照
+链路，但尚未通过“自主实时研究”验收。
 
-The completed replay contains:
+完成后的中文回放包含：
 
-- 2 reviewed first-party disclosures and 1 captured market-data source;
-- 11 normalized, evidence-linked financial and operating metrics;
-- 5 nodes, 3 audited edges, and 3 research-priority candidates;
-- no named external supplier claim; and
-- a `needs_review` decision rather than a buy/sell output.
+- 2份已审核的一手披露和1份已采集的市场数据；
+- 11项带证据关联的财务与经营指标；
+- 5个节点、3条已审计关系和3个研究优先对象；
+- 没有任何缺乏证据的具名外部供应商关系；
+- 最终状态为`needs_review`，而不是买入或卖出结论。
 
-The strongest evidence-backed result is that AI accelerator/server capacity and multi-site
-data-center networking are research-priority bottleneck layers. The two captured disclosures do
-not support attributing Alphabet's capital expenditure to named external beneficiaries.
+现有证据最充分地支持两个研究方向：AI加速器与服务器容量、跨数据中心网络。两份
+Alphabet一手材料不足以将资本开支进一步归因到具名外部受益公司。
 
-## Evidence captured
+## 已采集证据
 
-| Evidence | Status | SHA-256 |
+| 证据 | 状态 | SHA-256 |
 |---|---|---|
-| Alphabet Q2 2026 earnings release | reviewed | `65f35a2e9c287112121f736321c7526d603ba8e0dae27acac56c7d7357602aa8` |
-| Q2 2026 CEO earnings-call remarks | reviewed | `4c3e3618cac3905c365788f120645a77796421fafd0232b2905d3d4cc92a2562` |
-| GOOGL Yahoo Chart snapshot | captured | `fe02d1ccca910fc47a029b49a5456c7aa22e136d121776961312a3792a4ec044` |
+| Alphabet 2026年第二季度财报 | 已审核 | `65f35a2e9c287112121f736321c7526d603ba8e0dae27acac56c7d7357602aa8` |
+| Alphabet 2026年Q2财报会CEO发言 | 已审核 | `4c3e3618cac3905c365788f120645a77796421fafd0232b2905d3d4cc92a2562` |
+| GOOGL Yahoo Chart行情快照 | 已采集 | `fe02d1ccca910fc47a029b49a5456c7aa22e136d121776961312a3792a4ec044` |
 
-The live disclosure capture required a one-command local environment override because this Codex
-desktop network resolves public hosts into the reserved `198.18.0.0/15` range. The default SSRF
-guard correctly rejects that range. This is an environment-compatibility intervention, not a
-reason to weaken the default protection.
+本次Codex桌面环境会把公共域名解析到保留地址段`198.18.0.0/15`，因此实时采集时使用了
+一次性的本地环境覆盖。CapexGraph默认SSRF防护拒绝该地址段是正确行为，不应为了适配
+当前环境而放松默认安全边界。
 
-## Financial integrity checks
+## 财务完整性检查
 
-The normalized import correctly preserved, among other facts:
+系统正确保存了以下关键指标：
 
-- revenue: USD 119.796 billion;
-- Google Cloud revenue: USD 24.768 billion, up 82% year over year;
-- purchases of property and equipment: USD 44.924 billion;
-- quarterly free cash flow: negative USD 5.855 billion;
-- net equity-securities gain: USD 99.031 billion;
-- disclosed EPS effect from that gain: USD 6.26;
-- Cloud backlog: USD 514 billion; and
-- model API throughput: approximately 22 billion tokens per minute.
+- 营收：1197.96亿美元；
+- Google Cloud收入：247.68亿美元，同比增长82%；
+- 购置物业与设备：449.24亿美元；
+- 季度自由现金流：-58.55亿美元；
+- 股权证券净收益：990.31亿美元；
+- 股权收益对EPS的披露影响：6.26美元；
+- Cloud积压订单：5140亿美元；
+- 模型API吞吐量：约每分钟220亿Token。
 
-This case is particularly useful because it requires the research layer to separate operating
-momentum from the large non-operating equity gain.
+本案例的价值在于，它迫使研究层把主营经营改善与巨额非经营性股权收益分开，不能被
+9.11美元的表面EPS误导。
 
-## Baseline failures observed before adaptation
+## 最初基线暴露的问题
 
-| Path | Baseline result | Meaning |
+| 路径 | 首次结果 | 含义 |
 |---|---|---|
-| Supplied official URLs | pass after local network override | Capture, extraction, hash, and review work |
-| Normalized financial CSV | pass | 11 evidence-linked facts persisted |
-| `GOOGL` identity | fail | Bundled registry was A-share-only |
-| Arbitrary live Theme execution | blocked | No model/API configuration was present |
-| Source discovery | unavailable | Current collector starts from supplied URLs |
-| Theme consumption of imported facts | unavailable | Facts persist but are not injected into Theme prompts |
-| Theme report financial display | fail | Report says no structured comparison for this mode |
-| Catalyst Scan | unavailable | It remains a reserved scaffold |
+| 指定官方URL采集 | 本地网络覆盖后通过 | 下载、文本提取、哈希和审核链路可用 |
+| 标准化财务CSV | 通过 | 11项带来源指标成功入库 |
+| `GOOGL`身份解析 | 失败 | 原内置注册表仅覆盖A股 |
+| 任意主题实时执行 | 阻塞 | 本机没有模型和API配置 |
+| 官方信源发现 | 不可用 | 当前采集器必须从用户提供的URL开始 |
+| Theme Scan使用财务指标 | 不可用 | 指标已持久化，但尚未注入推理上下文 |
+| Catalyst Scan | 不可用 | 仍是保留脚手架 |
 
-Before the deterministic replay, the live run therefore contained two reviewed disclosures and
-11 financial facts, but zero nodes, edges, and candidates. That is the honest current live-system
-baseline.
+在确定性回放之前，实时运行已经拥有2份已审核披露和11项财务指标，但节点、关系和候选
+数量均为0。这是当前实时系统的真实基线。
 
-## Minimal adaptations made
+## 本次最小改进
 
-- Added registry-backed `GOOGL` and `GOOG` identities.
-- Added a dated `demo-alphabet-q2` frozen replay.
-- Allowed a captured evidence item to survive workflow replay when the fixture proposes the same
-  stable evidence identity. The captured hash, local path, and review state remain authoritative.
-- Added a frozen-response integration test covering capture, review, financial import, replay,
-  evidence preservation, and supplier-attribution restraint.
+- 增加有注册表依据的`GOOGL`和`GOOG`身份；
+- 增加`demo-alphabet-q2`中文冻结回放；
+- 当回放引用同一个稳定证据ID时，保留实时采集得到的哈希、本地文件和审核状态；
+- 中文报告展示财务指标及其证据ID；
+- 增加冻结网络响应的集成测试，覆盖采集、审核、财务导入、回放、证据保留和供应商
+  幻觉约束。
 
-The replay is deliberately human-curated. It validates typed outputs, provenance rules, audit
-coverage, and the expected research boundary; it does not prove autonomous source discovery or
-model judgment.
+该回放由人工策划。它验证结构化输出、证据纪律和预期研究边界，但不证明模型已经能够
+自主发现材料并复现相同判断。
 
-## Research decision
+## 研究结论
 
-1. **AI accelerator and server capacity — high-priority watch.** Management explicitly describes
-   demand as supply constrained while model usage is increasing.
-2. **Multi-site data-center networking — medium-priority watch.** Management directly describes a
-   network designed to connect accelerators across multiple sites, but no spending split or vendor
-   exposure is disclosed.
-3. **Alphabet — operating anchor, not a clean headline-EPS signal.** Cloud growth and operating
-   income are strong, while free-cash-flow pressure and the equity gain must be analyzed separately.
-4. **Power and cooling — unresolved hypothesis.** Economically plausible, but intentionally left
-   without an edge because the captured sources do not provide sufficient evidence.
+1. **AI加速器与服务器容量——高优先级观察。** 管理层明确表示需求仍受供给约束，
+   同时Token使用量继续快速增长。
+2. **跨数据中心网络——中优先级观察。** 管理层直接描述了连接多个数据中心加速器的
+   网络架构，但没有披露网络资本开支拆分或供应商敞口。
+3. **Alphabet——经营锚点，不是干净的表面EPS信号。** Cloud增长和营业利润强劲，
+   但需要分别分析自由现金流压力和股权收益。
+4. **电力与冷却——待验证假设。** 产业逻辑合理，但两份材料没有提供足够证据，因此
+   系统没有为其建立关系边。
 
-The captured Yahoo snapshot for GOOGL as of 2026-07-22 was USD 342.09, with a 3-month return of
-3.01%, 16.28% below the six-month high, below its 50-day average, and classified as `range`.
-Yahoo Chart is an unofficial best-effort adapter, so this is workflow context rather than a
-licensed market-data record.
+GOOGL在2026-07-22的Yahoo快照价格为342.09美元，3个月涨幅3.01%，较6个月高点低
+16.28%，位于50日均线下方，系统阶段判断为`range`。Yahoo Chart属于非官方尽力而为
+的数据适配器，只能作为工作流上下文，不能替代持牌行情源。
 
-## Remaining product defects
+## 尚未解决的产品缺口
 
-### P0 — trustworthy live execution
+### P0：可信实时执行
 
-1. Add official-source discovery and a visible review queue.
-2. Allow a non-fixture Theme run to consume already reviewed evidence without requiring users to
-   handcraft a provider path.
-3. Record provider and coverage failures in the run and Cockpit instead of only returning a CLI
-   error.
+1. 增加官方信源发现和可见的审核队列。
+2. 让非Fixture主题直接消费已经审核的证据，而不是要求用户手工拼接Provider路径。
+3. 把Provider失败、覆盖不足和人工审核要求写入运行状态及Cockpit，而不只是返回CLI
+   错误。
 
-### P1 — filing-derived financial context
+### P1：财报事实进入推理
 
-1. Extract normalized filing facts rather than requiring a manual CSV.
-2. Inject evidence-linked facts into the appropriate Theme/Anchor stages.
-3. Render the imported metrics and their source lineage in the report.
-4. Add period-over-period calculations without allowing the model to invent units or periods.
+1. 从正式文件自动提取标准化财务事实，替代人工CSV。
+2. 将有证据关联的财务事实注入对应的Theme和Anchor阶段。
+3. 在不允许模型虚构单位或期间的前提下，增加同比、环比和趋势计算。
 
-### Deferred
+### 后续阶段
 
-- Implement Catalyst Scan only after the v0.3 live evidence path is trustworthy.
-- Add scheduled re-evaluation for subsequent Alphabet quarters.
-- Expand from infrastructure layers to named suppliers only through separate first-party evidence.
+- v0.3实时证据路径可信之前，不提前实现Catalyst Scan。
+- 为后续Alphabet季度增加定时重评。
+- 只有获得独立的一手采购、供应商和产品证据后，才从基础设施层扩展到具名公司。
 
-## Reproduction
+## 复现方法
 
-Frozen replay:
+中文冻结回放：
 
 ```powershell
 .\.venv\Scripts\python.exe -m capexgraph.cli demo-alphabet-q2
 ```
 
-The live capture and import commands are documented in this directory's `README.md`. The generated
-local HTML report is under:
-
-```text
-runs/20260723-theme-89e5570f/report.html
-```
+实时采集和财务导入命令见本目录`README.md`。中文HTML研究报告位于对应运行目录的
+`report.html`。

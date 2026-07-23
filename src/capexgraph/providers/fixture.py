@@ -10,6 +10,7 @@ THEME_SUBJECTS = {
     "a股半导体硅片板块",
     "半导体硅片",
     "alphabet q2 2026 ai capex transmission",
+    "alphabet 2026年q2 ai资本开支传导",
 }
 
 ANCHOR_SUBJECTS = {"兆易创新", "603986", "603986.sh"}
@@ -30,7 +31,10 @@ class FixtureResearchModel:
             raise ValueError(f"Fixture provider only supports: {supported}")
         if mode == "anchor":
             filename = "anchor_gigadevice_cn.json"
-        elif normalized == "alphabet q2 2026 ai capex transmission":
+        elif normalized in {
+            "alphabet q2 2026 ai capex transmission",
+            "alphabet 2026年q2 ai资本开支传导",
+        }:
             filename = "theme_alphabet_q2_2026_us.json"
         else:
             filename = "theme_semiconductor_wafers_cn.json"

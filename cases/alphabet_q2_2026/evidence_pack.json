@@ -1,9 +1,9 @@
 {
-  "subject": "Alphabet Q2 2026 AI CapEx Transmission",
+  "subject": "Alphabet 2026年Q2 AI资本开支传导",
   "sources": [
     {
       "id": "alphabet-q2-2026-earnings-release",
-      "title": "Alphabet Announces Second Quarter 2026 Results",
+      "title": "Alphabet 2026年第二季度财报",
       "kind": "filing",
       "url": "https://s206.q4cdn.com/479360582/files/doc_financials/2026/q2/2026q2-alphabet-earnings-release.pdf",
       "published_at": "2026-07-22",
@@ -11,7 +11,7 @@
     },
     {
       "id": "alphabet-q2-2026-ceo-remarks",
-      "title": "Q2 2026 earnings call: Remarks from our CEO",
+      "title": "Alphabet 2026年Q2财报会CEO发言",
       "kind": "transcript",
       "url": "https://blog.google/company-news/inside-google/message-ceo/alphabet-earnings-q2-2026/",
       "published_at": "2026-07-22",

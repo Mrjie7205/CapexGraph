@@ -1,8 +1,8 @@
 {
   "fixture": {
     "id": "golden-alphabet-q2-2026-ai-capex-v1",
-    "subject": "Alphabet Q2 2026 AI CapEx Transmission",
-    "curation_note": "Frozen first-party disclosure replay as of 2026-07-22. It validates research contracts, not live source discovery or autonomous analysis."
+    "subject": "Alphabet 2026年Q2 AI资本开支传导",
+    "curation_note": "截至2026-07-22的一手披露冻结回放。用于验证研究契约，不代表实时信源发现或自主分析。"
   },
   "outputs": {
     "ThemeBoundaryOutput": {
@@ -36,43 +36,43 @@
       "nodes": [
         {
           "id": "company-alphabet",
-          "label": "Alphabet Class A",
+          "label": "Alphabet A类股",
           "node_type": "company",
           "ticker": "GOOGL",
           "market": "NASDAQ",
-          "layer": "Hyperscale cloud and AI platform"
+          "layer": "超大规模云与AI平台"
         },
         {
           "id": "demand-enterprise-ai",
-          "label": "Enterprise AI demand",
+          "label": "企业AI需求",
           "node_type": "demand_segment",
           "ticker": null,
           "market": "GLOBAL",
-          "layer": "AI infrastructure and solutions demand"
+          "layer": "AI基础设施与解决方案需求"
         },
         {
           "id": "bottleneck-ai-compute",
-          "label": "AI accelerator and server capacity",
+          "label": "AI加速器与服务器容量",
           "node_type": "bottleneck_layer",
           "ticker": null,
           "market": "GLOBAL",
-          "layer": "Compute infrastructure"
+          "layer": "算力基础设施"
         },
         {
           "id": "bottleneck-datacenter-network",
-          "label": "Multi-site data-center networking",
+          "label": "跨数据中心网络",
           "node_type": "bottleneck_layer",
           "ticker": null,
           "market": "GLOBAL",
-          "layer": "Network and data-center infrastructure"
+          "layer": "网络与数据中心基础设施"
         },
         {
           "id": "hypothesis-power-cooling",
-          "label": "Power and cooling capacity",
+          "label": "电力与冷却容量",
           "node_type": "unverified_hypothesis",
           "ticker": null,
           "market": "GLOBAL",
-          "layer": "Data-center physical infrastructure"
+          "layer": "数据中心物理基础设施"
         }
       ],
       "coverage_notes": [
@@ -89,19 +89,19 @@
       "evidence": [
         {
           "id": "alphabet-q2-2026-earnings-release",
-          "title": "Alphabet Announces Second Quarter 2026 Results",
+          "title": "Alphabet 2026年第二季度财报",
           "kind": "filing",
           "source_url": "https://s206.q4cdn.com/479360582/files/doc_financials/2026/q2/2026q2-alphabet-earnings-release.pdf",
           "published_at": "2026-07-22",
-          "excerpt": "Alphabet reported $119.8 billion of revenue, $24.8 billion of Google Cloud revenue, $44.9 billion of purchases of property and equipment, and negative $5.9 billion of quarterly free cash flow."
+          "excerpt": "Alphabet披露营收1198亿美元、Google Cloud收入248亿美元、购置物业与设备449亿美元，季度自由现金流为负59亿美元。"
         },
         {
           "id": "alphabet-q2-2026-ceo-remarks",
-          "title": "Q2 2026 earnings call: Remarks from our CEO",
+          "title": "Alphabet 2026年Q2财报会CEO发言",
           "kind": "transcript",
           "source_url": "https://blog.google/company-news/inside-google/message-ceo/alphabet-earnings-q2-2026/",
           "published_at": "2026-07-22",
-          "excerpt": "Management said Cloud revenue grew 82%, backlog reached $514 billion, model demand remained supply constrained, and Virgo Network connects accelerators across multiple data-center sites."
+          "excerpt": "管理层表示Cloud收入增长82%，积压订单达到5140亿美元，模型需求仍受供给约束，Virgo网络用于连接多个数据中心的加速器。"
         }
       ],
       "edges": [
@@ -110,8 +110,8 @@
           "source": "company-alphabet",
           "target": "demand-enterprise-ai",
           "relationship": "supplies",
-          "product": "Google Cloud AI infrastructure and AI solutions",
-          "basis": "The release and CEO remarks attribute Cloud growth to enterprise AI infrastructure and solutions demand.",
+          "product": "Google Cloud AI基础设施与AI解决方案",
+          "basis": "财报与CEO发言均将Cloud增长归因于企业AI基础设施和解决方案需求。",
           "confidence": "high",
           "evidence_ids": [
             "alphabet-q2-2026-earnings-release",
@@ -123,8 +123,8 @@
           "source": "company-alphabet",
           "target": "bottleneck-ai-compute",
           "relationship": "depends_on",
-          "product": "AI accelerators and server capacity",
-          "basis": "Management disclosed rapidly rising model usage and explicitly described demand as supply constrained.",
+          "product": "AI加速器与服务器容量",
+          "basis": "管理层披露模型使用量快速增长，并明确表示需求仍受供给约束。",
           "confidence": "high",
           "evidence_ids": [
             "alphabet-q2-2026-ceo-remarks"
@@ -135,8 +135,8 @@
           "source": "bottleneck-ai-compute",
           "target": "bottleneck-datacenter-network",
           "relationship": "depends_on",
-          "product": "Multi-site accelerator interconnect",
-          "basis": "Management described Virgo Network as connecting up to a million accelerators across multiple data-center sites.",
+          "product": "跨数据中心加速器互联",
+          "basis": "管理层称Virgo网络可连接分布于多个数据中心的百万级AI加速器。",
           "confidence": "high",
           "evidence_ids": [
             "alphabet-q2-2026-ceo-remarks"
@@ -179,26 +179,26 @@
         {
           "node_id": "bottleneck-ai-compute",
           "verdict": "watch",
-          "thesis": "The strongest directly evidenced bottleneck is AI compute capacity: token usage is rising and management still describes demand as supply constrained.",
+          "thesis": "证据最充分的瓶颈是AI算力容量：Token使用量持续增长，管理层仍明确表示需求受供给约束。",
           "archetypes": [
-            "Capacity bottleneck",
-            "Accelerator and server scaling"
+            "容量瓶颈",
+            "加速器与服务器扩容"
           ],
           "risks": [
-            "Efficiency improvements can reduce compute required per query",
-            "Aggregate capital expenditure does not disclose vendor allocation",
-            "Capacity additions may catch up with demand"
+            "软硬件效率提升可能降低单次查询所需算力",
+            "公司没有披露资本开支在各供应商之间的分配",
+            "新增供给可能逐步追上需求"
           ],
           "invalidation": [
-            "Management no longer reports supply constraints while backlog and token growth decelerate",
-            "Capital expenditure remains high without corresponding Cloud growth or utilization"
+            "管理层不再提及供给约束，同时积压订单和Token增速放缓",
+            "资本开支持续高企，但Cloud增长或利用率没有同步改善"
           ],
           "triggers": [
             {
               "metric": "model_api_tokens_per_minute",
               "operator": ">=",
               "value": 22000000000,
-              "note": "Q2 2026 disclosed baseline"
+              "note": "2026年Q2披露基线"
             }
           ],
           "confidence": "high"
@@ -206,19 +206,19 @@
         {
           "node_id": "bottleneck-datacenter-network",
           "verdict": "watch",
-          "thesis": "Connecting accelerator fleets across multiple data-center sites makes network scale decision-relevant, but no supplier or spending split is yet evidenced.",
+          "thesis": "跨多个数据中心连接大规模加速器集群，使网络扩容成为关键研究方向，但目前尚无供应商名单或网络资本开支拆分。",
           "archetypes": [
-            "Scale-out network",
-            "Multi-site data-center fabric"
+            "横向扩展网络",
+            "跨数据中心网络架构"
           ],
           "risks": [
-            "Internal architecture may not translate into an external public-company opportunity",
-            "The disclosure lacks network-specific capital expenditure",
-            "Vendor concentration and product mix are unknown"
+            "内部自研架构未必能转化为外部上市公司的业绩机会",
+            "披露中缺少网络专项资本开支",
+            "供应商集中度和产品结构未知"
           ],
           "invalidation": [
-            "Network scaling is not mentioned in subsequent disclosures",
-            "Accelerator deployment grows without corresponding interconnect investment evidence"
+            "后续披露不再提及网络扩容",
+            "加速器部署增长，但没有相应互联投资证据"
           ],
           "triggers": [],
           "confidence": "medium"
@@ -226,37 +226,37 @@
         {
           "node_id": "company-alphabet",
           "verdict": "watch",
-          "thesis": "Cloud demand and operating income accelerated, but the quarter also demonstrates the cash-flow cost of capacity expansion and a headline EPS distorted by equity-security gains.",
+          "thesis": "Cloud需求和营业利润加速增长，但本季度也体现了扩容带来的现金流成本，且表面EPS受到巨额股权证券收益扭曲。",
           "archetypes": [
-            "Demand anchor",
-            "Self-funded hyperscaler"
+            "需求锚点",
+            "自我造血的超大规模云厂商"
           ],
           "risks": [
-            "Free cash flow pressure from capital expenditure",
-            "Headline earnings distorted by non-operating equity gains",
-            "Returns on infrastructure spending may lag deployment"
+            "资本开支对自由现金流形成压力",
+            "非经营性股权收益扭曲表面利润",
+            "基础设施投资回报可能滞后于部署"
           ],
           "invalidation": [
-            "Cloud growth and backlog decelerate while capital expenditure remains elevated",
-            "Operating returns fail to offset rising depreciation and infrastructure costs"
+            "资本开支维持高位，但Cloud增长和积压订单放缓",
+            "经营回报无法覆盖上升的折旧和基础设施成本"
           ],
           "triggers": [
             {
               "metric": "free_cash_flow",
               "operator": "<",
               "value": 0,
-              "note": "Q2 2026 free cash flow was negative"
+              "note": "2026年Q2自由现金流为负"
             }
           ],
           "confidence": "medium"
         }
       ],
-      "ranking_method": "Rank direct evidence of constraint first, then infrastructure dependence, then the spending anchor. No vendor, valuation, or price-momentum ranking is attempted.",
+      "ranking_method": "优先排序有直接证据的供给约束，其次是基础设施依赖，最后是资本开支锚点；不对供应商、估值或价格动量进行排名。",
       "data_gaps": [
-        "Capital expenditure split by equipment and facility category",
-        "Named vendor procurement and supplier revenue exposure",
-        "Deployment lead times, utilization, pricing, and incremental returns",
-        "Power, cooling, optical, storage, and construction evidence"
+        "按设备和设施类别拆分的资本开支",
+        "具名供应商采购关系及收入敞口",
+        "部署周期、利用率、价格与增量投资回报",
+        "电力、冷却、光互联、存储和建设环节证据"
       ]
     },
     "DebateOutput": {
@@ -264,64 +264,64 @@
         {
           "node_id": "bottleneck-ai-compute",
           "bull_case": [
-            "Supply-constrained demand and rapid token growth support continued capacity additions."
+            "供给受限的需求和Token快速增长支持持续扩容。"
           ],
           "bear_case": [
-            "Model and hardware efficiency gains may weaken the link between token growth and hardware spending."
+            "模型与硬件效率提升可能削弱Token增长与硬件投入之间的关系。"
           ],
           "unresolved_questions": [
-            "Which accelerator and server categories receive the incremental capital expenditure?"
+            "新增资本开支具体流向哪些加速器和服务器品类？"
           ]
         },
         {
           "node_id": "bottleneck-datacenter-network",
           "bull_case": [
-            "Multi-site accelerator fabrics become more important as clusters scale."
+            "随着集群扩张，跨数据中心加速器互联的重要性上升。"
           ],
           "bear_case": [
-            "The architecture may be internally designed and the disclosed evidence gives no investable vendor exposure."
+            "该架构可能主要由内部设计，现有披露没有给出可投资的供应商敞口。"
           ],
           "unresolved_questions": [
-            "What proportion of infrastructure capital expenditure is directed to network equipment and optical links?"
+            "基础设施资本开支中有多少流向网络设备和光互联？"
           ]
         },
         {
           "node_id": "company-alphabet",
           "bull_case": [
-            "Cloud revenue and operating income growth show measurable monetization of AI infrastructure."
+            "Cloud收入和营业利润增长显示AI基础设施已产生可量化的商业回报。"
           ],
           "bear_case": [
-            "Negative quarterly free cash flow and a large non-operating equity gain complicate the headline earnings signal."
+            "季度自由现金流为负，且存在巨额非经营性股权收益，使表面盈利信号失真。"
           ],
           "unresolved_questions": [
-            "How quickly will deployed infrastructure translate into durable free cash flow and returns on capital?"
+            "已部署基础设施需要多久才能转化为可持续自由现金流和资本回报？"
           ]
         }
       ],
       "cross_candidate_observations": [
-        "The disclosure validates infrastructure demand more strongly than it validates any external supplier.",
-        "A spending increase is not enough to rank beneficiaries without procurement, product-mix, and revenue-exposure evidence."
+        "本次披露对基础设施需求的验证强于对任何外部供应商的验证。",
+        "在缺少采购、产品结构和收入敞口证据时，仅凭资本开支增长不足以排序受益公司。"
       ]
     },
     "DecisionOutput": {
       "research_status": "needs_review",
-      "summary": "Alphabet Q2 2026 validates AI compute capacity and multi-site networking as research priorities, while explicitly stopping before named supplier attribution. Alphabet itself is a demand anchor whose operating strength must be separated from cash-flow pressure and the equity-gain distortion.",
+      "summary": "Alphabet 2026年Q2财报确认AI算力容量和跨数据中心网络是优先研究方向，但现有证据不足以指向具名外部供应商。Alphabet本身是需求和资本开支锚点，分析时必须将主营经营改善、现金流压力和股权收益造成的EPS失真分开。",
       "ranked_node_ids": [
         "bottleneck-ai-compute",
         "bottleneck-datacenter-network",
         "company-alphabet"
       ],
       "limitations": [
-        "This is a frozen, human-curated replay of first-party materials, not autonomous live-source discovery.",
-        "The fixture validates schemas and evidence discipline but does not prove that a model can reproduce the judgment.",
-        "No named external supplier relationship is established by the two captured sources.",
-        "Imported financial facts are stored by the current system but are not yet automatically injected into Theme Scan."
+        "这是基于一手材料的人工策划冻结回放，不是自主实时信源发现。",
+        "该回放验证结构化输出和证据纪律，但不代表模型能够自主复现相同判断。",
+        "两份已采集材料没有建立任何具名外部供应商关系。",
+        "财务指标已进入报告和系统存储，但尚未自动注入Theme Scan推理上下文。"
       ],
       "next_actions": [
-        "Acquire filing-derived capital expenditure, depreciation, Cloud revenue, operating income, backlog, and free-cash-flow time series.",
-        "Search separate first-party procurement, supplier, and product disclosures before adding named beneficiaries.",
-        "Add official-source discovery and financial-fact context to the live non-fixture workflow.",
-        "Track whether supply-constraint language, Cloud backlog, and free cash flow change in subsequent quarters."
+        "从后续文件中提取资本开支、折旧、Cloud收入、营业利润、积压订单和自由现金流时间序列。",
+        "在加入具名受益公司前，单独检索一手采购、供应商和产品披露。",
+        "为非Fixture实时工作流加入官方信源发现和财务事实上下文。",
+        "持续跟踪后续季度的供给约束表述、Cloud积压订单和自由现金流变化。"
       ]
     }
   }

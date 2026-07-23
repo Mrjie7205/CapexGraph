@@ -120,6 +120,11 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "model_provider": model.provider_name,
                 "model": model.model_name,
                 "evidence_policy": model.evidence_policy.value,
+                "report_language": (
+                    "zh-CN"
+                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
+                    else "en"
+                ),
             }
         )
         _record_output(run, "intake", output)
@@ -341,7 +346,11 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "provider": model.provider_name,
                 "model": model.model_name,
                 "evidence_policy": model.evidence_policy.value,
-                "disclaimer": "Research and education only; not investment advice.",
+                "disclaimer": (
+                    "仅供研究和教育，不构成投资建议。"
+                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
+                    else "Research and education only; not investment advice."
+                ),
             },
         )
         return {"message": "Structured research decision issued", "status": output.research_status}

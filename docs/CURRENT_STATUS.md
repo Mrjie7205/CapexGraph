@@ -27,6 +27,8 @@ substantial change, and update it in the same pull request whenever shipped capa
 - added registry-backed `GOOGL` and `GOOG` identities;
 - preserved captured hash/review metadata when deterministic replay reuses the same evidence
   identity; and
+- added Chinese HTML report rendering for Chinese subjects, including evidence-linked financial
+  metrics; and
 - recorded the live baseline and remaining defects in
   `cases/alphabet_q2_2026/ACCEPTANCE_REPORT.md`.
 

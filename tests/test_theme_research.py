@@ -40,7 +40,7 @@ def test_golden_theme_scan_produces_auditable_artifacts(tmp_path, monkeypatch) -
 
     decision = json.loads((tmp_path / completed.id / "decision.json").read_text("utf-8"))
     assert decision["research_status"] == "needs_review"
-    assert "not investment advice" in decision["disclaimer"]
+    assert decision["disclaimer"] == "仅供研究和教育，不构成投资建议。"
     manifest = json.loads((tmp_path / completed.id / "manifest.json").read_text("utf-8"))
     assert manifest["manifest"]["model"] == "golden-a-share-semiconductor-wafers-v1"
 
