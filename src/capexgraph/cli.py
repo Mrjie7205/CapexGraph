@@ -15,7 +15,15 @@ from capexgraph.domain import EvidenceKind, ResearchRun, RunMode, RunStatus
 from capexgraph.providers import ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
-from capexgraph.runtime import RunStore
+from capexgraph.runtime import (
+    MigrationError,
+    RunStore,
+    backup_database,
+    database_status,
+    restore_database,
+    upgrade_database,
+)
+from capexgraph.runtime.store import state_db_path
 from capexgraph.tools import (
     EvidencePack,
     EvidenceSourceRequest,
@@ -42,12 +50,17 @@ tracking_app = typer.Typer(
     help="Track candidates and evaluate forward evidence.", no_args_is_help=True
 )
 report_app = typer.Typer(help="Render portable research reports.", no_args_is_help=True)
+db_app = typer.Typer(
+    help="Inspect, upgrade, back up, and restore SQLite state.",
+    no_args_is_help=True,
+)
 app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
 app.add_typer(financials_app, name="financials")
 app.add_typer(tracking_app, name="tracking")
 app.add_typer(report_app, name="report")
+app.add_typer(db_app, name="db")
 console = Console()
 
 if sys.platform == "win32":
@@ -492,6 +505,95 @@ def report_render(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(f"[green]Rendered[/green] {path}")
+
+
+@db_app.command("status")
+def db_status(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Show the current and latest persisted schema versions."""
+    target = (path or state_db_path()).resolve()
+    try:
+        status = database_status(target)
+    except MigrationError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    pending = ", ".join(str(item) for item in status.pending_versions) or "none"
+    console.print(
+        Panel.fit(
+            f"path       {status.path}\n"
+            f"exists     {status.exists}\n"
+            f"legacy     {status.legacy}\n"
+            f"current    {status.current_version}\n"
+            f"latest     {status.latest_version}\n"
+            f"pending    {pending}",
+            title="CapexGraph database",
+            border_style="green" if status.up_to_date else "yellow",
+        )
+    )
+
+
+@db_app.command("upgrade")
+def db_upgrade(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Apply pending versioned migrations transactionally."""
+    target = (path or state_db_path()).resolve()
+    try:
+        status = upgrade_database(target)
+    except MigrationError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(
+        f"[green]Database ready[/green] {status.path} · schema {status.current_version}"
+    )
+
+
+@db_app.command("backup")
+def db_backup(
+    output: Annotated[Path, typer.Option("--output", "-o", resolve_path=True)],
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+    force: Annotated[bool, typer.Option("--force", help="Replace an existing backup")] = False,
+) -> None:
+    """Create a consistent SQLite backup."""
+    source = (path or state_db_path()).resolve()
+    try:
+        result = backup_database(source, output, overwrite=force)
+    except (FileNotFoundError, FileExistsError, ValueError, MigrationError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Backup created[/green] {result}")
+
+
+@db_app.command("restore")
+def db_restore(
+    backup: Annotated[Path, typer.Argument(exists=True, dir_okay=False, resolve_path=True)],
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Replace the target database after stopping the API"),
+    ] = False,
+) -> None:
+    """Restore a verified backup and bring it to the current schema."""
+    target = (path or state_db_path()).resolve()
+    try:
+        result = restore_database(backup, target, overwrite=force)
+    except (FileNotFoundError, FileExistsError, ValueError, MigrationError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Database restored[/green] {result}")
 
 
 @app.command()

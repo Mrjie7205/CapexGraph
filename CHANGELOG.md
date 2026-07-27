@@ -19,6 +19,10 @@ All notable changes to CapexGraph are documented here.
   states, confidence, financial metrics, units, risks, limitations, and disclaimers.
 - added an execution-grade v0.3 plan covering dependency order, PR boundaries, acceptance tests,
   release gates, risks, and explicit exclusions.
+- added versioned, checksummed SQLite migrations with automatic safe startup upgrades;
+- added a frozen v0.2 legacy database fixture and regression coverage for runs, checkpoints,
+  tracking snapshots, and trigger events;
+- added consistent SQLite backup/restore plus `capexgraph db status|upgrade|backup|restore`.
 
 ## 0.2.0 — 2026-07-17
 

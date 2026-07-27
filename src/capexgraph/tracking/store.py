@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 
+from capexgraph.runtime.migrations import ensure_database
 from capexgraph.runtime.store import state_db_path
 from capexgraph.tracking.models import (
     TrackedCandidate,
@@ -35,59 +36,7 @@ class TrackingStore:
             connection.close()
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS tracked_candidates (
-                    id TEXT PRIMARY KEY,
-                    run_id TEXT NOT NULL,
-                    node_id TEXT NOT NULL,
-                    ticker TEXT NOT NULL,
-                    label TEXT NOT NULL,
-                    benchmark_ticker TEXT NOT NULL,
-                    call_date TEXT NOT NULL,
-                    call_price REAL,
-                    call_benchmark_price REAL,
-                    stage TEXT NOT NULL,
-                    thesis TEXT NOT NULL DEFAULT '',
-                    invalidation_json TEXT NOT NULL DEFAULT '[]',
-                    triggers_json TEXT NOT NULL DEFAULT '[]',
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    UNIQUE(run_id, node_id)
-                );
-
-                CREATE TABLE IF NOT EXISTS tracking_snapshots (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tracked_id TEXT NOT NULL,
-                    as_of_date TEXT NOT NULL,
-                    price REAL NOT NULL,
-                    benchmark_price REAL NOT NULL,
-                    return_pct REAL NOT NULL,
-                    benchmark_return_pct REAL NOT NULL,
-                    alpha_pct REAL NOT NULL,
-                    source TEXT NOT NULL,
-                    recorded_at TEXT NOT NULL,
-                    UNIQUE(tracked_id, as_of_date),
-                    FOREIGN KEY(tracked_id) REFERENCES tracked_candidates(id) ON DELETE CASCADE
-                );
-
-                CREATE TABLE IF NOT EXISTS trigger_events (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tracked_id TEXT NOT NULL,
-                    metric TEXT NOT NULL,
-                    operator TEXT NOT NULL,
-                    threshold REAL NOT NULL,
-                    observed_value REAL NOT NULL,
-                    note TEXT NOT NULL DEFAULT '',
-                    as_of_date TEXT NOT NULL,
-                    acknowledged_at TEXT,
-                    created_at TEXT NOT NULL,
-                    UNIQUE(tracked_id, metric, operator, threshold, as_of_date),
-                    FOREIGN KEY(tracked_id) REFERENCES tracked_candidates(id) ON DELETE CASCADE
-                );
-                """
-            )
+        ensure_database(self.db_path)
 
     @staticmethod
     def _candidate_from_row(row: sqlite3.Row) -> TrackedCandidate:

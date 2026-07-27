@@ -62,6 +62,15 @@ A tracked candidate stores the original call date, candidate price, benchmark pr
 invalidation text, and structured triggers. Later paired snapshots calculate return and alpha.
 Trigger events are append-only and acknowledgement never deletes event history.
 
+### Database lifecycle
+
+One ordered migration registry owns both research-run and tracking schemas. Every applied migration
+records its version, name, checksum, and timestamp in `schema_migrations`. Fresh databases and
+unversioned v0.2 databases reach the same schema through transactional, idempotent migrations.
+Only migrations marked safe for startup may run automatically; explicit upgrade, consistent backup,
+and verified restore are available through the CLI. A failed migration rolls back only its own
+transaction and never stamps a version that did not complete.
+
 ### Applications
 
 - FastAPI exposes runs, evidence review, artifacts, tracking, and HTML reports.

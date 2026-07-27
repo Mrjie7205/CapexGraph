@@ -100,6 +100,19 @@ checkpoints/        one durable artifact per completed/failed step
 SQLite at `runs/capexgraph.db` is the local system of record. JSON artifacts remain human-readable
 and portable. Set `CAPEXGRAPH_STATE_DB` to move the database.
 
+SQLite schemas are versioned. Safe additive migrations run when a store opens; operators can
+inspect and control the same path explicitly:
+
+```powershell
+capexgraph db status
+capexgraph db backup --output .\backup\capexgraph.db
+capexgraph db upgrade
+# Stop the API before replacing an active database.
+capexgraph db restore .\backup\capexgraph.db --force
+```
+
+See [the upgrade guide](docs/UPGRADING.md) before restoring or moving a workspace.
+
 ## Common commands
 
 ```powershell
@@ -121,6 +134,10 @@ capexgraph tracking add <run-id> <node-id>
 capexgraph tracking snapshot <tracked-id> --live
 capexgraph tracking list
 capexgraph report render <run-id>
+
+# Database safety
+capexgraph db status
+capexgraph db backup --output .\backup\capexgraph.db
 ```
 
 CapexGraph records candidate and benchmark prices on a common market date, then reports since-call

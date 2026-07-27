@@ -21,8 +21,9 @@ substantial change, and update it in the same pull request whenever shipped capa
 - tracked call/benchmark baselines, subsequent snapshots, alpha, trigger events, and stage board;
 - self-contained HTML reports, Windows bootstrap, Docker configuration, and wheel release.
 
-## Unreleased acceptance work
+## Unreleased v0.3 work
 
+- merged the Alphabet acceptance baseline through PR #11 after all Python-version and Web CI passed;
 - added a dated Alphabet Q2 2026 AI CapEx frozen replay and first-party live-capture case;
 - added registry-backed `GOOGL` and `GOOG` identities;
 - preserved captured hash/review metadata when deterministic replay reuses the same evidence
@@ -31,12 +32,17 @@ substantial change, and update it in the same pull request whenever shipped capa
   metrics; and
 - recorded the live baseline and remaining defects in
   `cases/alphabet_q2_2026/ACCEPTANCE_REPORT.md`.
+- added a unified, versioned SQLite migration registry with checksums, transactional rollback,
+  idempotent safe startup upgrades, and a frozen v0.2 legacy database fixture;
+- added `db status`, `db upgrade`, consistent backup, and verified restore commands; and
+- verified that a v0.2 database preserves its run, checkpoint, tracked candidate, snapshot, and
+  trigger-event counts after upgrade.
 
 This does not complete the v0.3 live vertical slice. Source discovery, automatic filing extraction,
 financial-fact prompt/report integration, and autonomous non-fixture execution remain open.
 
-The unreleased acceptance work is verified with Ruff, 35 passing Python tests, and a production
-Vite build.
+The M1 migration slice has targeted regression coverage; the full release matrix is rerun at each
+milestone and before release.
 
 ## Verified at v0.2.0
 
@@ -68,7 +74,8 @@ reviewed but not built locally.
 - Monitoring is manually invoked. There is no scheduler or automatic re-evaluation job.
 - The application is local-first and single-user. Cloud authentication and team permissions are not
   implemented.
-- SQLite schema creation is idempotent, but there is no formal migration framework yet.
+- SQLite is versioned and safely migratable; source-queue and financial-fact migrations are still
+  pending as part of M2 and M4.
 - The Cockpit is functional but still concentrated in a large `App.tsx`; report/run comparison and
   a searchable library are future work.
 
@@ -77,12 +84,10 @@ reviewed but not built locally.
 Implement v0.3 in the execution order defined by
 [`docs/V0_3_PLAN.md`](V0_3_PLAN.md), `ROADMAP.md`, and the `roadmap` GitHub Issues:
 
-1. merge the local Alphabet acceptance baseline into GitHub `main`;
-2. [#4 schema versioning and migrations](https://github.com/Mrjie7205/CapexGraph/issues/4);
-3. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
-4. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
-5. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7); and
-6. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
+1. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
+2. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
+3. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7);
+4. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
 
 Do not begin Catalyst Scan merely because the enum exists; trustworthy live evidence remains the
 higher priority.

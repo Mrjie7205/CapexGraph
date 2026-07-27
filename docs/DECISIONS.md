@@ -75,3 +75,14 @@ for typed state.
 
 CapexGraph may form research priorities, triggers, and invalidation states. It does not place orders,
 manage a portfolio autonomously, or present model output as personalized financial advice.
+
+## D009 — One versioned migration registry owns SQLite
+
+- **Status:** accepted
+- **Date:** 2026-07-27
+
+Run and tracking stores no longer create their schemas independently. One ordered, checksummed
+migration registry owns the whole SQLite workspace. Migrations are transactional and idempotent;
+safe additive migrations may run on startup, while any migration marked non-automatic requires an
+explicit operator upgrade. Backup and restore use SQLite's consistent backup API and restore never
+overwrites an existing database without an explicit force flag.
