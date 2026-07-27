@@ -160,6 +160,35 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=3,
+        name="versioned_financial_facts",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS financial_facts (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                metric TEXT NOT NULL,
+                statement TEXT NOT NULL,
+                period_end TEXT,
+                fact_type TEXT NOT NULL,
+                source_evidence_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_financial_facts_run_metric_period
+            ON financial_facts(run_id, metric, period_end DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_financial_facts_source
+            ON financial_facts(run_id, source_evidence_id)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

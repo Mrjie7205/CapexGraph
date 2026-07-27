@@ -36,11 +36,17 @@ def test_golden_anchor_scan_is_evidence_bound(tmp_path, monkeypatch) -> None:
         json.loads(artifact.read_text(encoding="utf-8"))
 
 
-def test_anchor_fixture_rejects_unknown_subject(tmp_path, monkeypatch) -> None:
+def test_anchor_fixture_unknown_subject_is_checkpointed(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
     run = create_run(RunMode.ANCHOR, "安集科技", "CN")
-    with pytest.raises(ValueError, match="only supports"):
-        build_executor_for_run(run, provider=ProviderName.FIXTURE)
+    failed = build_executor_for_run(
+        run,
+        provider=ProviderName.FIXTURE,
+        max_attempts=1,
+    ).execute(run.id)
+
+    assert failed.status == RunStatus.FAILED
+    assert "Provider setup failed" in failed.pipeline[0].error
 
 
 def test_anchor_execution_requires_provider(tmp_path, monkeypatch) -> None:

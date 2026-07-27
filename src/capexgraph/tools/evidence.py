@@ -257,6 +257,10 @@ def attach_collected_document(run_id: str, document: CollectedDocument) -> Evide
     providers = run.manifest.setdefault("data_providers", [])
     if "http-evidence" not in providers:
         providers.append("http-evidence")
+    records = run.manifest.setdefault("data_provider_records", [])
+    identity = {"name": "http-evidence", "version": "1"}
+    if identity not in records:
+        records.append(identity)
     save_run(run)
     return document.evidence
 

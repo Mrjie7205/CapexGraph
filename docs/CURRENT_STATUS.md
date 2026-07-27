@@ -1,97 +1,92 @@
 # Current status
 
 - Last verified: 2026-07-27
-- Release: `v0.2.0` alpha
-- Main release commit: `ca2fe8f`
-- Next target: `v0.3 — Trustworthy live research`
+- Release: `v0.3.0` — Trustworthy live research
+- Next target: `v0.4` — continuous monitoring and re-evaluation
 
-This file is the short handoff for a new session. Verify it against code and tests when starting a
+This is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
 
-## Shipped
+## Shipped in v0.3.0
 
-- durable SQLite research runs, bounded retries, JSON checkpoints, and resume;
-- complete Theme Scan and Anchor Scan typed workflows;
-- frozen no-key semiconductor-wafer and 兆易创新 golden cases;
-- optional OpenAI structured-output provider;
-- SSRF-safe HTML/PDF capture, content hashing, and explicit evidence review;
-- deterministic A-share ticker identity, Yahoo chart snapshots, and normalized financial imports;
-- FastAPI endpoints and a React/Vite Cockpit with background execution and polling;
-- dynamic run graph, evidence ledger, candidate queue, and decision display;
-- tracked call/benchmark baselines, subsequent snapshots, alpha, trigger events, and stage board;
-- self-contained HTML reports, Windows bootstrap, Docker configuration, and wheel release.
+- one ordered, checksummed SQLite migration registry, including tested v0.2 legacy upgrades,
+  consistent backup, verified restore, and three current schema versions;
+- a persistent `SourceSuggestion` review queue, official SEC/EDGAR discovery, deterministic manual
+  issuer/regulator URLs, canonical-URL and content-hash deduplication, durable failures, retry, and
+  dismissal;
+- SSRF-safe HTML/PDF capture, extracted text, SHA-256 provenance, and explicit human review;
+- `partial` and `strict` evidence modes with a deterministic preflight and checkpointed recovery;
+- bounded injection of captured/reviewed source text and filing facts into every Theme/Anchor stage;
+- model, source, and data provider names and versions, as-of date, evidence policy, coverage, review
+  backlog, and failures in each run manifest;
+- code-enforced confidence gates: an unreviewed or model-only relationship cannot remain medium or
+  high confidence;
+- a frozen non-fixture Alphabet integration path that proves source text and facts reach model
+  prompts, and that a strict failure resumes after review without editing JSON;
+- a versioned `FinancialFact` contract and SEC Company Facts provider covering income statement,
+  cash flow, and balance-sheet metrics;
+- immutable restatement history, explicit missing values, unit/period conflict failures, and derived
+  free cash flow with formula and input fact IDs;
+- source locator, provider version, raw SEC response hash, financial-fact context, and report/UI
+  presentation;
+- a Cockpit create-first path that needs no model key for workspace creation, source discovery,
+  capture, review, or SEC fact extraction;
+- Cockpit coverage/failure states, checkpoint-at-a-time execution, retry/resume, financial-fact
+  table, and portable report access;
+- reports that separate reviewed facts, grounded inferences, unverified hypotheses, and coverage
+  gaps; and
+- preserved no-key semiconductor-wafer, 兆易创新, and Alphabet frozen replays, Chinese reporting,
+  tracking, scorecards, and stage boards.
 
-## Unreleased v0.3 work
+## Verified for v0.3.0
 
-- merged the Alphabet acceptance baseline through PR #11 after all Python-version and Web CI passed;
-- added a dated Alphabet Q2 2026 AI CapEx frozen replay and first-party live-capture case;
-- added registry-backed `GOOGL` and `GOOG` identities;
-- preserved captured hash/review metadata when deterministic replay reuses the same evidence
-  identity; and
-- added Chinese HTML report rendering for Chinese subjects, including evidence-linked financial
-  metrics; and
-- recorded the live baseline and remaining defects in
-  `cases/alphabet_q2_2026/ACCEPTANCE_REPORT.md`.
-- added a unified, versioned SQLite migration registry with checksums, transactional rollback,
-  idempotent safe startup upgrades, and a frozen v0.2 legacy database fixture;
-- added `db status`, `db upgrade`, consistent backup, and verified restore commands; and
-- verified that a v0.2 database preserves its run, checkpoint, tracked candidate, snapshot, and
-  trigger-event counts after upgrade.
-- added a persistent source-suggestion queue with SEC/EDGAR discovery and a deterministic manual
-  issuer/regulator URL path;
-- added canonical-URL and content-hash deduplication, persisted discovery/capture failures, retry,
-  dismissal, and guarded redirect handling; and
-- exposed the source queue and extracted evidence text in CLI, API, and the Cockpit.
+- 58 Python tests pass locally;
+- Ruff passes;
+- the React/Vite production build passes;
+- the v0.2 legacy fixture upgrades to schema version 3 without changing run, checkpoint, candidate,
+  snapshot, or trigger-event counts;
+- the frozen Alphabet live vertical, restatement/missing/derived fact cases, and A-share golden
+  regressions pass; and
+- the package version is aligned across Python and Web;
+- the `0.3.0` wheel contains filing providers, financial persistence, and fixtures;
+- a clean Python environment installed the wheel, completed the no-key Theme golden run, and
+  initialized schema version 3; and
+- browser QA created an OpenAI/strict workspace with no key and confirmed `created` plus zero
+  completed stages; it also verified coverage/readiness, financial-fact entry, portable-report
+  sections, and visible persistence of a real SEC 403 provider failure.
 
-This does not complete the v0.3 live vertical slice. Automatic filing extraction,
-financial-fact prompt/report integration, and autonomous non-fixture execution remain open.
-
-The M1 migration slice has targeted regression coverage; the full release matrix is rerun at each
-milestone and before release.
-
-## Verified at v0.2.0
-
-- 30 Python tests passed locally;
-- Ruff passed;
-- production Vite build passed;
-- Python 3.11, 3.12, 3.13, and Web GitHub CI passed;
-- the `0.2.0` wheel was built and its fixtures/tracking modules were inspected;
-- API and Web dev servers returned healthy responses; and
-- a CLI tracking smoke test recorded +12% candidate return, +4% benchmark return, and +8% alpha,
-  then rendered an HTML report.
-- after adding the repository handoff contract, the full suite contains 32 passing tests, including
-  two checks that enforce required context files, version alignment, and Catalyst/M3 boundaries.
-
-Docker was not available on the development machine, so the image configuration was added and
-reviewed but not built locally.
+GitHub multi-version CI remains the final remote release gate and must be rechecked whenever this
+file is updated for a later build.
 
 ## Honest capability boundaries
 
 - Catalyst Scan is only a scaffold. It has no research schemas, handlers, audit, golden fixture, or
   live execution path.
-- The OpenAI provider returns structured outputs but does not autonomously search or fetch official
-  sources. URLs must be captured and reviewed through the evidence tools.
-- Official-source discovery currently covers SEC/EDGAR and deterministic user-supplied URLs. It
-  does not promise automatic A-share exchange search or broad web/news discovery.
-- Yahoo Chart is an unofficial, best-effort no-key adapter, not a licensed production feed.
-- Financial data is attached through normalized evidence-linked imports; automatic XBRL/filing
-  extraction is not implemented.
-- Monitoring is manually invoked. There is no scheduler or automatic re-evaluation job.
+- Creating a workspace, collecting/reviewing sources, replaying fixtures, and extracting SEC facts
+  need no model key. A real OpenAI agent execution still requires `OPENAI_API_KEY` and
+  `CAPEXGRAPH_MODEL`.
+- CapexGraph does not autonomously browse the broad Web. Official discovery currently covers
+  SEC/EDGAR plus user-supplied official URLs.
+- Automatic filing facts currently cover a bounded US-GAAP metric set through SEC Company Facts.
+  A-share exchange filings and taxonomy adapters are not implemented.
+- `captured` verifies bytes and hash; `reviewed` records human approval of that capture. Neither
+  status proves every interpretation in a report.
+- Partial mode may produce a low-confidence `needs_review` report with explicit gaps. Strict mode
+  requires at least one reviewed, hash-valid source and blocks unsupported medium/high claims.
+- Yahoo Chart is an unofficial, best-effort no-key market adapter, not a licensed production feed.
+- Monitoring remains manually invoked. Scheduling and automatic re-evaluation belong to v0.4.
 - The application is local-first and single-user. Cloud authentication and team permissions are not
   implemented.
-- SQLite is versioned and safely migratable; source-queue and financial-fact migrations are still
-  pending as part of M2 and M4.
-- The Cockpit is functional but still concentrated in a large `App.tsx`; report/run comparison and
-  a searchable library are future work.
+- A running model call is not cancelled mid-stage. The Cockpit can execute one stage and pause at
+  the next durable checkpoint.
 
 ## Start here next
 
-Implement v0.3 in the execution order defined by
-[`docs/V0_3_PLAN.md`](V0_3_PLAN.md), `ROADMAP.md`, and the `roadmap` GitHub Issues:
+Begin v0.4 from [ROADMAP.md](../ROADMAP.md):
 
-1. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
-2. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7);
-3. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
+1. scheduled or externally triggered market snapshots;
+2. financial/operating trigger evaluation from new evidence-linked facts;
+3. source update → trigger → acknowledgement → linked re-evaluation history; and
+4. scorecard comparison across runs and cohorts.
 
-Do not begin Catalyst Scan merely because the enum exists; trustworthy live evidence remains the
-higher priority.
+Do not begin Catalyst Scan merely because the enum exists; it remains a v0.5 target.

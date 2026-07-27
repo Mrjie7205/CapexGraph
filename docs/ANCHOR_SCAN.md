@@ -31,4 +31,11 @@ The golden case intentionally uses only peer relationships. Product overlap is n
 into a customer, supplier, or beneficiary claim. Outputs are written as `graph.json`,
 `evidence.json`, `financials.json`, `candidates.json`, and `decision.json` under the run folder.
 
+For live runs, captured/reviewed source text and versioned filing facts are injected into every
+uncompleted stage through the same bounded context used by Theme Scan. Existing captured evidence
+is preserved when a model proposes the same stable identity; its hash and human-review status are
+not replaced by a model excerpt. Partial mode downgrades unsupported relationships. Strict mode
+checkpoints missing review or unsupported medium/high relationship claims and can resume after the
+evidence ledger is corrected.
+
 This workflow produces research priorities, not a buy list or investment recommendation.

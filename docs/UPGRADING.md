@@ -11,9 +11,18 @@ capexgraph db backup --output .\backup\capexgraph.db
 capexgraph db upgrade
 ```
 
-An unversioned v0.2 database is reported as `legacy=True`, version `0`, with migration `1` pending.
+An unversioned v0.2 database is reported as `legacy=True`, version `0`, with migrations pending.
 The baseline migration creates only missing tables and indexes, then records its checksum. Existing
 runs, checkpoints, tracked candidates, snapshots, and trigger events are not rewritten.
+
+The v0.3.0 schema reaches version 3:
+
+1. the v0.2 run/checkpoint/tracking baseline;
+2. the persistent source-suggestion queue; and
+3. immutable, source-linked financial facts.
+
+All three are additive and safe for startup. The legacy-upgrade test verifies that the original
+run, checkpoint, tracked candidate, snapshot, and trigger-event counts remain unchanged.
 
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
@@ -33,3 +42,15 @@ the target atomically, verifies it again, and applies any currently registered m
 
 Use `--path` on any database command when operating on a workspace other than
 `CAPEXGRAPH_STATE_DB` or `runs/capexgraph.db`.
+
+## Moving from v0.2 to v0.3
+
+1. stop the API and Cockpit;
+2. create a backup with the v0.2 or v0.3 CLI;
+3. install v0.3;
+4. run `capexgraph db status` and `capexgraph db upgrade`; and
+5. start the API, inspect an older run, and verify its tracking card.
+
+Older run payloads are preserved. New v0.3 manifest keys such as `evidence_mode`, provider records,
+and coverage are populated when a run is created, executed, or inspected; the upgrader does not
+fabricate historical provider metadata.

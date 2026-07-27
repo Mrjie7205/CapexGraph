@@ -6,6 +6,10 @@ import html
 import json
 from pathlib import Path
 
+from capexgraph.research.context import (
+    evaluate_evidence_coverage,
+    evidence_is_reviewed_and_unchanged,
+)
 from capexgraph.runtime.artifacts import atomic_write_text
 from capexgraph.runtime.store import runs_dir
 from capexgraph.workflows import load_run
@@ -77,7 +81,12 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
         raise KeyError(f"Research run not found: {run_id}")
     decision = _read_artifact(run_id, "decision.json")
     financials = _read_artifact(run_id, "financials.json")
-    financial_metrics = _read_artifact(run_id, "financials/metrics.json").get("items", [])
+    financial_facts = _read_artifact(run_id, "financials/facts.json").get("items", [])
+    financial_metrics = (
+        financial_facts
+        or _read_artifact(run_id, "financials/metrics.json").get("items", [])
+    )
+    coverage = evaluate_evidence_coverage(run)
     node_by_id = {node.id: node for node in run.nodes}
     report_language = str(run.manifest.get("report_language") or "")
     chinese = report_language == "zh-CN" or (
@@ -127,6 +136,39 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
         for item in run.evidence
     ) or ("<li>未生成证据条目。</li>" if chinese else "<li>No evidence items were produced.</li>")
 
+    provider_details = run.manifest.get("model_provider_details") or {
+        "name": run.manifest.get("model_provider") or "not selected",
+        "version": "—",
+        "model": run.manifest.get("model") or "—",
+    }
+    source_providers = run.manifest.get("source_discovery_providers", [])
+    data_provider_records = run.manifest.get("data_provider_records", [])
+    provider_rows = "".join(
+        "<tr>"
+        f"<td>{html.escape(label)}</td>"
+        f"<td>{html.escape(str(item.get('name', '—')))}</td>"
+        f"<td>{html.escape(str(item.get('version', '—')))}</td>"
+        f"<td>{html.escape(str(item.get('model', '—')))}</td>"
+        "</tr>"
+        for label, items in (
+            ("Model", [provider_details]),
+            ("Source discovery", source_providers),
+            ("Data", data_provider_records),
+        )
+        for item in items
+        if isinstance(item, dict)
+    )
+    provider_rows = provider_rows or (
+        "<tr><td colspan='4'>尚未记录Provider。</td></tr>"
+        if chinese
+        else "<tr><td colspan='4'>No providers recorded.</td></tr>"
+    )
+    coverage_gaps = "".join(f"<li>{html.escape(gap)}</li>" for gap in coverage.gaps) or (
+        "<li>当前未检测到覆盖缺口。</li>"
+        if chinese
+        else "<li>No coverage gaps detected.</li>"
+    )
+
     limitations = "".join(
         f"<li>{html.escape(str(item))}</li>" for item in decision.get("limitations", [])
     ) or (
@@ -167,19 +209,23 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
         f"<td>{html.escape(str(item.get('period_end', '')))}</td>"
         f"<td>{html.escape(metric_value(item.get('value', '')))}</td>"
         f"<td>{html.escape(localized(str(item.get('unit', '')), UNIT_ZH))}</td>"
+        f"<td>{html.escape(str(item.get('fact_type') or ('imported' if not financial_facts else '—')))}</td>"
         f"<td>{html.escape(str(item.get('source_evidence_id') or '—'))}</td>"
+        f"<td>{html.escape(str(item.get('source_locator') or '—'))}</td>"
         "</tr>"
         for item in financial_metrics
     )
     financial_section = (
         "<section><h2>04 / 财务与经营指标</h2>"
         "<table><thead><tr><th>标的</th><th>指标</th><th>报告期</th><th>数值</th>"
-        f"<th>单位</th><th>证据ID</th></tr></thead><tbody>{metric_rows}</tbody></table></section>"
+        "<th>单位</th><th>事实类型</th><th>证据ID</th><th>来源定位</th></tr></thead>"
+        f"<tbody>{metric_rows}</tbody></table></section>"
         if chinese and metric_rows
         else (
             "<section><h2>04 / Financial and operating metrics</h2>"
             "<table><thead><tr><th>Ticker</th><th>Metric</th><th>Period</th><th>Value</th>"
-            f"<th>Unit</th><th>Evidence ID</th></tr></thead><tbody>{metric_rows}</tbody></table></section>"
+            "<th>Unit</th><th>Fact type</th><th>Evidence ID</th><th>Source locator</th></tr></thead>"
+            f"<tbody>{metric_rows}</tbody></table></section>"
             if metric_rows
             else ""
         )
@@ -194,6 +240,49 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
         "仅供研究和教育，不构成投资建议。"
         if chinese
         else "Research and education only; not investment advice."
+    )
+    curated = run.manifest.get("evidence_policy") == "curated"
+    reviewed_fact_items = [
+        item
+        for item in run.evidence
+        if curated or evidence_is_reviewed_and_unchanged(run, item)
+    ]
+    fact_lines = "".join(
+        f"<li><strong>{html.escape(item.title)}</strong><small>{html.escape(item.id)}</small></li>"
+        for item in reviewed_fact_items
+    ) or (
+        "<li>尚无已审核事实；已采集材料仍需人工批准。</li>"
+        if chinese
+        else "<li>No reviewed facts yet; captured material still needs approval.</li>"
+    )
+    grounded_edges = [
+        edge for edge in run.edges if not edge.metadata.get("verification_required", False)
+    ]
+    inference_lines = "".join(
+        f"<li><strong>{html.escape(edge.product)}</strong><small>{html.escape(edge.basis)}</small></li>"
+        for edge in grounded_edges
+    ) or (
+        "<li>暂无通过证据门禁的推断。</li>"
+        if chinese
+        else "<li>No inference has passed the evidence gate.</li>"
+    )
+    unverified_edges = [
+        edge for edge in run.edges if edge.metadata.get("verification_required", False)
+    ]
+    hypothesis_lines = "".join(
+        f"<li><strong>{html.escape(edge.product)}</strong><small>{html.escape(edge.basis)}</small></li>"
+        for edge in unverified_edges
+    )
+    graph_gaps = _read_artifact(run_id, "graph.json").get("gaps", [])
+    hypothesis_lines += "".join(
+        f"<li><strong>{'覆盖缺口' if chinese else 'Coverage gap'}</strong>"
+        f"<small>{html.escape(str(gap))}</small></li>"
+        for gap in graph_gaps
+    )
+    hypothesis_lines = hypothesis_lines or (
+        "<li>暂无未验证假设。</li>"
+        if chinese
+        else "<li>No unverified hypotheses recorded.</li>"
     )
 
     document = f"""<!doctype html>
@@ -212,6 +301,11 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
     .meta {{ text-align:right; font-size:10px; line-height:1.8; color:var(--muted); }}
     .summary {{ display:grid; grid-template-columns:1.3fr .7fr; gap:42px; padding:35px 0; border-bottom:1px solid var(--line); }}
     .summary p {{ font-size:24px; line-height:1.45; margin:0; }} .summary ul {{ margin:0; padding-left:18px; color:var(--muted); }}
+    .trust-grid {{ display:grid; grid-template-columns:.8fr 1.2fr; gap:28px; }} .coverage-card {{ border:1px solid var(--line); padding:18px; }}
+    .coverage-card strong {{ font-size:34px; font-weight:400; }} .coverage-card span {{ display:block; color:var(--wine); font:9px Consolas,monospace; text-transform:uppercase; }}
+    .coverage-card ul {{ padding-left:18px; color:var(--muted); font-size:13px; }} .claim-grid {{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }}
+    .claim-grid article {{ border:1px solid var(--line); padding:16px; }} .claim-grid ul {{ padding-left:18px; }} .claim-grid li {{ margin:10px 0; }}
+    .claim-grid small {{ display:block; margin-top:4px; color:var(--muted); text-transform:none; letter-spacing:0; }}
     section {{ margin-top:38px; }} h2 {{ font-size:14px; font-family:Consolas,monospace; text-transform:uppercase; letter-spacing:.1em; color:var(--wine); }}
     table {{ width:100%; border-collapse:collapse; font-size:14px; }} th,td {{ text-align:left; border-bottom:1px solid var(--line); padding:12px 9px; }} th {{ font-size:9px; color:var(--muted); }}
     .confidence {{ font-size:8px; color:var(--wine); }} .confidence.high {{ color:var(--green); }}
@@ -221,16 +315,18 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
     .sources {{ list-style:none; padding:0; }} .sources li {{ display:grid; grid-template-columns:90px 1fr; gap:8px 14px; border-bottom:1px solid var(--line); padding:12px 0; }}
     .sources span {{ color:var(--green); font:9px Consolas,monospace; text-transform:uppercase; }} .sources small {{ grid-column:2; color:var(--muted); text-transform:none; overflow-wrap:anywhere; }}
     .actions {{ display:grid; grid-template-columns:1fr 1fr; gap:40px; }} footer {{ border-top:2px solid var(--ink); margin-top:50px; padding-top:18px; color:var(--muted); font:10px Consolas,monospace; }}
-    @media(max-width:760px) {{ main {{ padding:32px 18px; }} h1 {{ font-size:42px; }} .summary,.actions {{ grid-template-columns:1fr; }} .candidates {{ grid-template-columns:1fr; }} header {{ grid-template-columns:1fr; }} .meta {{ text-align:left; margin-top:18px; }} }}
+    @media(max-width:760px) {{ main {{ padding:32px 18px; }} h1 {{ font-size:42px; }} .summary,.actions,.trust-grid,.claim-grid {{ grid-template-columns:1fr; }} .candidates {{ grid-template-columns:1fr; }} header {{ grid-template-columns:1fr; }} .meta {{ text-align:left; margin-top:18px; }} }}
   </style>
 </head>
 <body><main>
   <header><div><div class="kicker">CapexGraph / {html.escape(mode_label)}</div><h1>{html.escape(run.subject)}</h1></div><div class="meta">{'运行' if chinese else 'RUN'} {html.escape(run.id)}<br>{'研究日期' if chinese else 'AS OF'} {run.as_of_date}<br>{'状态' if chinese else 'STATUS'} {html.escape(localized(run.status.value, STATUS_ZH))}</div></header>
   <div class="summary"><p>{html.escape(decision.get('summary', summary_fallback))}</p><ul><li>{len(run.nodes)} {'个节点' if chinese else 'nodes'} / {len(run.edges)} {'条关系' if chinese else 'edges'}</li><li>{len(run.evidence)} {'项证据' if chinese else 'evidence items'}</li><li>{len(run.candidates)} {'个研究对象' if chinese else 'candidates'}</li><li>{html.escape(financial_note)}</li></ul></div>
+  <section><h2>00 / {'Provider与证据覆盖' if chinese else 'Providers and evidence coverage'}</h2><div class="trust-grid"><div class="coverage-card"><span>{'覆盖状态' if chinese else 'Coverage status'}</span><strong>{html.escape(coverage.status)}</strong><p>{coverage.reviewed} {'项已审核' if chinese else 'reviewed'} · {coverage.pending_reviews} {'项待审核' if chinese else 'pending review'}</p><ul>{coverage_gaps}</ul></div><table><thead><tr><th>{'类别' if chinese else 'Role'}</th><th>Provider</th><th>{'版本' if chinese else 'Version'}</th><th>Model</th></tr></thead><tbody>{provider_rows}</tbody></table></div></section>
   <section><h2>01 / {'有证据支撑的关系图' if chinese else 'Grounded relationship map'}</h2><table><thead><tr><th>{'来源节点' if chinese else 'Source'}</th><th>{'关系' if chinese else 'Relation'}</th><th>{'目标节点' if chinese else 'Target'}</th><th>{'产品或能力' if chinese else 'Product'}</th><th>{'置信度' if chinese else 'Confidence'}</th><th>{'证据数' if chinese else 'Sources'}</th></tr></thead><tbody>{edge_rows}</tbody></table></section>
   <section><h2>02 / {'研究队列' if chinese else 'Research queue'}</h2><div class="candidates">{candidate_cards}</div></section>
   <section><h2>03 / {'证据台账' if chinese else 'Evidence ledger'}</h2><ul class="sources">{source_items}</ul></section>
   {financial_section}
+  <section><h2>05 / {'事实、推断与未验证假设' if chinese else 'Facts, inferences, and unverified hypotheses'}</h2><div class="claim-grid"><article><h3>{'已审核事实' if chinese else 'Reviewed facts'}</h3><ul>{fact_lines}</ul></article><article><h3>{'有依据的推断' if chinese else 'Grounded inferences'}</h3><ul>{inference_lines}</ul></article><article><h3>{'未验证假设' if chinese else 'Unverified hypotheses'}</h3><ul>{hypothesis_lines}</ul></article></div></section>
   <section class="actions"><div><h2>{'局限性' if chinese else 'Limitations'}</h2><ul>{limitations}</ul></div><div><h2>{'下一步行动' if chinese else 'Next actions'}</h2><ol>{next_actions}</ol></div></section>
   <footer>{html.escape(decision.get('disclaimer', disclaimer_fallback))}</footer>
 </main></body></html>"""

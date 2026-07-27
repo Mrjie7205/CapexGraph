@@ -5,13 +5,15 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 from capexgraph import __version__
-from capexgraph.domain import EvidenceKind, ResearchRun, RunMode, RunStatus
+from capexgraph.domain import EvidenceKind, EvidenceMode, ResearchRun, RunMode, RunStatus
+from capexgraph.financials import FinancialFactService
 from capexgraph.providers import ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
@@ -98,6 +100,7 @@ def _create(
     as_of: str | None,
     execute: bool,
     provider: ProviderName | None = None,
+    evidence_mode: EvidenceMode = EvidenceMode.PARTIAL,
 ) -> None:
     if mode in {RunMode.THEME, RunMode.ANCHOR} and execute and provider is None:
         raise typer.BadParameter(
@@ -107,7 +110,7 @@ def _create(
         as_of_date = date.fromisoformat(as_of) if as_of else None
     except ValueError as error:
         raise typer.BadParameter("--as-of must use YYYY-MM-DD") from error
-    run = create_run(mode, subject, market, as_of_date)
+    run = create_run(mode, subject, market, as_of_date, evidence_mode)
     if provider is not None:
         run.manifest["model_provider"] = provider.value
         run = save_run(run)
@@ -136,9 +139,13 @@ def theme(
         ProviderName | None,
         typer.Option("--provider", help="Structured research provider: fixture or openai"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode,
+        typer.Option("--evidence-mode", help="partial or strict evidence preflight"),
+    ] = EvidenceMode.PARTIAL,
 ) -> None:
     """Create a Theme Scan research run."""
-    _create(RunMode.THEME, subject, market, as_of, execute, provider)
+    _create(RunMode.THEME, subject, market, as_of, execute, provider, evidence_mode)
 
 
 @app.command()
@@ -151,9 +158,13 @@ def anchor(
         ProviderName | None,
         typer.Option("--provider", help="Structured research provider: fixture or openai"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode,
+        typer.Option("--evidence-mode", help="partial or strict evidence preflight"),
+    ] = EvidenceMode.PARTIAL,
 ) -> None:
     """Create an Anchor Scan research run."""
-    _create(RunMode.ANCHOR, subject, market, as_of, execute, provider)
+    _create(RunMode.ANCHOR, subject, market, as_of, execute, provider, evidence_mode)
 
 
 @app.command()
@@ -204,18 +215,25 @@ def run_command(
         ProviderName | None,
         typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode | None,
+        typer.Option("--evidence-mode", help="Override partial or strict evidence preflight"),
+    ] = None,
 ) -> None:
     """Execute pending workflow steps."""
     try:
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if evidence_mode is not None:
+            run.manifest["evidence_mode"] = evidence_mode.value
+            run = save_run(run)
         run = build_executor_for_run(
             run,
             provider=provider,
             max_attempts=attempts,
         ).execute(run_id, until=until)
-    except (KeyError, ValueError, RuntimeError) as error:
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_run(run, "Workflow execution")
@@ -232,12 +250,19 @@ def resume(
         ProviderName | None,
         typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode | None,
+        typer.Option("--evidence-mode", help="Override partial or strict evidence preflight"),
+    ] = None,
 ) -> None:
     """Resume from the latest completed checkpoint."""
     try:
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if evidence_mode is not None:
+            run.manifest["evidence_mode"] = evidence_mode.value
+            run = save_run(run)
         run = build_executor_for_run(
             run,
             provider=provider,
@@ -247,7 +272,7 @@ def resume(
             until=until,
             retry_failed=True,
         )
-    except (KeyError, ValueError, RuntimeError) as error:
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_run(run, "Workflow resumed")
@@ -518,6 +543,51 @@ def financials_import(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(f"[green]Imported[/green] {len(metrics)} financial metrics")
+
+
+@financials_app.command("extract")
+def financials_extract(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    identifier: Annotated[
+        str | None,
+        typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
+    ] = None,
+) -> None:
+    """Capture SEC Company Facts and persist versioned, source-linked facts."""
+    try:
+        facts = FinancialFactService().extract(run_id, identifier=identifier)
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    missing = sum(fact.fact_type.value == "missing" for fact in facts)
+    console.print(
+        f"[green]Extracted[/green] {len(facts)} financial facts · {missing} explicit missing"
+    )
+
+
+@financials_app.command("list")
+def financials_list(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+) -> None:
+    """List persisted filing-derived financial facts."""
+    try:
+        facts = FinancialFactService().list(run_id)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    table = Table(title="CapexGraph financial facts")
+    for heading in ("Metric", "Period", "Value", "Unit", "Type", "Source locator"):
+        table.add_column(heading)
+    for fact in facts:
+        table.add_row(
+            fact.metric,
+            str(fact.period_end or "—"),
+            str(fact.value if fact.value is not None else "—"),
+            fact.unit,
+            fact.fact_type.value,
+            fact.source_locator,
+        )
+    console.print(table)
 
 
 @tracking_app.command("add")

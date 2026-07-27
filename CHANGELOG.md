@@ -4,6 +4,8 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+## 0.3.0 — 2026-07-27
+
 - added a repository-owned cross-session handoff contract: agent guide, forward roadmap, project
   context, current status, accepted decisions, documentation drift checks, and PR checklist;
 - clarified that Catalyst Scan is reserved/scaffolded rather than shipped;
@@ -29,6 +31,23 @@ All notable changes to CapexGraph are documented here.
   handling, and HTML/PDF content-type enforcement;
 - added source discovery, capture, retry, dismissal, and extracted-text paths across CLI, API, and
   the Cockpit.
+- added `partial` and `strict` evidence modes, deterministic coverage preflight, bounded captured
+  source text in every Theme/Anchor prompt, and checkpointed strict-mode recovery;
+- recorded model, source-discovery, market/evidence, and filing provider versions plus as-of date,
+  coverage, pending review, and durable failure metadata in run manifests;
+- prevented unreviewed/model-only relationship proposals from retaining medium/high confidence;
+- added a frozen non-fixture Alphabet vertical proving reviewed source text and financial context
+  reach the model without hand-editing run artifacts;
+- added immutable, versioned SEC Company Facts across income, cash flow, and balance-sheet metrics,
+  including restatements, explicit missing values, deterministic unit/period conflicts, and derived
+  free cash flow with formula lineage;
+- added financial-fact schema migration 3, raw SEC response evidence/hash capture, JSON source
+  locators, CLI/API extraction, and Theme/Anchor context injection;
+- added Cockpit create-first/no-key preparation, evidence-mode selection, one-stage pause,
+  retry/resume, coverage and provider failures, filing-fact extraction/table, and report access;
+- updated reports to expose providers, evidence coverage, fact provenance, reviewed facts,
+  grounded inferences, unverified hypotheses, and coverage gaps; and
+- aligned Python and Web versions to `0.3.0`.
 
 ## 0.2.0 — 2026-07-17
 

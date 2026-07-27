@@ -98,3 +98,25 @@ outcomes. A suggestion never becomes captured or reviewed merely because it came
 issuer domain, a user, or a model. Successful guarded download creates a separate Evidence object;
 human review remains a second explicit action. URL identity and downloaded-content identity are
 deduplicated separately and neither operation silently overwrites an existing capture.
+
+## D011 — Live prompts consume bounded run evidence
+
+- **Status:** accepted
+- **Date:** 2026-07-27
+
+Every Theme and Anchor stage receives a deterministic, bounded context containing coverage,
+captured/reviewed source text, and persisted financial facts. A model is not expected to infer
+source contents from URLs. Partial mode may continue with gaps but unsupported relationships become
+low confidence. Strict mode requires reviewed, hash-valid evidence and checkpoints unsupported
+medium/high claims so the same run can resume after review.
+
+## D012 — Filing facts are immutable evidence-linked versions
+
+- **Status:** accepted
+- **Date:** 2026-07-27
+
+Official filing adapters capture their raw response as Evidence before normalized facts enter the
+system of record. Every `FinancialFact` preserves period, unit, concept, filing identity, evidence
+ID, and source locator. Restatements append a new value instead of overwriting history; missing is
+null rather than zero; derived values declare formula and input fact IDs. Deterministic code, not an
+agent, owns these validations.

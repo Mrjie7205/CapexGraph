@@ -39,6 +39,34 @@ async def test_create_theme_run(tmp_path, monkeypatch) -> None:
 
 
 @pytest.mark.anyio
+async def test_create_only_strict_workspace_and_read_coverage(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/v1/runs/theme",
+            json={
+                "subject": "Alphabet AI CapEx",
+                "market": "US",
+                "provider": "openai",
+                "evidence_mode": "strict",
+                "execute": False,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "created"
+        assert payload["manifest"]["evidence_mode"] == "strict"
+
+        coverage = await client.get(f"/api/v1/runs/{payload['id']}/coverage")
+        assert coverage.status_code == 200
+        assert coverage.json()["status"] == "empty"
+        assert coverage.json()["strict_ready"] is False
+
+
+@pytest.mark.anyio
 async def test_create_and_execute_fixture_theme_run(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
     async with AsyncClient(

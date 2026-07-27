@@ -1,5 +1,6 @@
 export type RunMode = "theme" | "anchor";
 export type Provider = "fixture" | "openai";
+export type EvidenceMode = "partial" | "strict";
 
 export interface PipelineStep {
   key: string;
@@ -36,6 +37,46 @@ export interface EvidenceItem {
   local_path?: string;
   excerpt: string;
   status: "proposed" | "captured" | "reviewed" | "rejected";
+}
+
+export interface EvidenceCoverage {
+  mode: EvidenceMode;
+  evidence_total: number;
+  captured: number;
+  reviewed: number;
+  proposed: number;
+  rejected: number;
+  hash_mismatches: number;
+  suggestions_total: number;
+  pending_reviews: number;
+  source_failures: number;
+  discovery_failures: number;
+  status: "empty" | "suggestions_only" | "partial" | "reviewed";
+  strict_ready: boolean;
+  gaps: string[];
+}
+
+export interface FinancialFact {
+  id: string;
+  company: string;
+  ticker: string;
+  statement: "income_statement" | "cash_flow" | "balance_sheet" | "supplemental";
+  metric: string;
+  concept: string;
+  period_start?: string;
+  period_end?: string;
+  fiscal_year?: number;
+  fiscal_period?: string;
+  form?: string;
+  filed_date?: string;
+  accession?: string;
+  value?: number;
+  unit: string;
+  fact_type: "reported" | "derived" | "restated" | "missing";
+  source_evidence_id: string;
+  source_locator: string;
+  formula?: string;
+  input_fact_ids: string[];
 }
 
 export type SourceSuggestionStatus =
@@ -147,6 +188,8 @@ export function createRun(
   mode: RunMode,
   subject: string,
   provider: Provider,
+  market: string,
+  evidenceMode: EvidenceMode,
   asOfDate?: string,
 ): Promise<ResearchRun> {
   return request(`/api/v1/runs/${mode}`, {
@@ -154,9 +197,10 @@ export function createRun(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       subject,
-      market: "CN",
+      market,
       provider,
       execute: false,
+      evidence_mode: evidenceMode,
       as_of_date: asOfDate,
     }),
   });
@@ -166,12 +210,42 @@ export function executeRun(
   runId: string,
   provider: Provider,
   resume = false,
+  options: { evidenceMode?: EvidenceMode; until?: string } = {},
 ): Promise<ResearchRun> {
   return request(`/api/v1/runs/${runId}/${resume ? "resume" : "execute"}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider, background: true, max_attempts: 2 }),
+    body: JSON.stringify({
+      provider,
+      background: true,
+      max_attempts: 2,
+      evidence_mode: options.evidenceMode,
+      until: options.until,
+    }),
   });
+}
+
+export function getCoverage(runId: string): Promise<EvidenceCoverage> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/coverage`);
+}
+
+export function listFinancialFacts(runId: string): Promise<FinancialFact[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/financials`);
+}
+
+export function extractFinancialFacts(
+  runId: string,
+  identifier?: string,
+): Promise<FinancialFact[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/financials/extract`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ identifier: identifier || undefined }),
+  });
+}
+
+export function reportUrl(runId: string): string {
+  return `/api/v1/runs/${encodeURIComponent(runId)}/report`;
 }
 
 export function reviewEvidence(

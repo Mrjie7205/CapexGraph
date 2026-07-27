@@ -7,7 +7,6 @@ from capexgraph.domain import (
     Candidate,
     Confidence,
     Evidence,
-    EvidenceStatus,
     PipelineStep,
     ResearchRun,
     SupplyChainEdge,
@@ -20,9 +19,16 @@ from capexgraph.research.anchor_schemas import (
     NeighbourComparisonOutput,
     RepricingCauseOutput,
 )
+from capexgraph.research.context import (
+    apply_relationship_confidence_gate,
+    enforce_evidence_preflight,
+    evidence_is_reviewed_and_unchanged,
+    refresh_evidence_coverage,
+)
 from capexgraph.research.theme import (
     SYSTEM_PROMPT,
     ThemeHandler,
+    _evidence_identity_matches,
     _merge_nodes,
     _prompt,
     _record_output,
@@ -42,14 +48,37 @@ def _merge_evidence(run: ResearchRun, proposals: list[Any]) -> None:
     for proposal in proposals:
         item = Evidence(**proposal.model_dump())
         existing = evidence.get(item.id)
-        if existing is not None and existing != item:
+        if existing is not None and not _evidence_identity_matches(existing, proposal):
             raise ValueError(f"Conflicting evidence definition: {item.id}")
-        evidence[item.id] = item
+        if existing is None:
+            evidence[item.id] = item
     run.evidence = list(evidence.values())
 
 
 def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
     def intake(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
+        run.manifest.update(
+            {
+                "model_provider": model.provider_name,
+                "model": model.model_name,
+                "model_provider_details": {
+                    "name": model.provider_name,
+                    "version": getattr(model, "provider_version", "unknown"),
+                    "model": model.model_name,
+                },
+                "evidence_policy": model.evidence_policy.value,
+                "as_of_date": run.as_of_date.isoformat(),
+                "report_language": (
+                    "zh-CN"
+                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
+                    else "en"
+                ),
+            }
+        )
+        enforce_evidence_preflight(
+            run,
+            curated=model.evidence_policy == EvidencePolicy.CURATED,
+        )
         output = model.generate(
             AnchorIdentityOutput,
             system_prompt=SYSTEM_PROMPT,
@@ -61,14 +90,7 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         )
         _merge_nodes(run, [output.anchor])
         _merge_evidence(run, output.evidence)
-        run.manifest.update(
-            {
-                "model_provider": model.provider_name,
-                "model": model.model_name,
-                "evidence_policy": model.evidence_policy.value,
-                "anchor_node_id": output.anchor.id,
-            }
-        )
+        run.manifest["anchor_node_id"] = output.anchor.id
         _record_output(run, "intake", output)
         return {"message": "Anchor identity resolved", "anchor_node_id": output.anchor.id}
 
@@ -121,13 +143,20 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
             payload = proposal.model_dump()
             payload["as_of_date"] = run.as_of_date
             reviewed = bool(proposal.evidence_ids) and all(
-                evidence_by_id.get(item_id)
-                and evidence_by_id[item_id].status == EvidenceStatus.REVIEWED
+                evidence_is_reviewed_and_unchanged(
+                    run,
+                    evidence_by_id.get(item_id),
+                )
                 for item_id in proposal.evidence_ids
             )
-            grounded = model.evidence_policy == EvidencePolicy.CURATED or reviewed
-            if not grounded:
-                payload["confidence"] = Confidence.LOW
+            gated_confidence, grounded = apply_relationship_confidence_gate(
+                run,
+                requested_confidence=proposal.confidence.value,
+                reviewed_sources=reviewed,
+                curated=model.evidence_policy == EvidencePolicy.CURATED,
+                claim_label=f"relationship {proposal.id}",
+            )
+            payload["confidence"] = gated_confidence
             payload["metadata"] = {
                 "evidence_policy": model.evidence_policy.value,
                 "verification_required": not grounded,
@@ -194,6 +223,7 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "nodes": [item.model_dump(mode="json") for item in run.nodes],
                 "edges": [item.model_dump(mode="json") for item in run.edges],
                 "audit": output.model_dump(mode="json"),
+                "gaps": run.manifest["agent_outputs"]["graph"].get("graph_gaps", []),
             },
         )
         return {"message": "Anchor relationship audit completed", "accepted_edges": len(run.edges)}
@@ -280,6 +310,7 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         if len(output.ranked_node_ids) != len(set(output.ranked_node_ids)):
             raise ValueError("Decision ranking contains duplicates")
         _record_output(run, "decision", output)
+        refresh_evidence_coverage(run)
         _write_run_artifact(
             run,
             "decision.json",
@@ -307,10 +338,26 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
 def build_anchor_executor(
     run: ResearchRun, *, provider: str, max_attempts: int = 2
 ) -> WorkflowExecutor:
-    model = create_research_model(
-        provider,
-        subject=run.subject,
-        mode="anchor",
-        model=os.getenv("CAPEXGRAPH_MODEL"),
-    )
+    try:
+        model = create_research_model(
+            provider,
+            subject=run.subject,
+            mode="anchor",
+            model=os.getenv("CAPEXGRAPH_MODEL"),
+        )
+    except Exception as error:  # noqa: BLE001 - setup failures become durable checkpoints
+        message = f"Provider setup failed: {type(error).__name__}: {error}"
+
+        def fail_setup(
+            _run: ResearchRun,
+            _step: PipelineStep,
+            *,
+            detail: str = message,
+        ) -> dict[str, Any]:
+            raise RuntimeError(detail)
+
+        return WorkflowExecutor(
+            handlers={step.key: fail_setup for step in run.pipeline},
+            max_attempts=max_attempts,
+        )
     return WorkflowExecutor(handlers=build_anchor_handlers(model), max_attempts=max_attempts)

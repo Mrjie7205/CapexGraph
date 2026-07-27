@@ -6,17 +6,20 @@ which must also update `docs/DECISIONS.md` and `docs/CURRENT_STATUS.md`.
 
 ## Current release
 
-`v0.2.0` completes the first local, evidence-first vertical slice:
+`v0.3.0` completes the trustworthy live-research vertical slice:
 
-- Theme Scan and Anchor Scan;
-- captured/reviewed evidence and deterministic research tools;
-- resumable runs and a live Cockpit;
-- candidate tracking, paired benchmark scorecards, and reports.
+- versioned database upgrades and recovery;
+- official SEC source discovery and review queues;
+- evidence coverage, strict/partial execution, and source text in agent context;
+- immutable SEC filing facts with source locators and formula lineage;
+- provider/failure visibility and the complete create → source → review → facts → research → report
+  Cockpit path; and
+- preserved no-key fixtures, resumable runs, tracking, scorecards, and reports.
 
-The immediate priority is not adding more agent personas. It is making non-fixture research as
-trustworthy and repeatable as the golden cases.
+The immediate priority is v0.4 monitoring and re-evaluation. It is not adding more agent personas
+or starting Catalyst early.
 
-## v0.3 — Trustworthy live research
+## v0.3 — Trustworthy live research ✅
 
 详细实施顺序、交付物、测试矩阵和Definition of Done见
 [`docs/V0_3_PLAN.md`](docs/V0_3_PLAN.md)。`ROADMAP.md`仍是里程碑范围和优先级的最终
@@ -39,6 +42,9 @@ trustworthy and repeatable as the golden cases.
 - SQLite upgrades preserve existing v0.2.0 runs and scorecards through tested migrations.
 - At least one official-filing live case has a reproducible integration test with network calls
   replaced by frozen responses.
+
+Completed in `v0.3.0`; the execution record and test matrix remain in
+[`docs/V0_3_PLAN.md`](docs/V0_3_PLAN.md).
 
 ## v0.4 — Continuous monitoring and re-evaluation
 
@@ -117,9 +123,9 @@ must link back to the relevant goal and repeat its measurable acceptance criteri
 
 ### Active executable queue
 
-1. P0 — [#4 Add versioned SQLite migrations and backup/restore](https://github.com/Mrjie7205/CapexGraph/issues/4)
-2. P0 — [#5 Build official-source discovery and evidence review queue](https://github.com/Mrjie7205/CapexGraph/issues/5)
-3. P0 — [#6 Complete a live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6)
-4. P1 — [#7 Normalize filing-derived financial facts with evidence lineage](https://github.com/Mrjie7205/CapexGraph/issues/7)
-5. P1 — [#8 Add scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8)
-6. P1 — [#9 Implement Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9)
+1. Completed in v0.3 — [#4 versioned SQLite migrations and backup/restore](https://github.com/Mrjie7205/CapexGraph/issues/4)
+2. Completed in v0.3 — [#5 official-source discovery and evidence review queue](https://github.com/Mrjie7205/CapexGraph/issues/5)
+3. Completed in v0.3 — [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6)
+4. Completed in v0.3 — [#7 filing-derived financial facts with evidence lineage](https://github.com/Mrjie7205/CapexGraph/issues/7)
+5. Active P1 — [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8)
+6. Deferred to v0.5 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9)

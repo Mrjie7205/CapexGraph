@@ -20,6 +20,7 @@ class FixtureResearchModel:
     """Deterministic provider backed by a frozen, inspectable evidence pack."""
 
     provider_name = "fixture"
+    provider_version = "1"
     model_name = "golden-a-share-semiconductor-wafers-v1"
     evidence_policy = EvidencePolicy.CURATED
 

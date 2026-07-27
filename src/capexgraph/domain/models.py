@@ -53,6 +53,11 @@ class EvidenceStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class EvidenceMode(StrEnum):
+    PARTIAL = "partial"
+    STRICT = "strict"
+
+
 class SourceSuggestionStatus(StrEnum):
     SUGGESTED = "suggested"
     SELECTED = "selected"
@@ -166,6 +171,59 @@ class FinancialMetric(BaseModel):
     value: float
     unit: str = Field(min_length=1)
     source_evidence_id: str | None = None
+
+
+class FinancialStatement(StrEnum):
+    INCOME = "income_statement"
+    CASH_FLOW = "cash_flow"
+    BALANCE_SHEET = "balance_sheet"
+    SUPPLEMENTAL = "supplemental"
+
+
+class FinancialFactType(StrEnum):
+    REPORTED = "reported"
+    DERIVED = "derived"
+    RESTATED = "restated"
+    MISSING = "missing"
+
+
+class FinancialFact(BaseModel):
+    id: str = Field(min_length=1)
+    company: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    statement: FinancialStatement
+    metric: str = Field(min_length=1)
+    concept: str = Field(min_length=1)
+    period_start: date | None = None
+    period_end: date | None = None
+    fiscal_year: int | None = None
+    fiscal_period: str | None = None
+    form: str | None = None
+    filed_date: date | None = None
+    accession: str | None = None
+    value: float | None = None
+    unit: str = Field(min_length=1)
+    fact_type: FinancialFactType = FinancialFactType.REPORTED
+    source_evidence_id: str = Field(min_length=1)
+    source_locator: str = Field(min_length=1)
+    formula: str | None = None
+    input_fact_ids: list[str] = Field(default_factory=list)
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_fact_shape(self) -> FinancialFact:
+        if self.fact_type == FinancialFactType.MISSING:
+            if self.value is not None:
+                raise ValueError("missing financial facts cannot contain a value")
+        elif self.value is None:
+            raise ValueError("reported, restated, and derived facts require a value")
+        if self.fact_type == FinancialFactType.DERIVED:
+            if not self.formula or not self.input_fact_ids:
+                raise ValueError("derived financial facts require a formula and input_fact_ids")
+        elif self.formula or self.input_fact_ids:
+            raise ValueError("only derived financial facts may declare formula inputs")
+        return self
 
 
 class SupplyChainNode(BaseModel):
