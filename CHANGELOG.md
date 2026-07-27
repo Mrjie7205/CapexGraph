@@ -17,6 +17,8 @@ All notable changes to CapexGraph are documented here.
   from becoming unsupported named-supplier claims.
 - added Chinese report localization for Chinese subjects, including workflow labels, evidence
   states, confidence, financial metrics, units, risks, limitations, and disclaimers.
+- added an execution-grade v0.3 plan covering dependency order, PR boundaries, acceptance tests,
+  release gates, risks, and explicit exclusions.
 
 ## 0.2.0 — 2026-07-17
 

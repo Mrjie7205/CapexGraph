@@ -18,6 +18,10 @@ trustworthy and repeatable as the golden cases.
 
 ## v0.3 — Trustworthy live research
 
+详细实施顺序、交付物、测试矩阵和Definition of Done见
+[`docs/V0_3_PLAN.md`](docs/V0_3_PLAN.md)。`ROADMAP.md`仍是里程碑范围和优先级的最终
+依据，执行计划不得扩大到v0.4或v0.5能力。
+
 ### Goals
 
 1. Add database schema versioning and migrations before evolving persisted runs and tracking data.

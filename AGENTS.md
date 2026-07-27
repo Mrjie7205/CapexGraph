@@ -17,11 +17,12 @@ Read these files in order:
 
 1. `docs/CURRENT_STATUS.md` — what is actually shipped and what is not;
 2. `ROADMAP.md` — the next approved priorities and acceptance criteria;
-3. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
-4. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
-5. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
-6. the workflow-specific document under `docs/`; and
-7. `CONTRIBUTING.md` — validation and documentation contract.
+3. `docs/V0_3_PLAN.md` — execution order while v0.3 is the active target;
+4. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
+5. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
+6. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
+7. the workflow-specific document under `docs/`; and
+8. `CONTRIBUTING.md` — validation and documentation contract.
 
 When documentation and code disagree, verify the implementation and tests, fix the documentation
 in the same change, and record material design changes in `docs/DECISIONS.md`.

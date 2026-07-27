@@ -13,6 +13,7 @@ def test_cross_session_handoff_files_exist() -> None:
     required = [
         "AGENTS.md",
         "ROADMAP.md",
+        "docs/V0_3_PLAN.md",
         "docs/PROJECT_CONTEXT.md",
         "docs/CURRENT_STATUS.md",
         "docs/DECISIONS.md",
@@ -33,9 +34,12 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     roadmap = (ROOT / "ROADMAP.md").read_text(encoding="utf-8")
     status = (ROOT / "docs/CURRENT_STATUS.md").read_text(encoding="utf-8")
     theme_doc = (ROOT / "docs/THEME_SCAN.md").read_text(encoding="utf-8")
+    v03_plan = (ROOT / "docs/V0_3_PLAN.md").read_text(encoding="utf-8")
 
     assert __version__ == package_version == web_version
     assert f"v{__version__}" in roadmap
     assert f"v{__version__}" in status
     assert "Catalyst Scan is only a scaffold" in status
     assert "M3 does not give the model" not in theme_doc
+    assert all(issue in v03_plan for issue in ("#4", "#5", "#6", "#7"))
+    assert "Catalyst Scan" in v03_plan and "v0.5" in v03_plan

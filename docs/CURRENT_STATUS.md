@@ -1,6 +1,6 @@
 # Current status
 
-- Last verified: 2026-07-23
+- Last verified: 2026-07-27
 - Release: `v0.2.0` alpha
 - Main release commit: `ca2fe8f`
 - Next target: `v0.3 — Trustworthy live research`
@@ -74,13 +74,15 @@ reviewed but not built locally.
 
 ## Start here next
 
-Implement v0.3 in the execution order defined by `ROADMAP.md` and its `roadmap` GitHub Issues:
+Implement v0.3 in the execution order defined by
+[`docs/V0_3_PLAN.md`](V0_3_PLAN.md), `ROADMAP.md`, and the `roadmap` GitHub Issues:
 
-1. [#4 schema versioning and migrations](https://github.com/Mrjie7205/CapexGraph/issues/4);
-2. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
-3. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
-4. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7); and
-5. explicit Cockpit coverage/failure states as part of #5 and #6.
+1. merge the local Alphabet acceptance baseline into GitHub `main`;
+2. [#4 schema versioning and migrations](https://github.com/Mrjie7205/CapexGraph/issues/4);
+3. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
+4. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
+5. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7); and
+6. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
 
 Do not begin Catalyst Scan merely because the enum exists; trustworthy live evidence remains the
 higher priority.
