@@ -1,9 +1,9 @@
 # Current status
 
-Last verified: 2026-07-17  
-Release: `v0.2.0` alpha  
-Main release commit: `ca2fe8f`  
-Next target: `v0.3 — Trustworthy live research`
+- Last verified: 2026-07-27
+- Release: `v0.2.0` alpha
+- Main release commit: `ca2fe8f`
+- Next target: `v0.3 — Trustworthy live research`
 
 This file is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
@@ -20,6 +20,23 @@ substantial change, and update it in the same pull request whenever shipped capa
 - dynamic run graph, evidence ledger, candidate queue, and decision display;
 - tracked call/benchmark baselines, subsequent snapshots, alpha, trigger events, and stage board;
 - self-contained HTML reports, Windows bootstrap, Docker configuration, and wheel release.
+
+## Unreleased acceptance work
+
+- added a dated Alphabet Q2 2026 AI CapEx frozen replay and first-party live-capture case;
+- added registry-backed `GOOGL` and `GOOG` identities;
+- preserved captured hash/review metadata when deterministic replay reuses the same evidence
+  identity; and
+- added Chinese HTML report rendering for Chinese subjects, including evidence-linked financial
+  metrics; and
+- recorded the live baseline and remaining defects in
+  `cases/alphabet_q2_2026/ACCEPTANCE_REPORT.md`.
+
+This does not complete the v0.3 live vertical slice. Source discovery, automatic filing extraction,
+financial-fact prompt/report integration, and autonomous non-fixture execution remain open.
+
+The unreleased acceptance work is verified with Ruff, 35 passing Python tests, and a production
+Vite build.
 
 ## Verified at v0.2.0
 
@@ -57,13 +74,15 @@ reviewed but not built locally.
 
 ## Start here next
 
-Implement v0.3 in the execution order defined by `ROADMAP.md` and its `roadmap` GitHub Issues:
+Implement v0.3 in the execution order defined by
+[`docs/V0_3_PLAN.md`](V0_3_PLAN.md), `ROADMAP.md`, and the `roadmap` GitHub Issues:
 
-1. [#4 schema versioning and migrations](https://github.com/Mrjie7205/CapexGraph/issues/4);
-2. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
-3. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
-4. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7); and
-5. explicit Cockpit coverage/failure states as part of #5 and #6.
+1. merge the local Alphabet acceptance baseline into GitHub `main`;
+2. [#4 schema versioning and migrations](https://github.com/Mrjie7205/CapexGraph/issues/4);
+3. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
+4. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
+5. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7); and
+6. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
 
 Do not begin Catalyst Scan merely because the enum exists; trustworthy live evidence remains the
 higher priority.

@@ -1,0 +1,328 @@
+{
+  "fixture": {
+    "id": "golden-alphabet-q2-2026-ai-capex-v1",
+    "subject": "Alphabet 2026年Q2 AI资本开支传导",
+    "curation_note": "截至2026-07-22的一手披露冻结回放。用于验证研究契约，不代表实时信源发现或自主分析。"
+  },
+  "outputs": {
+    "ThemeBoundaryOutput": {
+      "scope": "Alphabet's Q2 2026 disclosure as a demand-side anchor for AI infrastructure capital expenditure, covering only directly evidenced operating demand and infrastructure constraints.",
+      "investment_question": "Which infrastructure layers are directly supported as constrained or strategically important, and where must the system stop before naming external beneficiaries?",
+      "included_layers": [
+        "Google Cloud AI infrastructure demand",
+        "AI accelerator and server capacity",
+        "multi-site data-center networking",
+        "capital expenditure and cash-flow pressure"
+      ],
+      "excluded_topics": [
+        "Named external suppliers not established by the captured sources",
+        "Brokerage execution or personalized trade advice",
+        "Power and cooling vendor attribution without procurement evidence"
+      ],
+      "capex_drivers": [
+        "Google Cloud revenue growth and backlog",
+        "Model API token growth",
+        "Management's statement that AI demand remains supply constrained",
+        "Scaling accelerators across multiple data-center sites"
+      ],
+      "research_questions": [
+        "Does the disclosure prove a capacity bottleneck rather than merely high spending?",
+        "Which infrastructure layers are explicitly described by management?",
+        "Can any named public supplier relationship be established from these sources alone?",
+        "How much of headline EPS reflects operating performance versus equity-security gains?"
+      ]
+    },
+    "PlayerCensusOutput": {
+      "nodes": [
+        {
+          "id": "company-alphabet",
+          "label": "Alphabet A类股",
+          "node_type": "company",
+          "ticker": "GOOGL",
+          "market": "NASDAQ",
+          "layer": "超大规模云与AI平台"
+        },
+        {
+          "id": "demand-enterprise-ai",
+          "label": "企业AI需求",
+          "node_type": "demand_segment",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "AI基础设施与解决方案需求"
+        },
+        {
+          "id": "bottleneck-ai-compute",
+          "label": "AI加速器与服务器容量",
+          "node_type": "bottleneck_layer",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "算力基础设施"
+        },
+        {
+          "id": "bottleneck-datacenter-network",
+          "label": "跨数据中心网络",
+          "node_type": "bottleneck_layer",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "网络与数据中心基础设施"
+        },
+        {
+          "id": "hypothesis-power-cooling",
+          "label": "电力与冷却容量",
+          "node_type": "unverified_hypothesis",
+          "ticker": null,
+          "market": "GLOBAL",
+          "layer": "数据中心物理基础设施"
+        }
+      ],
+      "coverage_notes": [
+        "The census deliberately uses demand and bottleneck layers instead of inventing a vendor list.",
+        "Alphabet is the disclosed spending and demand anchor; this is not a complete AI infrastructure universe."
+      ],
+      "unresolved_entities": [
+        "External accelerator, server, optical, electrical, cooling, and construction vendors require separate procurement or supplier evidence.",
+        "The captured sources name available accelerator platforms but do not establish a complete supplier relationship map."
+      ]
+    },
+    "ThemeGraphOutput": {
+      "additional_nodes": [],
+      "evidence": [
+        {
+          "id": "alphabet-q2-2026-earnings-release",
+          "title": "Alphabet 2026年第二季度财报",
+          "kind": "filing",
+          "source_url": "https://s206.q4cdn.com/479360582/files/doc_financials/2026/q2/2026q2-alphabet-earnings-release.pdf",
+          "published_at": "2026-07-22",
+          "excerpt": "Alphabet披露营收1198亿美元、Google Cloud收入248亿美元、购置物业与设备449亿美元，季度自由现金流为负59亿美元。"
+        },
+        {
+          "id": "alphabet-q2-2026-ceo-remarks",
+          "title": "Alphabet 2026年Q2财报会CEO发言",
+          "kind": "transcript",
+          "source_url": "https://blog.google/company-news/inside-google/message-ceo/alphabet-earnings-q2-2026/",
+          "published_at": "2026-07-22",
+          "excerpt": "管理层表示Cloud收入增长82%，积压订单达到5140亿美元，模型需求仍受供给约束，Virgo网络用于连接多个数据中心的加速器。"
+        }
+      ],
+      "edges": [
+        {
+          "id": "edge-alphabet-serves-ai-demand",
+          "source": "company-alphabet",
+          "target": "demand-enterprise-ai",
+          "relationship": "supplies",
+          "product": "Google Cloud AI基础设施与AI解决方案",
+          "basis": "财报与CEO发言均将Cloud增长归因于企业AI基础设施和解决方案需求。",
+          "confidence": "high",
+          "evidence_ids": [
+            "alphabet-q2-2026-earnings-release",
+            "alphabet-q2-2026-ceo-remarks"
+          ]
+        },
+        {
+          "id": "edge-alphabet-depends-compute",
+          "source": "company-alphabet",
+          "target": "bottleneck-ai-compute",
+          "relationship": "depends_on",
+          "product": "AI加速器与服务器容量",
+          "basis": "管理层披露模型使用量快速增长，并明确表示需求仍受供给约束。",
+          "confidence": "high",
+          "evidence_ids": [
+            "alphabet-q2-2026-ceo-remarks"
+          ]
+        },
+        {
+          "id": "edge-compute-depends-network",
+          "source": "bottleneck-ai-compute",
+          "target": "bottleneck-datacenter-network",
+          "relationship": "depends_on",
+          "product": "跨数据中心加速器互联",
+          "basis": "管理层称Virgo网络可连接分布于多个数据中心的百万级AI加速器。",
+          "confidence": "high",
+          "evidence_ids": [
+            "alphabet-q2-2026-ceo-remarks"
+          ]
+        }
+      ],
+      "graph_gaps": [
+        "The earnings release does not break capital expenditure into accelerators, servers, network, buildings, power, or cooling.",
+        "No captured source establishes named external suppliers or the revenue exposure of potential beneficiaries.",
+        "Power and cooling are economically plausible dependencies but remain unconnected hypotheses in this evidence pack."
+      ]
+    },
+    "EvidenceAuditOutput": {
+      "findings": [
+        {
+          "edge_id": "edge-alphabet-serves-ai-demand",
+          "verdict": "accept",
+          "rationale": "First-party financial and management disclosures directly support Cloud AI demand and service delivery."
+        },
+        {
+          "edge_id": "edge-alphabet-depends-compute",
+          "verdict": "accept",
+          "rationale": "Management directly stated that model demand is supply constrained and described the accelerator portfolio."
+        },
+        {
+          "edge_id": "edge-compute-depends-network",
+          "verdict": "accept",
+          "rationale": "Management directly tied the network design to connecting accelerators across multiple data-center sites."
+        }
+      ],
+      "source_warnings": [
+        "Backlog is a committed-demand indicator, not current-period revenue or supplier orders.",
+        "Capital expenditure is reported in aggregate and cannot be allocated to individual infrastructure layers from these sources.",
+        "A product or platform mention is not sufficient evidence of a customer-supplier relationship or beneficiary revenue."
+      ],
+      "audit_summary": "The disclosure supports strong AI demand, a compute-capacity constraint, and network scaling. It does not support a named external beneficiary graph."
+    },
+    "BottleneckScoreOutput": {
+      "candidates": [
+        {
+          "node_id": "bottleneck-ai-compute",
+          "verdict": "watch",
+          "thesis": "证据最充分的瓶颈是AI算力容量：Token使用量持续增长，管理层仍明确表示需求受供给约束。",
+          "archetypes": [
+            "容量瓶颈",
+            "加速器与服务器扩容"
+          ],
+          "risks": [
+            "软硬件效率提升可能降低单次查询所需算力",
+            "公司没有披露资本开支在各供应商之间的分配",
+            "新增供给可能逐步追上需求"
+          ],
+          "invalidation": [
+            "管理层不再提及供给约束，同时积压订单和Token增速放缓",
+            "资本开支持续高企，但Cloud增长或利用率没有同步改善"
+          ],
+          "triggers": [
+            {
+              "metric": "model_api_tokens_per_minute",
+              "operator": ">=",
+              "value": 22000000000,
+              "note": "2026年Q2披露基线"
+            }
+          ],
+          "confidence": "high"
+        },
+        {
+          "node_id": "bottleneck-datacenter-network",
+          "verdict": "watch",
+          "thesis": "跨多个数据中心连接大规模加速器集群，使网络扩容成为关键研究方向，但目前尚无供应商名单或网络资本开支拆分。",
+          "archetypes": [
+            "横向扩展网络",
+            "跨数据中心网络架构"
+          ],
+          "risks": [
+            "内部自研架构未必能转化为外部上市公司的业绩机会",
+            "披露中缺少网络专项资本开支",
+            "供应商集中度和产品结构未知"
+          ],
+          "invalidation": [
+            "后续披露不再提及网络扩容",
+            "加速器部署增长，但没有相应互联投资证据"
+          ],
+          "triggers": [],
+          "confidence": "medium"
+        },
+        {
+          "node_id": "company-alphabet",
+          "verdict": "watch",
+          "thesis": "Cloud需求和营业利润加速增长，但本季度也体现了扩容带来的现金流成本，且表面EPS受到巨额股权证券收益扭曲。",
+          "archetypes": [
+            "需求锚点",
+            "自我造血的超大规模云厂商"
+          ],
+          "risks": [
+            "资本开支对自由现金流形成压力",
+            "非经营性股权收益扭曲表面利润",
+            "基础设施投资回报可能滞后于部署"
+          ],
+          "invalidation": [
+            "资本开支维持高位，但Cloud增长和积压订单放缓",
+            "经营回报无法覆盖上升的折旧和基础设施成本"
+          ],
+          "triggers": [
+            {
+              "metric": "free_cash_flow",
+              "operator": "<",
+              "value": 0,
+              "note": "2026年Q2自由现金流为负"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ],
+      "ranking_method": "优先排序有直接证据的供给约束，其次是基础设施依赖，最后是资本开支锚点；不对供应商、估值或价格动量进行排名。",
+      "data_gaps": [
+        "按设备和设施类别拆分的资本开支",
+        "具名供应商采购关系及收入敞口",
+        "部署周期、利用率、价格与增量投资回报",
+        "电力、冷却、光互联、存储和建设环节证据"
+      ]
+    },
+    "DebateOutput": {
+      "reviews": [
+        {
+          "node_id": "bottleneck-ai-compute",
+          "bull_case": [
+            "供给受限的需求和Token快速增长支持持续扩容。"
+          ],
+          "bear_case": [
+            "模型与硬件效率提升可能削弱Token增长与硬件投入之间的关系。"
+          ],
+          "unresolved_questions": [
+            "新增资本开支具体流向哪些加速器和服务器品类？"
+          ]
+        },
+        {
+          "node_id": "bottleneck-datacenter-network",
+          "bull_case": [
+            "随着集群扩张，跨数据中心加速器互联的重要性上升。"
+          ],
+          "bear_case": [
+            "该架构可能主要由内部设计，现有披露没有给出可投资的供应商敞口。"
+          ],
+          "unresolved_questions": [
+            "基础设施资本开支中有多少流向网络设备和光互联？"
+          ]
+        },
+        {
+          "node_id": "company-alphabet",
+          "bull_case": [
+            "Cloud收入和营业利润增长显示AI基础设施已产生可量化的商业回报。"
+          ],
+          "bear_case": [
+            "季度自由现金流为负，且存在巨额非经营性股权收益，使表面盈利信号失真。"
+          ],
+          "unresolved_questions": [
+            "已部署基础设施需要多久才能转化为可持续自由现金流和资本回报？"
+          ]
+        }
+      ],
+      "cross_candidate_observations": [
+        "本次披露对基础设施需求的验证强于对任何外部供应商的验证。",
+        "在缺少采购、产品结构和收入敞口证据时，仅凭资本开支增长不足以排序受益公司。"
+      ]
+    },
+    "DecisionOutput": {
+      "research_status": "needs_review",
+      "summary": "Alphabet 2026年Q2财报确认AI算力容量和跨数据中心网络是优先研究方向，但现有证据不足以指向具名外部供应商。Alphabet本身是需求和资本开支锚点，分析时必须将主营经营改善、现金流压力和股权收益造成的EPS失真分开。",
+      "ranked_node_ids": [
+        "bottleneck-ai-compute",
+        "bottleneck-datacenter-network",
+        "company-alphabet"
+      ],
+      "limitations": [
+        "这是基于一手材料的人工策划冻结回放，不是自主实时信源发现。",
+        "该回放验证结构化输出和证据纪律，但不代表模型能够自主复现相同判断。",
+        "两份已采集材料没有建立任何具名外部供应商关系。",
+        "财务指标已进入报告和系统存储，但尚未自动注入Theme Scan推理上下文。"
+      ],
+      "next_actions": [
+        "从后续文件中提取资本开支、折旧、Cloud收入、营业利润、积压订单和自由现金流时间序列。",
+        "在加入具名受益公司前，单独检索一手采购、供应商和产品披露。",
+        "为非Fixture实时工作流加入官方信源发现和财务事实上下文。",
+        "持续跟踪后续季度的供给约束表述、Cloud积压订单和自由现金流变化。"
+      ]
+    }
+  }
+}

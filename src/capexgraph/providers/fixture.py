@@ -9,6 +9,8 @@ THEME_SUBJECTS = {
     "a股半导体硅片",
     "a股半导体硅片板块",
     "半导体硅片",
+    "alphabet q2 2026 ai capex transmission",
+    "alphabet 2026年q2 ai资本开支传导",
 }
 
 ANCHOR_SUBJECTS = {"兆易创新", "603986", "603986.sh"}
@@ -27,11 +29,15 @@ class FixtureResearchModel:
         if normalized not in subjects:
             supported = "、".join(sorted(subjects))
             raise ValueError(f"Fixture provider only supports: {supported}")
-        filename = (
-            "theme_semiconductor_wafers_cn.json"
-            if mode == "theme"
-            else "anchor_gigadevice_cn.json"
-        )
+        if mode == "anchor":
+            filename = "anchor_gigadevice_cn.json"
+        elif normalized in {
+            "alphabet q2 2026 ai capex transmission",
+            "alphabet 2026年q2 ai资本开支传导",
+        }:
+            filename = "theme_alphabet_q2_2026_us.json"
+        else:
+            filename = "theme_semiconductor_wafers_cn.json"
         fixture_path = files("capexgraph.fixtures").joinpath(filename)
         self._payload = json.loads(fixture_path.read_text(encoding="utf-8"))
         self.model_name = self._payload["fixture"]["id"]

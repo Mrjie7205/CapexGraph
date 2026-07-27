@@ -28,7 +28,18 @@ The run produces:
 
 ### Fixture
 
-`--provider fixture` accepts only the golden semiconductor-wafer subject. Its public sources were manually curated, so audited edges may retain medium or high confidence.
+`--provider fixture` accepts the golden semiconductor-wafer subject and the dated
+`Alphabet 2026年Q2 AI资本开支传导` acceptance subject. Their public sources and expected
+outputs were manually curated, so audited edges may retain medium or high confidence. The Alphabet
+case additionally verifies that a newly captured source can retain its hash and review state when
+the deterministic replay proposes the same stable evidence identity.
+
+```powershell
+capexgraph demo-alphabet-q2
+```
+
+The Alphabet fixture deliberately stops at evidence-backed infrastructure layers. It does not
+convert product mentions or aggregate capital expenditure into named supplier relationships.
 
 ### OpenAI
 

@@ -72,6 +72,17 @@ def _merge_nodes(run: ResearchRun, proposals: list[Any]) -> None:
     run.nodes = list(nodes.values())
 
 
+def _evidence_identity_matches(existing: Evidence, proposal: Any) -> bool:
+    existing_url = str(existing.source_url).rstrip("/") if existing.source_url else None
+    proposal_url = str(proposal.source_url).rstrip("/") if proposal.source_url else None
+    return (
+        existing.title == proposal.title
+        and existing.kind == proposal.kind
+        and existing_url == proposal_url
+        and existing.published_at == proposal.published_at
+    )
+
+
 def _validate_graph(run: ResearchRun) -> None:
     node_ids = {node.id for node in run.nodes}
     evidence_ids = {item.id for item in run.evidence}
@@ -109,6 +120,11 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "model_provider": model.provider_name,
                 "model": model.model_name,
                 "evidence_policy": model.evidence_policy.value,
+                "report_language": (
+                    "zh-CN"
+                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
+                    else "en"
+                ),
             }
         )
         _record_output(run, "intake", output)
@@ -149,9 +165,10 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         for proposal in output.evidence:
             item = Evidence(**proposal.model_dump())
             existing = evidence.get(item.id)
-            if existing is not None and existing != item:
+            if existing is not None and not _evidence_identity_matches(existing, proposal):
                 raise ValueError(f"Conflicting evidence definition: {item.id}")
-            evidence[item.id] = item
+            if existing is None:
+                evidence[item.id] = item
         run.evidence = list(evidence.values())
 
         edges: list[SupplyChainEdge] = []
@@ -329,7 +346,11 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "provider": model.provider_name,
                 "model": model.model_name,
                 "evidence_policy": model.evidence_policy.value,
-                "disclaimer": "Research and education only; not investment advice.",
+                "disclaimer": (
+                    "仅供研究和教育，不构成投资建议。"
+                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
+                    else "Research and education only; not investment advice."
+                ),
             },
         )
         return {"message": "Structured research decision issued", "status": output.research_status}

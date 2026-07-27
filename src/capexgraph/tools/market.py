@@ -187,9 +187,14 @@ def capture_market_snapshot(
     relative_path = f"market/{safe_ticker}.json"
     atomic_write_bytes(runs_dir() / run.id / relative_path, raw)
     evidence_id = f"market-{safe_ticker}-{snapshot.as_of_date.isoformat()}"
+    chinese_name = any("\u4e00" <= character <= "\u9fff" for character in identity.name)
     market_evidence = Evidence(
         id=evidence_id,
-        title=f"{identity.name} daily adjusted market history",
+        title=(
+            f"{identity.name}日度复权行情"
+            if chinese_name
+            else f"{identity.name} daily adjusted market history"
+        ),
         kind=EvidenceKind.MARKET_DATA,
         source_url=source_url,
         published_at=snapshot.as_of_date,

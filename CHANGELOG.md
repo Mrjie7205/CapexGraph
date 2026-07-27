@@ -8,6 +8,17 @@ All notable changes to CapexGraph are documented here.
   context, current status, accepted decisions, documentation drift checks, and PR checklist;
 - clarified that Catalyst Scan is reserved/scaffolded rather than shipped;
 - updated Theme Scan documentation for the M4 evidence capture and review boundary.
+- added an Alphabet Q2 2026 AI CapEx acceptance case with first-party evidence manifests,
+  normalized financial facts, a deterministic no-key replay, and an observed-defects report;
+- added registry-backed Alphabet Class A and Class C ticker identities;
+- preserved captured evidence hashes, local artifacts, and review status when a workflow reuses
+  the same stable evidence identity;
+- added frozen-response integration coverage that prevents aggregate CapEx or product mentions
+  from becoming unsupported named-supplier claims.
+- added Chinese report localization for Chinese subjects, including workflow labels, evidence
+  states, confidence, financial metrics, units, risks, limitations, and disclaimers.
+- added an execution-grade v0.3 plan covering dependency order, PR boundaries, acceptance tests,
+  release gates, risks, and explicit exclusions.
 
 ## 0.2.0 — 2026-07-17
 

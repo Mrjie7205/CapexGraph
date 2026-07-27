@@ -69,4 +69,4 @@ def test_html_report_is_portable_and_escaped(tmp_path, monkeypatch) -> None:
     assert path == (tmp_path / run.id / "report.html").resolve()
     assert "&lt;script&gt;" in content
     assert "<script>alert" not in content
-    assert "Research and education only" in content
+    assert "仅供研究和教育" in content
