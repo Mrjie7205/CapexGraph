@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   createRun,
   captureTrackingSnapshot,
+  evidenceTextUrl,
   executeRun,
   getDecision,
   getRun,
@@ -11,12 +12,15 @@ import {
   setTrackingStage,
   trackCandidate,
   type DecisionArtifact,
+  type EvidenceMode,
   type Provider,
   type ResearchRun,
   type RunMode,
   type Scorecard,
   type TrackingStage,
 } from "./api";
+import { ResearchReadiness } from "./ResearchReadiness";
+import { SourceQueue } from "./SourceQueue";
 
 const FINAL_STATUSES = new Set(["needs_review", "completed", "failed", "cancelled"]);
 
@@ -92,6 +96,8 @@ function GraphView({ run }: { run: ResearchRun | null }) {
 function App() {
   const [mode, setMode] = useState<RunMode>("theme");
   const [provider, setProvider] = useState<Provider>("fixture");
+  const [evidenceMode, setEvidenceMode] = useState<EvidenceMode>("partial");
+  const [market, setMarket] = useState("CN");
   const [subject, setSubject] = useState("A股半导体硅片");
   const [runs, setRuns] = useState<ResearchRun[]>([]);
   const [selected, setSelected] = useState<ResearchRun | null>(null);
@@ -140,8 +146,9 @@ function App() {
     getDecision(selected.id).then(setDecision).catch(() => undefined);
   }, [selected?.id, selected?.status]);
 
-  async function startRun(run: ResearchRun, resume = false) {
-    await executeRun(run.id, provider, resume);
+  async function startRun(run: ResearchRun, resume = false, until?: string) {
+    const runProvider = String(run.manifest.model_provider || provider) as Provider;
+    await executeRun(run.id, runProvider, resume, { evidenceMode, until });
     setSelected({ ...run, status: "running" });
     setPolling(true);
   }
@@ -152,10 +159,15 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      const created = await createRun(mode, subject.trim(), provider);
+      const created = await createRun(
+        mode,
+        subject.trim(),
+        provider,
+        market.trim().toUpperCase(),
+        evidenceMode,
+      );
       setSelected(created);
       setRuns((items) => [created, ...items.filter((item) => item.id !== created.id)]);
-      await startRun(created);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Run creation failed");
     } finally {
@@ -172,10 +184,17 @@ function App() {
     setBusy(true);
     setError("");
     try {
-      const created = await createRun(demoMode, demoSubject, "fixture", demoDate);
+      const created = await createRun(
+        demoMode,
+        demoSubject,
+        "fixture",
+        "CN",
+        "partial",
+        demoDate,
+      );
       setSelected(created);
       setRuns((items) => [created, ...items]);
-      await executeRun(created.id, "fixture");
+      await executeRun(created.id, "fixture", false, { evidenceMode: "partial" });
       setSelected({ ...created, status: "running" });
       setPolling(true);
     } catch (reason) {
@@ -198,13 +217,29 @@ function App() {
     }
   }
 
+  async function runNextStage() {
+    if (!selected) return;
+    const nextStep = selected.pipeline.find((step) => ["pending", "failed"].includes(step.status));
+    if (!nextStep) return;
+    setBusy(true);
+    setError("");
+    try {
+      await startRun(selected, selected.status === "failed", nextStep.key);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Stage execution failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function review(evidenceId: string, approved: boolean) {
     if (!selected) return;
     try {
       const updated = await reviewEvidence(selected.id, evidenceId, approved);
+      const current = await getRun(selected.id);
       setSelected({
-        ...selected,
-        evidence: selected.evidence.map((item) => (item.id === updated.id ? updated : item)),
+        ...current,
+        evidence: current.evidence.map((item) => (item.id === updated.id ? updated : item)),
       });
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Evidence review failed");
@@ -261,7 +296,7 @@ function App() {
           <span className="brand-mark"><i>C</i><i>G</i></span>
           <span>CapexGraph<small>evidence-led research</small></span>
         </a>
-        <nav><a className="active" href="#runs">Runs</a><a href="#graph">Graph</a><a href="#radar">Radar</a><a href="#ledger">Evidence</a></nav>
+        <nav><a className="active" href="#runs">Runs</a><a href="#sources">Sources</a><a href="#graph">Graph</a><a href="#radar">Radar</a><a href="#ledger">Evidence</a></nav>
         <div className="system-state"><span /> Local research workspace</div>
       </header>
 
@@ -278,12 +313,14 @@ function App() {
               <button type="button" className={mode === "theme" ? "selected" : ""} onClick={() => { setMode("theme"); setSubject("A股半导体硅片"); }}><span>Theme Scan</span><small>主题 → 瓶颈</small></button>
               <button type="button" className={mode === "anchor" ? "selected" : ""} onClick={() => { setMode("anchor"); setSubject("兆易创新"); }}><span>Anchor Scan</span><small>个股 → 邻居</small></button>
             </div>
-            <div className="form-pair">
+            <div className="composer-options">
               <label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value as Provider)}><option value="fixture">Fixture · no key</option><option value="openai">OpenAI</option></select></label>
-              <label>Market<input value="CN" disabled /></label>
+              <label>Evidence<select value={evidenceMode} onChange={(event) => setEvidenceMode(event.target.value as EvidenceMode)}><option value="partial">Partial · continue with gaps</option><option value="strict">Strict · reviewed first</option></select></label>
+              <label>Market<input value={market} onChange={(event) => setMarket(event.target.value)} maxLength={12} /></label>
             </div>
             <label htmlFor="subject">{mode === "theme" ? "Investment theme" : "Ticker or company"}</label>
-            <div className="subject-row"><input id="subject" value={subject} onChange={(event) => setSubject(event.target.value)} /><button className="launch" disabled={busy}>{busy ? "Starting…" : "Create & run ↗"}</button></div>
+            <div className="subject-row"><input id="subject" value={subject} onChange={(event) => setSubject(event.target.value)} /><button className="launch" disabled={busy}>{busy ? "Creating…" : "Create workspace ↗"}</button></div>
+            <p className="composer-note">创建工作区、找信源、审核和 SEC 财务抽取无需模型 Key；只有 OpenAI 研究执行需要配置 Key。</p>
             <button className="demo-launch" type="button" disabled={busy} onClick={runGoldenDemo}>Run {mode} golden case · 无需 API Key</button>
             {error && <p className="run-error">{error}</p>}
           </form>
@@ -305,7 +342,17 @@ function App() {
             {runs.slice(0, 5).map((run) => <button key={run.id} className={selected?.id === run.id ? "active" : ""} onClick={() => setSelected(run)}><span>{run.mode}</span><strong>{run.subject}</strong><small>{run.status}</small></button>)}
           </div>
           <div className="run-title"><div><small>{selected?.mode?.toUpperCase() ?? "NO RUN"}</small><h2>{selected?.subject ?? "Create a research run"}</h2></div><span className="run-id">{selected?.id ?? "—"}</span></div>
-          {selected && hasPending && <div className="run-action"><button disabled={busy || polling} onClick={continueRun}>{selected.status === "failed" ? "Resume failed run" : "Continue workflow"}</button></div>}
+          {selected && hasPending && <div className="run-action">
+            {selected.status === "failed" ? (
+              <button disabled={busy || polling} onClick={continueRun}>Retry from failed checkpoint</button>
+            ) : (
+              <>
+                <button disabled={busy || polling} onClick={runNextStage}>Run next stage · pause after checkpoint</button>
+                <button className="secondary" disabled={busy || polling} onClick={continueRun}>Run all remaining stages</button>
+              </>
+            )}
+            <small>{selected.status === "created" ? "先采集和审核材料，再执行研究；部分模式允许带缺口继续。" : "Completed checkpoints are preserved when execution resumes."}</small>
+          </div>}
           <ol className="steps">
             {selected?.pipeline.map((step, index) => <li className={step.status === "completed" ? "done" : step.status === "running" ? "live" : step.status === "failed" ? "failed" : "wait"} key={step.key}><span className="step-no">{String(index + 1).padStart(2, "0")}</span><div><strong>{step.label}</strong><small>{step.message || step.agent}</small>{step.error && <small className="step-error">{step.error}</small>}</div><i>{step.status}</i></li>)}
           </ol>
@@ -318,11 +365,23 @@ function App() {
         </article>
       </section>
 
+      <SourceQueue
+        run={selected}
+        onRunUpdated={setSelected}
+        onError={setError}
+      />
+
+      <ResearchReadiness
+        run={selected}
+        onRunUpdated={setSelected}
+        onError={setError}
+      />
+
       <section className="lower-grid">
         <article className="ledger panel" id="ledger">
           <div className="panel-title"><span>Evidence ledger</span><b>{selected?.evidence.length ?? 0} ITEMS</b></div>
-          {selected?.evidence.map((item) => <div className="source-row" key={item.id}><span className={`source-status ${item.status}`}>{item.status}</span><div><strong>{item.title}</strong><small>{item.publisher ?? item.id}</small></div>{item.status === "captured" ? <div className="review-actions"><button onClick={() => review(item.id, true)}>Approve</button><button onClick={() => review(item.id, false)}>Reject</button></div> : item.source_url ? <a href={item.source_url} target="_blank" rel="noreferrer">Source ↗</a> : <span />}</div>)}
-          {selected && selected.evidence.length === 0 && <p className="empty-state">Execute through the graph stage to populate evidence.</p>}
+          {selected?.evidence.map((item) => <div className="source-row" key={item.id}><span className={`source-status ${item.status}`}>{item.status}</span><div><strong>{item.title}</strong><small>{item.publisher ?? item.id}</small></div><div className="review-actions">{item.source_url && <a href={item.source_url} target="_blank" rel="noreferrer">Source ↗</a>}{item.local_path?.startsWith("sources/") && <a href={evidenceTextUrl(selected.id, item.id)} target="_blank" rel="noreferrer">Text ↗</a>}{item.status === "captured" && <><button onClick={() => review(item.id, true)}>Approve</button><button onClick={() => review(item.id, false)}>Reject</button></>}</div></div>)}
+          {selected && selected.evidence.length === 0 && <p className="empty-state">Capture an official source first, or execute in partial mode to generate low-confidence research leads.</p>}
           {!selected && <p className="empty-state">Select a run to inspect its source ledger.</p>}
         </article>
 

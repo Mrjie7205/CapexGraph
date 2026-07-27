@@ -1,6 +1,37 @@
 # Live research tools
 
-M4 turns evidence from a model suggestion into a captured, inspectable source.
+v0.3 separates source discovery from evidence capture. A discovery result is a queue item, not a
+fact and not Evidence.
+
+## Official-source review queue
+
+```text
+suggested → selected → capture_pending → captured Evidence
+       ↘ dismissed          ↘ capture_failed → retry
+                             ↘ duplicate
+```
+
+Discover recent SEC filings by exact ticker, SEC company name, or CIK:
+
+```powershell
+capexgraph sources discover <run-id> --identifier GOOGL
+capexgraph sources list <run-id>
+capexgraph sources capture <run-id> <suggestion-id>
+```
+
+Or add a known issuer/regulator URL without downloading it:
+
+```powershell
+capexgraph sources add <run-id> "https://issuer.example/report" `
+  --title "Issuer report" `
+  --issuer-domain issuer.example
+```
+
+The queue records provider/version, discovery reason, authority classification, canonical URL,
+status, errors, duplicate identity, and any resulting evidence ID. URL duplicates and identical
+downloaded bytes are handled separately. SEC suggestions are prioritized as regulator sources but
+still require capture and human review. Discovery-provider errors and capture failures remain
+visible after restart.
 
 ## Evidence lifecycle
 
@@ -22,6 +53,10 @@ capexgraph evidence review <run-id> company-annual-report
 
 The collector accepts public HTTP/HTTPS sources, follows redirects, limits each source to 20 MiB, blocks credentials and private/loopback destinations, stores the original HTML/PDF under `sources/`, and writes extracted text beside it. Set `CAPEXGRAPH_ALLOW_PRIVATE_URLS=1` only for an intentionally local deployment.
 
+Redirect destinations are validated before they are requested. Only HTML and PDF captures enter the
+evidence ledger; unsupported content types, oversized files, unsafe destinations, and failed
+downloads stay in the source queue as explicit failures.
+
 ## Ticker identity
 
 ```powershell
@@ -41,7 +76,32 @@ The default no-key adapter captures adjusted daily history from Yahoo's chart en
 
 ## Financial facts
 
-CapexGraph imports normalized financial facts instead of scraping unverified numbers into the system of record. The CSV columns are:
+The built-in filing provider captures the official SEC Company Facts response, stores and hashes
+the raw JSON as Evidence, and deterministically normalizes a bounded US-GAAP metric set:
+
+- income statement: revenue, operating income, and net income;
+- cash flow: operating cash flow, capital expenditures, and derived free cash flow; and
+- balance sheet: cash, debt, and property/plant/equipment.
+
+```powershell
+capexgraph financials extract <run-id> --identifier GOOGL
+capexgraph financials list <run-id>
+capexgraph evidence review <run-id> <sec-companyfacts-evidence-id>
+```
+
+Each fact stores canonical company/ticker, statement, normalized metric, original concept, period,
+fiscal fields, form, filed date, accession, value/unit, fact type, evidence ID, and exact JSON
+locator. A derived fact additionally stores its formula and input fact IDs. A later restatement is
+stored beside the original value; it never silently overwrites history. Missing values remain
+`missing` with `value=null`, never zero. Unit or same-filing period/value conflicts fail
+deterministically and are persisted as provider errors.
+
+The raw response is captured but not automatically human-approved. It can be reviewed through the
+same evidence ledger. Theme and Anchor prompts receive a bounded copy of the stored facts on their
+next uncompleted stage.
+
+The legacy evidence-linked CSV path remains available for company-specific metrics not covered by
+the SEC adapter. Its columns are:
 
 ```text
 ticker,metric,period_end,value,unit,source_evidence_id
@@ -52,3 +112,29 @@ capexgraph financials import <run-id> .\financial_metrics.csv
 ```
 
 When `source_evidence_id` is present, the import fails unless that evidence exists in the same run.
+
+Automatic extraction currently supports SEC Company Facts only. A-share exchange filings and
+non-US taxonomies require a future provider adapter.
+
+SEC asks automated clients to send an identifying User-Agent. Configure
+`CAPEXGRAPH_SEC_USER_AGENT` with your application/name and a real contact address. A 403 or network
+block is persisted as a provider failure and shown in the Cockpit; CapexGraph does not bypass the
+regulator's access controls. Exact CIK input bypasses only the separate remote ticker-registry
+lookup, not the Company Facts endpoint itself.
+
+## Evidence modes and execution
+
+`partial` is the default. It permits research with incomplete coverage, but unreviewed/model-only
+relationships are forced to low confidence and the report exposes the gap.
+
+`strict` requires at least one reviewed, hash-valid capture before a non-fixture workflow begins and
+blocks any medium/high relationship proposal whose citations are not all reviewed:
+
+```powershell
+capexgraph theme "AI data-center power" --market US --provider openai `
+  --evidence-mode strict
+capexgraph run <run-id> --provider openai --evidence-mode strict
+```
+
+Failures are ordinary durable checkpoints. Capture/review the missing source and use
+`capexgraph resume <run-id>`; completed stages are not regenerated.

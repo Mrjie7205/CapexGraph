@@ -24,6 +24,7 @@ from capexgraph.workflows import load_run, save_run
 
 class MarketDataProvider(Protocol):
     provider_name: str
+    provider_version: str
 
     def fetch_history(self, ticker: str, *, days: int = 400) -> list[MarketBar]: ...
 
@@ -43,6 +44,7 @@ class YahooChartProvider:
     """Best-effort, no-key daily price provider backed by Yahoo's chart endpoint."""
 
     provider_name = "yahoo-chart"
+    provider_version = "1"
 
     def __init__(self, client: httpx.Client | None = None) -> None:
         self.client = client or httpx.Client(timeout=20, follow_redirects=True)
@@ -213,5 +215,12 @@ def capture_market_snapshot(
     providers = run.manifest.setdefault("data_providers", [])
     if active_provider.provider_name not in providers:
         providers.append(active_provider.provider_name)
+    records = run.manifest.setdefault("data_provider_records", [])
+    identity = {
+        "name": active_provider.provider_name,
+        "version": getattr(active_provider, "provider_version", "unknown"),
+    }
+    if identity not in records:
+        records.append(identity)
     save_run(run)
     return snapshot

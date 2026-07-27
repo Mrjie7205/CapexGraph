@@ -9,7 +9,6 @@ from capexgraph.domain import (
     Candidate,
     Confidence,
     Evidence,
-    EvidenceStatus,
     PipelineStep,
     ResearchRun,
     RunMode,
@@ -18,6 +17,13 @@ from capexgraph.domain import (
     Trigger,
 )
 from capexgraph.providers import EvidencePolicy, ProviderName, ResearchModel, create_research_model
+from capexgraph.research.context import (
+    apply_relationship_confidence_gate,
+    build_research_context,
+    enforce_evidence_preflight,
+    evidence_is_reviewed_and_unchanged,
+    refresh_evidence_coverage,
+)
 from capexgraph.research.theme_schemas import (
     BottleneckScoreOutput,
     DebateOutput,
@@ -47,7 +53,10 @@ def _prompt(run: ResearchRun, task: str, context: dict[str, Any]) -> str:
             "market": run.market,
             "as_of_date": run.as_of_date.isoformat(),
         },
-        "context": context,
+        "context": {
+            **context,
+            **build_research_context(run),
+        },
     }
     return json.dumps(payload, ensure_ascii=False, indent=2, default=str)
 
@@ -106,6 +115,28 @@ def _validate_graph(run: ResearchRun) -> None:
 
 def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
     def intake(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
+        run.manifest.update(
+            {
+                "model_provider": model.provider_name,
+                "model": model.model_name,
+                "model_provider_details": {
+                    "name": model.provider_name,
+                    "version": getattr(model, "provider_version", "unknown"),
+                    "model": model.model_name,
+                },
+                "evidence_policy": model.evidence_policy.value,
+                "as_of_date": run.as_of_date.isoformat(),
+                "report_language": (
+                    "zh-CN"
+                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
+                    else "en"
+                ),
+            }
+        )
+        enforce_evidence_preflight(
+            run,
+            curated=model.evidence_policy == EvidencePolicy.CURATED,
+        )
         output = model.generate(
             ThemeBoundaryOutput,
             system_prompt=SYSTEM_PROMPT,
@@ -114,18 +145,6 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "Define the research boundary and the decision-relevant questions.",
                 {},
             ),
-        )
-        run.manifest.update(
-            {
-                "model_provider": model.provider_name,
-                "model": model.model_name,
-                "evidence_policy": model.evidence_policy.value,
-                "report_language": (
-                    "zh-CN"
-                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
-                    else "en"
-                ),
-            }
         )
         _record_output(run, "intake", output)
         return {"message": "Theme boundary defined", "scope": output.scope}
@@ -177,18 +196,25 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
             payload = proposal.model_dump()
             payload["as_of_date"] = run.as_of_date
             reviewed_sources = bool(proposal.evidence_ids) and all(
-                evidence_by_id.get(evidence_id)
-                and evidence_by_id[evidence_id].status == EvidenceStatus.REVIEWED
+                evidence_is_reviewed_and_unchanged(
+                    run,
+                    evidence_by_id.get(evidence_id),
+                )
                 for evidence_id in proposal.evidence_ids
             )
-            claim_is_grounded = model.evidence_policy == EvidencePolicy.CURATED or reviewed_sources
+            gated_confidence, claim_is_grounded = apply_relationship_confidence_gate(
+                run,
+                requested_confidence=proposal.confidence.value,
+                reviewed_sources=reviewed_sources,
+                curated=model.evidence_policy == EvidencePolicy.CURATED,
+                claim_label=f"relationship {proposal.id}",
+            )
             payload["metadata"] = {
                 "evidence_policy": model.evidence_policy.value,
                 "verification_required": not claim_is_grounded,
                 "reviewed_sources": reviewed_sources,
             }
-            if not claim_is_grounded:
-                payload["confidence"] = Confidence.LOW
+            payload["confidence"] = gated_confidence
             edges.append(SupplyChainEdge(**payload))
         run.edges = edges
         _validate_graph(run)
@@ -259,6 +285,7 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
                 "nodes": [node.model_dump(mode="json") for node in run.nodes],
                 "edges": [edge.model_dump(mode="json") for edge in run.edges],
                 "audit": output.model_dump(mode="json"),
+                "gaps": run.manifest["agent_outputs"]["graph"].get("graph_gaps", []),
             },
         )
         return {"message": "Evidence audit completed", "accepted_edges": len(run.edges)}
@@ -338,6 +365,7 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         if len(output.ranked_node_ids) != len(set(output.ranked_node_ids)):
             raise ValueError("Decision ranking contains duplicate candidates")
         _record_output(run, "decision", output)
+        refresh_evidence_coverage(run)
         _write_run_artifact(
             run,
             "decision.json",
@@ -378,12 +406,28 @@ def build_executor_for_run(
         return WorkflowExecutor(max_attempts=max_attempts)
     if not selected:
         raise ValueError("Theme Scan execution requires --provider fixture or --provider openai")
-    model = create_research_model(
-        selected,
-        subject=run.subject,
-        mode="theme",
-        model=os.getenv("CAPEXGRAPH_MODEL"),
-    )
+    try:
+        model = create_research_model(
+            selected,
+            subject=run.subject,
+            mode="theme",
+            model=os.getenv("CAPEXGRAPH_MODEL"),
+        )
+    except Exception as error:  # noqa: BLE001 - setup failures become durable checkpoints
+        message = f"Provider setup failed: {type(error).__name__}: {error}"
+
+        def fail_setup(
+            _run: ResearchRun,
+            _step: PipelineStep,
+            *,
+            detail: str = message,
+        ) -> dict[str, Any]:
+            raise RuntimeError(detail)
+
+        return WorkflowExecutor(
+            handlers={step.key: fail_setup for step in run.pipeline},
+            max_attempts=max_attempts,
+        )
     return WorkflowExecutor(
         handlers=build_theme_handlers(model),
         max_attempts=max_attempts,

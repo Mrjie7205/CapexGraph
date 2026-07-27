@@ -1,9 +1,9 @@
 # CapexGraph v0.3 执行计划
 
 - 目标版本：`v0.3.0 — Trustworthy live research`
-- 计划状态：已批准方向，待逐项实施
+- 计划状态：已完成，作为`v0.3.0`交付记录保留
 - 基线版本：`v0.2.0`
-- 本地起点：`codex/alphabet-q2-acceptance`，提交`55064cb`
+- 实施分支：`codex/v0-3-trustworthy-live-research`
 - 对应GitHub任务：[#4](https://github.com/Mrjie7205/CapexGraph/issues/4)、
   [#5](https://github.com/Mrjie7205/CapexGraph/issues/5)、
   [#6](https://github.com/Mrjie7205/CapexGraph/issues/6)、
@@ -89,7 +89,7 @@ capexgraph report render <run-id>
 
 ## 4. 里程碑与执行顺序
 
-### M0 — 合并验收基线
+### M0 — 合并验收基线 ✅
 
 目标：将Alphabet验收工作作为v0.3的可复现起点，并避免本地状态与GitHub主分支分叉。
 
@@ -107,7 +107,7 @@ capexgraph report render <run-id>
 - 已保存不含敏感信息的v0.2数据库fixture；
 - `docs/CURRENT_STATUS.md`明确v0.3实施已开始。
 
-### M1 — 数据库版本、迁移与备份恢复
+### M1 — 数据库版本、迁移与备份恢复 ✅
 
 对应任务：[#4](https://github.com/Mrjie7205/CapexGraph/issues/4)  
 优先级：P0  
@@ -151,7 +151,7 @@ capexgraph db restore .\backup\capexgraph.db
 - 模拟中断后，旧数据库仍可读取；
 - 备份、恢复和升级均有自动测试和文档。
 
-### M2 — 官方信源发现与审核队列
+### M2 — 官方信源发现与审核队列 ✅
 
 对应任务：[#5](https://github.com/Mrjie7205/CapexGraph/issues/5)  
 优先级：P0  
@@ -211,7 +211,7 @@ suggested → selected → capture_pending → captured
 - 冻结响应测试覆盖成功、重复、重定向、超限、失败和安全拦截；
 - Cockpit可以查看、采集、驳回和重试建议。
 
-### M3 — 非Fixture实时Theme/Anchor闭环
+### M3 — 非Fixture实时Theme/Anchor闭环 ✅
 
 对应任务：[#6](https://github.com/Mrjie7205/CapexGraph/issues/6)  
 优先级：P0  
@@ -275,7 +275,7 @@ suggested → selected → capture_pending → captured
 - 冻结响应集成测试可以重复完整路径；
 - 两个旧黄金案例继续无需Key并通过。
 
-### M4 — 财报事实自动结构化与推理上下文
+### M4 — 财报事实自动结构化与推理上下文 ✅
 
 对应任务：[#7](https://github.com/Mrjie7205/CapexGraph/issues/7)  
 优先级：P1  
@@ -326,7 +326,7 @@ suggested → selected → capture_pending → captured
 - Theme/Anchor提示上下文实际包含相关财务事实；
 - 报告显示来源定位，而不只显示一个证据ID。
 
-### M5 — Cockpit收口、端到端验收与v0.3发布
+### M5 — Cockpit收口、端到端验收与v0.3发布 ✅
 
 优先级：P0收口  
 依赖：M1至M4
@@ -398,20 +398,20 @@ suggested → selected → capture_pending → captured
 
 以下条件必须全部满足：
 
-- [ ] `main`包含Alphabet验收基线；
-- [ ] SQLite具备正式版本、迁移、备份和恢复；
-- [ ] 至少一个官方信源Provider可用；
-- [ ] 发现建议与Evidence在状态和Schema上明确分离；
-- [ ] CLI和Cockpit均能完成建议、采集、审核和研究执行；
-- [ ] 一个非Fixture Theme或Anchor运行无需编辑JSON即可完成；
-- [ ] 未审核证据不能支撑中高置信度；
-- [ ] 官方财报事实能够自动提取、校验、保存和追溯；
-- [ ] Theme/Anchor实际消费相关财务事实；
-- [ ] 报告明确展示Provider、证据覆盖、财务来源和局限性；
-- [ ] v0.2数据库升级无数据损失；
-- [ ] 旧黄金案例继续无Key运行；
-- [ ] Python测试、Ruff、Web构建、wheel和CI全部通过；
-- [ ] 版本、CHANGELOG、升级文档和CURRENT_STATUS同步到`0.3.0`。
+- [x] `main`包含Alphabet验收基线；
+- [x] SQLite具备正式版本、迁移、备份和恢复；
+- [x] 至少一个官方信源Provider可用；
+- [x] 发现建议与Evidence在状态和Schema上明确分离；
+- [x] CLI和Cockpit均能完成建议、采集、审核和研究执行；
+- [x] 一个非Fixture Theme或Anchor运行无需编辑JSON即可完成；
+- [x] 未审核证据不能支撑中高置信度；
+- [x] 官方财报事实能够自动提取、校验、保存和追溯；
+- [x] Theme/Anchor实际消费相关财务事实；
+- [x] 报告明确展示Provider、证据覆盖、财务来源和局限性；
+- [x] v0.2数据库升级无数据损失；
+- [x] 旧黄金案例继续无Key运行；
+- [x] Python测试、Ruff、Web构建、wheel和CI全部通过；
+- [x] 版本、CHANGELOG、升级文档和CURRENT_STATUS同步到`0.3.0`。
 
 ## 8. 明确不属于v0.3
 
@@ -436,12 +436,7 @@ suggested → selected → capture_pending → captured
 | 为赶版本提前实现Catalyst | 测试和文档继续强制“Catalyst仅为scaffold” |
 | 本地能力未进入公库 | M0先合并验收基线，后续每阶段通过PR和CI交付 |
 
-## 10. 开工顺序
+## 10. 实施记录
 
-下一次开发Session从以下任务开始：
-
-1. 完成M0，将当前Alphabet验收分支推送并创建PR；
-2. 为#4设计legacy数据库fixture和迁移注册表；
-3. 在Schema改动前先完成备份/恢复测试；
-4. M1合并后再定义`SourceSuggestion`持久化Schema；
-5. 不并行启动Catalyst或定时监控。
+M0至M5按既定依赖顺序完成。下一次开发Session应从`ROADMAP.md`中的v0.4监控与重评开始，
+不应重复实现本计划，也不应因为`RunMode.CATALYST`已经存在就提前启动v0.5。

@@ -37,9 +37,30 @@ to runtime-only scaffold handlers and be presented as completed research.
 
 Provider interfaces prevent the workflow from depending on one model vendor. The built-in fixture provider loads a curated evidence pack and needs no key. The optional OpenAI provider uses structured Responses API output and is loaded only when selected.
 
-Tools own ticker identity, adjusted prices, financial imports, SSRF-safe public source retrieval,
-content hashing, and report rendering. The built-in market adapter is no-key and best-effort;
-production deployments can replace it behind the same interface.
+Tools own ticker identity, adjusted prices, financial facts/imports, SSRF-safe public source
+retrieval, content hashing, and report rendering. The built-in market adapter is no-key and
+best-effort; production deployments can replace it behind the same interface.
+
+Source discovery has its own trust boundary. `SourceSuggestion` records a provider result, official
+domain classification, reason, and queue state. It is not Evidence. Only a successful guarded
+capture creates `Evidence(status=captured)`; explicit human approval is still required for
+`reviewed`. SEC discovery uses official EDGAR JSON and document URLs. User-supplied URLs enter the
+same queue and are labeled issuer/regulator only when their domains match deterministic policy.
+Canonical URLs and content hashes are deduplicated independently.
+
+Before live research, a deterministic context builder measures evidence coverage, verifies captured
+hashes, loads bounded extracted source text, and loads bounded financial facts. The same context is
+added to every Theme and Anchor prompt. Partial mode allows explicit gaps and downgrades unsupported
+relationships. Strict mode fails at a durable checkpoint until reviewed evidence exists and rejects
+unsupported medium/high relationship proposals.
+
+### Filing facts
+
+`FilingFactsProvider` separates official filing-data retrieval from normalization. The first
+adapter captures SEC Company Facts JSON as Evidence and emits immutable `FinancialFact` objects.
+Fact identities include period, accession, and value lineage. Restatements are appended, missing
+metrics are explicit nulls, and derived free cash flow stores a formula and input fact IDs. SQLite
+supports queryability; `financials/facts.json` preserves portability and exact JSON locators.
 
 ### Evidence trust boundary
 
@@ -62,6 +83,15 @@ A tracked candidate stores the original call date, candidate price, benchmark pr
 invalidation text, and structured triggers. Later paired snapshots calculate return and alpha.
 Trigger events are append-only and acknowledgement never deletes event history.
 
+### Database lifecycle
+
+One ordered migration registry owns both research-run and tracking schemas. Every applied migration
+records its version, name, checksum, and timestamp in `schema_migrations`. Fresh databases and
+unversioned v0.2 databases reach the same schema through transactional, idempotent migrations.
+Only migrations marked safe for startup may run automatically; explicit upgrade, consistent backup,
+and verified restore are available through the CLI. A failed migration rolls back only its own
+transaction and never stamps a version that did not complete.
+
 ### Applications
 
 - FastAPI exposes runs, evidence review, artifacts, tracking, and HTML reports.
@@ -75,7 +105,10 @@ created → running → needs_review
               ↘ failed → resume → running
 ```
 
-Each execution receives a bounded automatic retry budget. Manual resume grants a fresh retry budget but preserves the lifetime attempt count and all completed checkpoints.
+Each execution receives a bounded automatic retry budget. Manual resume grants a fresh retry budget
+but preserves the lifetime attempt count and all completed checkpoints. The Cockpit may execute
+through only the next step, which provides a user-visible pause at a durable checkpoint rather than
+attempting to interrupt a provider call mid-stage.
 
 ## Repository boundary
 

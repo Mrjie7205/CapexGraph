@@ -10,6 +10,7 @@ class OpenAIResearchModel:
     """Optional OpenAI Responses API adapter with native Pydantic parsing."""
 
     provider_name = "openai"
+    provider_version = "1"
     evidence_policy = EvidencePolicy.UNVERIFIED_MODEL
 
     def __init__(

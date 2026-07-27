@@ -21,9 +21,9 @@ starts one level earlier:
 The project is independent from `serenity-bottleneck-hunter`. That skill remains a self-contained,
 low-friction project; CapexGraph is a separate professional research system.
 
-## MVP capabilities
+## v0.3 capabilities
 
-CapexGraph `0.2.0` is an **alpha research workspace** with:
+CapexGraph `0.3.0` is an **alpha research workspace** with:
 
 - seven-stage Theme and Anchor Scan agent workflows;
 - typed, schema-validated outputs and code-enforced integrity checks;
@@ -31,10 +31,19 @@ CapexGraph `0.2.0` is an **alpha research workspace** with:
 - an optional OpenAI Responses API provider;
 - resumable foreground or background execution with SQLite checkpoints;
 - SSRF-safe HTML/PDF evidence capture, hashing, and explicit review;
-- deterministic ticker identity, no-key market snapshots, and financial imports;
+- deterministic ticker identity, no-key market snapshots, and legacy financial imports;
 - a React/Vite Cockpit with run history, polling, dynamic graphs, and evidence review;
 - candidate/benchmark tracking, alpha scorecards, triggers, and stage boards;
 - self-contained HTML research reports;
+- SEC/EDGAR and manual official-source suggestion queues with explicit capture and review;
+- partial and strict evidence modes, bounded source-text context, provider/version manifests, and
+  code-enforced confidence gates;
+- automatic SEC Company Facts extraction with period/unit validation, restatement history, explicit
+  missing values, derived formulas, and source locators;
+- coverage, provider failure, checkpoint execution, financial facts, and report access in the
+  Cockpit;
+- report sections that distinguish reviewed facts, grounded inference, unverified hypotheses, and
+  evidence gaps;
 - tests, multi-version CI, Windows bootstrap, and container setup.
 
 It produces research priorities for human review. It does not produce autonomous investment
@@ -70,6 +79,8 @@ $env:CAPEXGRAPH_MODEL = "your-structured-output-capable-model"
 
 Model-proposed sources remain `low` confidence until the source is captured, hash-verified, and
 explicitly reviewed. The model cannot promote an unreviewed claim by wording it confidently.
+Use `--evidence-mode strict` to block execution until a reviewed, unchanged capture exists; the
+default `partial` mode may continue but preserves unsupported relationships at low confidence.
 
 ### Web Cockpit
 
@@ -77,9 +88,11 @@ explicitly reviewed. The model cannot promote an unreviewed claim by wording it 
 .\scripts\dev.ps1
 ```
 
-Open `http://127.0.0.1:5173`. The Cockpit creates Theme or Anchor runs, executes them in the
-background, polls progress, resumes failures, renders the real graph, reviews captured evidence,
-and manages forward tracking.
+Open `http://127.0.0.1:5173`. Creating a workspace, discovering/capturing/reviewing sources, and
+extracting SEC facts do not require a model key. OpenAI-backed research execution does require its
+API key and model configuration. The Cockpit can run one durable stage at a time, run all remaining
+stages, retry a failed checkpoint, inspect coverage and provider failures, render the real graph,
+open the portable report, and manage forward tracking.
 
 ## Research artifact contract
 
@@ -90,7 +103,11 @@ manifest.json       input, versions, providers, timestamps
 state.json          resumable workflow state
 graph.json          nodes, grounded edges, confidence
 evidence.json       source ledger
+coverage.json       deterministic review and failure coverage
+sources.json        persistent discovery/capture queue
 financials.json     source-linked comparison for Anchor Scan
+financials/facts.json versioned filing-derived facts and source locators
+financials/summary.json latest available facts and explicit missing metrics
 candidates.json     verdicts, risks, invalidation, triggers
 decision.json       final structured decision
 report.html         self-contained portable research report
@@ -100,10 +117,28 @@ checkpoints/        one durable artifact per completed/failed step
 SQLite at `runs/capexgraph.db` is the local system of record. JSON artifacts remain human-readable
 and portable. Set `CAPEXGRAPH_STATE_DB` to move the database.
 
+SQLite schemas are versioned. Safe additive migrations run when a store opens; operators can
+inspect and control the same path explicitly:
+
+```powershell
+capexgraph db status
+capexgraph db backup --output .\backup\capexgraph.db
+capexgraph db upgrade
+# Stop the API before replacing an active database.
+capexgraph db restore .\backup\capexgraph.db --force
+```
+
+See [the upgrade guide](docs/UPGRADING.md) before restoring or moving a workspace.
+
 ## Common commands
 
 ```powershell
 # Research
+capexgraph theme "AI数据中心电力" --market CN --provider openai
+capexgraph sources add <run-id> <url> --title "Issuer filing"
+capexgraph sources capture <run-id> <suggestion-id>
+capexgraph evidence review <run-id> <evidence-id>
+capexgraph run <run-id> --provider openai --evidence-mode strict
 capexgraph theme "A股半导体硅片" --provider fixture --execute
 capexgraph anchor "603986" --provider fixture --execute
 capexgraph demo-alphabet-q2
@@ -112,8 +147,13 @@ capexgraph resume <run-id>
 
 # Live evidence and market data
 capexgraph ticker resolve 兆易创新
+capexgraph sources discover <run-id> --identifier GOOGL
+capexgraph sources add <run-id> <url> --title "Issuer filing"
+capexgraph sources capture <run-id> <suggestion-id>
 capexgraph evidence collect <run-id> <url> --id filing-1 --title "Filing"
 capexgraph evidence review <run-id> filing-1
+capexgraph financials extract <run-id> --identifier GOOGL
+capexgraph financials list <run-id>
 capexgraph market snapshot <run-id> 603986
 
 # Forward tracking and reports
@@ -121,6 +161,10 @@ capexgraph tracking add <run-id> <node-id>
 capexgraph tracking snapshot <tracked-id> --live
 capexgraph tracking list
 capexgraph report render <run-id>
+
+# Database safety
+capexgraph db status
+capexgraph db backup --output .\backup\capexgraph.db
 ```
 
 CapexGraph records candidate and benchmark prices on a common market date, then reports since-call
@@ -137,7 +181,14 @@ GET  /api/v1/runs/{id}
 POST /api/v1/runs/{id}/execute
 POST /api/v1/runs/{id}/resume
 GET  /api/v1/runs/{id}/checkpoints
+GET  /api/v1/runs/{id}/coverage
 GET  /api/v1/runs/{id}/artifacts/{filename}
+POST /api/v1/runs/{id}/sources/discover
+POST /api/v1/runs/{id}/sources/suggest
+GET  /api/v1/runs/{id}/sources
+POST /api/v1/runs/{id}/sources/{suggestion-id}/capture
+POST /api/v1/runs/{id}/financials/extract
+GET  /api/v1/runs/{id}/financials
 POST /api/v1/runs/{id}/tracking
 GET  /api/v1/tracking
 POST /api/v1/tracking/{id}/snapshots

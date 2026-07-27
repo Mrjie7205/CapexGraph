@@ -57,6 +57,12 @@ sources with the live evidence tools, verify their hashes, and explicitly review
 preserve medium/high confidence only when all of its cited captured sources are reviewed and
 unchanged; review still does not guarantee the interpretation is correct.
 
+Before the first live stage, the workflow records model/provider version and evaluates evidence
+coverage. Every stage receives bounded extracted text from captured/reviewed sources and bounded
+versioned financial facts; the prompt does not receive only titles or URLs. `partial` mode can
+continue with explicit low-confidence gaps. `strict` mode checkpoints a failure until at least one
+reviewed, hash-valid source exists and blocks unsupported medium/high relationship proposals.
+
 See `docs/LIVE_RESEARCH.md` for the capture and review contract.
 
 ## Deterministic integrity checks
@@ -70,3 +76,6 @@ The workflow fails and checkpoints the error when:
 - a candidate references an unknown node;
 - the debate omits a candidate;
 - the decision ranks an unknown or duplicate candidate.
+- strict evidence preflight or confidence requirements are not met;
+- a captured source hash no longer matches; or
+- a provider/fact input fails deterministic validation.

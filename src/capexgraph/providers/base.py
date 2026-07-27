@@ -20,6 +20,7 @@ class EvidencePolicy(StrEnum):
 
 class ResearchModel(Protocol):
     provider_name: str
+    provider_version: str
     model_name: str
     evidence_policy: EvidencePolicy
 

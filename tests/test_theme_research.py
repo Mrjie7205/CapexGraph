@@ -58,6 +58,22 @@ def test_theme_execution_requires_an_explicit_provider(tmp_path, monkeypatch) ->
         build_executor_for_run(run)
 
 
+def test_provider_setup_failure_is_checkpointed_for_retry(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.THEME, "Unconfigured live subject", "US")
+
+    failed = build_executor_for_run(
+        run,
+        provider=ProviderName.FIXTURE,
+        max_attempts=1,
+    ).execute(run.id)
+
+    assert failed.status == RunStatus.FAILED
+    assert failed.pipeline[0].status.value == "failed"
+    assert "Provider setup failed" in failed.pipeline[0].error
+    assert failed.pipeline[0].attempts == 1
+
+
 def test_unverified_model_edges_and_candidates_are_downgraded(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
     run = create_run(RunMode.THEME, "A股半导体硅片", "CN")

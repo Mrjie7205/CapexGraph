@@ -2,33 +2,42 @@ import json
 from datetime import date
 from typing import Annotated
 
+import httpx
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
 from capexgraph.domain import (
     Evidence,
     EvidenceKind,
+    EvidenceMode,
+    FinancialFact,
     FinancialMetric,
     MarketSnapshot,
     ResearchRun,
     RunMode,
     RunStatus,
+    SourceSuggestion,
+    SourceSuggestionStatus,
     StepCheckpoint,
     TickerIdentity,
 )
+from capexgraph.financials import FinancialFactService
 from capexgraph.providers import ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
+from capexgraph.research.context import EvidenceCoverage, refresh_evidence_coverage
 from capexgraph.runtime import RunStore
 from capexgraph.runtime.store import runs_dir
+from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
 from capexgraph.tools import (
     EvidenceSourceRequest,
     TickerResolver,
     capture_market_snapshot,
     collect_evidence_for_run,
+    read_run_evidence_text,
     review_run_evidence,
 )
 from capexgraph.tools.financials import attach_financial_metric_items
@@ -60,6 +69,7 @@ class RunRequest(BaseModel):
     subject: str = Field(min_length=1, max_length=200)
     market: str = Field(default="CN", min_length=2, max_length=12)
     as_of_date: date | None = None
+    evidence_mode: EvidenceMode = EvidenceMode.PARTIAL
 
 
 class ThemeRunRequest(RunRequest):
@@ -73,6 +83,7 @@ class ExecuteRequest(BaseModel):
     max_attempts: int = Field(default=2, ge=1, le=10)
     provider: ProviderName | None = None
     background: bool = False
+    evidence_mode: EvidenceMode | None = None
 
 
 class EvidenceCollectRequest(BaseModel):
@@ -88,12 +99,33 @@ class EvidenceReviewRequest(BaseModel):
     approved: bool
 
 
+class SourceDiscoverRequest(BaseModel):
+    provider: str = Field(default="sec", pattern=r"^sec$")
+    identifier: str | None = Field(default=None, max_length=200)
+    forms: list[str] = Field(default_factory=list, max_length=20)
+    limit: int = Field(default=10, ge=1, le=100)
+
+
+class SourceSuggestRequest(BaseModel):
+    url: HttpUrl
+    title: str = Field(min_length=1, max_length=300)
+    kind: EvidenceKind = EvidenceKind.COMPANY_DISCLOSURE
+    publisher: str | None = Field(default=None, max_length=160)
+    published_at: date | None = None
+    issuer_domains: list[str] = Field(default_factory=list, max_length=20)
+    reason: str | None = Field(default=None, max_length=500)
+
+
 class MarketCaptureRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=80)
 
 
 class FinancialMetricsRequest(BaseModel):
     items: list[FinancialMetric] = Field(min_length=1, max_length=5000)
+
+
+class FinancialExtractRequest(BaseModel):
+    identifier: str | None = Field(default=None, min_length=1, max_length=200)
 
 
 class TrackCandidateRequest(BaseModel):
@@ -133,7 +165,13 @@ def meta() -> dict[str, object]:
 
 @app.post("/api/v1/runs/theme", response_model=ResearchRun)
 def create_theme_run(request: ThemeRunRequest) -> ResearchRun:
-    run = create_run(RunMode.THEME, request.subject, request.market, request.as_of_date)
+    run = create_run(
+        RunMode.THEME,
+        request.subject,
+        request.market,
+        request.as_of_date,
+        request.evidence_mode,
+    )
     if request.provider is not None:
         run.manifest["model_provider"] = request.provider.value
         run = save_run(run)
@@ -151,7 +189,13 @@ def create_theme_run(request: ThemeRunRequest) -> ResearchRun:
 
 @app.post("/api/v1/runs/anchor", response_model=ResearchRun)
 def create_anchor_run(request: ThemeRunRequest) -> ResearchRun:
-    run = create_run(RunMode.ANCHOR, request.subject, request.market, request.as_of_date)
+    run = create_run(
+        RunMode.ANCHOR,
+        request.subject,
+        request.market,
+        request.as_of_date,
+        request.evidence_mode,
+    )
     if request.provider is not None:
         run.manifest["model_provider"] = request.provider.value
         run = save_run(run)
@@ -197,6 +241,8 @@ ARTIFACT_ALLOWLIST = {
     "candidates.json",
     "decision.json",
     "manifest.json",
+    "sources.json",
+    "coverage.json",
 }
 
 
@@ -244,6 +290,117 @@ def review_evidence(
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+@app.get(
+    "/api/v1/runs/{run_id}/evidence/{evidence_id}/text",
+    response_class=PlainTextResponse,
+)
+def get_evidence_text(run_id: str, evidence_id: str) -> PlainTextResponse:
+    try:
+        return PlainTextResponse(read_run_evidence_text(run_id, evidence_id))
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/v1/runs/{run_id}/coverage", response_model=EvidenceCoverage)
+def get_evidence_coverage(run_id: str) -> EvidenceCoverage:
+    run = load_run(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    coverage = refresh_evidence_coverage(run)
+    save_run(run)
+    return coverage
+
+
+@app.post("/api/v1/runs/{run_id}/sources/discover", response_model=list[SourceSuggestion])
+def discover_run_sources(
+    run_id: str,
+    request: SourceDiscoverRequest,
+) -> list[SourceSuggestion]:
+    try:
+        return SourceDiscoveryService().discover(
+            run_id,
+            identifier=request.identifier,
+            forms=request.forms,
+            limit=request.limit,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/sources/suggest", response_model=SourceSuggestion)
+def suggest_run_source(
+    run_id: str,
+    request: SourceSuggestRequest,
+) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().suggest_url(
+            run_id,
+            url=str(request.url),
+            title=request.title,
+            kind=request.kind,
+            publisher=request.publisher,
+            published_at=request.published_at,
+            issuer_domains=request.issuer_domains,
+            reason=request.reason,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/runs/{run_id}/sources", response_model=list[SourceSuggestion])
+def list_run_sources(
+    run_id: str,
+    status: Annotated[SourceSuggestionStatus | None, Query()] = None,
+) -> list[SourceSuggestion]:
+    try:
+        return SourceDiscoveryService().list(run_id, status=status)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/sources/{suggestion_id}/capture",
+    response_model=SourceSuggestion,
+)
+def capture_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().capture(run_id, suggestion_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, SourceCaptureError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/sources/{suggestion_id}/retry",
+    response_model=SourceSuggestion,
+)
+def retry_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().retry(run_id, suggestion_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, SourceCaptureError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/sources/{suggestion_id}/dismiss",
+    response_model=SourceSuggestion,
+)
+def dismiss_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().dismiss(run_id, suggestion_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.post("/api/v1/runs/{run_id}/market", response_model=MarketSnapshot)
 def capture_run_market(run_id: str, request: MarketCaptureRequest) -> MarketSnapshot:
     try:
@@ -265,6 +422,27 @@ def attach_run_financials(
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/financials/extract", response_model=list[FinancialFact])
+def extract_run_financial_facts(
+    run_id: str,
+    request: FinancialExtractRequest,
+) -> list[FinancialFact]:
+    try:
+        return FinancialFactService().extract(run_id, identifier=request.identifier)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError, httpx.HTTPError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/runs/{run_id}/financials", response_model=list[FinancialFact])
+def list_run_financial_facts(run_id: str) -> list[FinancialFact]:
+    try:
+        return FinancialFactService().list(run_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
 
 
 @app.get("/api/v1/tickers/resolve", response_model=TickerIdentity)
@@ -396,6 +574,9 @@ def execute_run(
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if request.evidence_mode is not None:
+            run.manifest["evidence_mode"] = request.evidence_mode.value
+            run = save_run(run)
         if request.background:
             background_tasks.add_task(
                 _background_execute,
@@ -430,6 +611,9 @@ def resume_run(
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if request.evidence_mode is not None:
+            run.manifest["evidence_mode"] = request.evidence_mode.value
+            run = save_run(run)
         if request.background:
             background_tasks.add_task(
                 _background_execute,

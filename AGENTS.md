@@ -17,7 +17,7 @@ Read these files in order:
 
 1. `docs/CURRENT_STATUS.md` — what is actually shipped and what is not;
 2. `ROADMAP.md` — the next approved priorities and acceptance criteria;
-3. `docs/V0_3_PLAN.md` — execution order while v0.3 is the active target;
+3. `docs/V0_3_PLAN.md` — completed v0.3 execution record and acceptance matrix;
 4. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
 5. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
 6. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
@@ -53,6 +53,7 @@ src/capexgraph/domain/       typed system-of-record contracts
 src/capexgraph/runtime/      SQLite runs, checkpoints, retries, resume
 src/capexgraph/research/     Theme and Anchor agent workflows
 src/capexgraph/providers/    fixture and optional model adapters
+src/capexgraph/financials/   immutable filing facts and persistence
 src/capexgraph/tools/        evidence, identity, market, financial tools
 src/capexgraph/tracking/     snapshots, triggers, scorecards, stages
 src/capexgraph/api/          FastAPI application
@@ -66,7 +67,8 @@ advertise it as shipped until its roadmap acceptance criteria and tests are comp
 
 ## Working method
 
-1. Start from an item in `ROADMAP.md` or a scoped user request.
+1. Start from an active item in `ROADMAP.md` or a scoped user request. v0.3 is complete; the next
+   approved product target is v0.4 monitoring and re-evaluation.
 2. Inspect the actual code path and tests before proposing architecture.
 3. State any assumption that changes evidence semantics, provider trust, or repository boundaries.
 4. Implement the smallest end-to-end vertical slice with durable artifacts and failure states.

@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 from uuid import uuid4
 
 from capexgraph import __version__
-from capexgraph.domain import PipelineStep, ResearchRun, RunMode
+from capexgraph.domain import EvidenceMode, PipelineStep, ResearchRun, RunMode
 from capexgraph.runtime.artifacts import atomic_write_text
 from capexgraph.runtime.store import RunStore, runs_dir
 
@@ -40,9 +40,15 @@ def create_run(
     mode: RunMode,
     subject: str,
     market: str,
-    as_of_date: date | None = None,
+    as_of_date: date | str | None = None,
+    evidence_mode: EvidenceMode = EvidenceMode.PARTIAL,
 ) -> ResearchRun:
     now = datetime.now(UTC)
+    resolved_as_of = (
+        date.fromisoformat(as_of_date)
+        if isinstance(as_of_date, str)
+        else as_of_date or date.today()
+    )
     run_id = f"{now:%Y%m%d}-{mode.value}-{uuid4().hex[:8]}"
     steps = [
         PipelineStep(
@@ -58,13 +64,16 @@ def create_run(
         mode=mode,
         subject=subject.strip(),
         market=market.upper().strip(),
-        as_of_date=as_of_date or date.today(),
+        as_of_date=resolved_as_of,
         pipeline=steps,
         manifest={
             "capexgraph_version": __version__,
-            "schema_version": "1",
+            "schema_version": "2",
             "model_provider": None,
+            "as_of_date": resolved_as_of.isoformat(),
+            "evidence_mode": evidence_mode.value,
             "data_providers": [],
+            "data_provider_records": [],
         },
     )
     return save_run(run)

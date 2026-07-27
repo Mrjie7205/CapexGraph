@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from capexgraph.domain import ResearchRun, RunStatus, StepCheckpoint
+from capexgraph.runtime.migrations import ensure_database
 
 
 def runs_dir() -> Path:
@@ -40,41 +41,7 @@ class RunStore:
             connection.close()
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS runs (
-                    id TEXT PRIMARY KEY,
-                    mode TEXT NOT NULL,
-                    subject TEXT NOT NULL,
-                    market TEXT NOT NULL,
-                    as_of_date TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    payload TEXT NOT NULL
-                );
-
-                CREATE INDEX IF NOT EXISTS idx_runs_updated_at
-                    ON runs(updated_at DESC);
-                CREATE INDEX IF NOT EXISTS idx_runs_status
-                    ON runs(status);
-
-                CREATE TABLE IF NOT EXISTS checkpoints (
-                    run_id TEXT NOT NULL,
-                    step_key TEXT NOT NULL,
-                    status TEXT NOT NULL,
-                    attempt INTEGER NOT NULL,
-                    started_at TEXT,
-                    completed_at TEXT,
-                    message TEXT NOT NULL DEFAULT '',
-                    error TEXT NOT NULL DEFAULT '',
-                    output_json TEXT NOT NULL DEFAULT '{}',
-                    PRIMARY KEY (run_id, step_key),
-                    FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
-                );
-                """
-            )
+        ensure_database(self.db_path)
 
     def save_run(self, run: ResearchRun) -> ResearchRun:
         payload = run.model_dump_json()

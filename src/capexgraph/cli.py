@@ -5,17 +5,28 @@ from datetime import date
 from pathlib import Path
 from typing import Annotated
 
+import httpx
 import typer
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
 from capexgraph import __version__
-from capexgraph.domain import EvidenceKind, ResearchRun, RunMode, RunStatus
+from capexgraph.domain import EvidenceKind, EvidenceMode, ResearchRun, RunMode, RunStatus
+from capexgraph.financials import FinancialFactService
 from capexgraph.providers import ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
-from capexgraph.runtime import RunStore
+from capexgraph.runtime import (
+    MigrationError,
+    RunStore,
+    backup_database,
+    database_status,
+    restore_database,
+    upgrade_database,
+)
+from capexgraph.runtime.store import state_db_path
+from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
 from capexgraph.tools import (
     EvidencePack,
     EvidenceSourceRequest,
@@ -42,12 +53,22 @@ tracking_app = typer.Typer(
     help="Track candidates and evaluate forward evidence.", no_args_is_help=True
 )
 report_app = typer.Typer(help="Render portable research reports.", no_args_is_help=True)
+sources_app = typer.Typer(
+    help="Discover, capture, and dismiss official-source suggestions.",
+    no_args_is_help=True,
+)
+db_app = typer.Typer(
+    help="Inspect, upgrade, back up, and restore SQLite state.",
+    no_args_is_help=True,
+)
 app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
 app.add_typer(financials_app, name="financials")
 app.add_typer(tracking_app, name="tracking")
 app.add_typer(report_app, name="report")
+app.add_typer(sources_app, name="sources")
+app.add_typer(db_app, name="db")
 console = Console()
 
 if sys.platform == "win32":
@@ -79,6 +100,7 @@ def _create(
     as_of: str | None,
     execute: bool,
     provider: ProviderName | None = None,
+    evidence_mode: EvidenceMode = EvidenceMode.PARTIAL,
 ) -> None:
     if mode in {RunMode.THEME, RunMode.ANCHOR} and execute and provider is None:
         raise typer.BadParameter(
@@ -88,7 +110,7 @@ def _create(
         as_of_date = date.fromisoformat(as_of) if as_of else None
     except ValueError as error:
         raise typer.BadParameter("--as-of must use YYYY-MM-DD") from error
-    run = create_run(mode, subject, market, as_of_date)
+    run = create_run(mode, subject, market, as_of_date, evidence_mode)
     if provider is not None:
         run.manifest["model_provider"] = provider.value
         run = save_run(run)
@@ -117,9 +139,13 @@ def theme(
         ProviderName | None,
         typer.Option("--provider", help="Structured research provider: fixture or openai"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode,
+        typer.Option("--evidence-mode", help="partial or strict evidence preflight"),
+    ] = EvidenceMode.PARTIAL,
 ) -> None:
     """Create a Theme Scan research run."""
-    _create(RunMode.THEME, subject, market, as_of, execute, provider)
+    _create(RunMode.THEME, subject, market, as_of, execute, provider, evidence_mode)
 
 
 @app.command()
@@ -132,9 +158,13 @@ def anchor(
         ProviderName | None,
         typer.Option("--provider", help="Structured research provider: fixture or openai"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode,
+        typer.Option("--evidence-mode", help="partial or strict evidence preflight"),
+    ] = EvidenceMode.PARTIAL,
 ) -> None:
     """Create an Anchor Scan research run."""
-    _create(RunMode.ANCHOR, subject, market, as_of, execute, provider)
+    _create(RunMode.ANCHOR, subject, market, as_of, execute, provider, evidence_mode)
 
 
 @app.command()
@@ -185,18 +215,25 @@ def run_command(
         ProviderName | None,
         typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode | None,
+        typer.Option("--evidence-mode", help="Override partial or strict evidence preflight"),
+    ] = None,
 ) -> None:
     """Execute pending workflow steps."""
     try:
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if evidence_mode is not None:
+            run.manifest["evidence_mode"] = evidence_mode.value
+            run = save_run(run)
         run = build_executor_for_run(
             run,
             provider=provider,
             max_attempts=attempts,
         ).execute(run_id, until=until)
-    except (KeyError, ValueError, RuntimeError) as error:
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_run(run, "Workflow execution")
@@ -213,12 +250,19 @@ def resume(
         ProviderName | None,
         typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
     ] = None,
+    evidence_mode: Annotated[
+        EvidenceMode | None,
+        typer.Option("--evidence-mode", help="Override partial or strict evidence preflight"),
+    ] = None,
 ) -> None:
     """Resume from the latest completed checkpoint."""
     try:
         run = load_run(run_id)
         if run is None:
             raise KeyError(f"Research run not found: {run_id}")
+        if evidence_mode is not None:
+            run.manifest["evidence_mode"] = evidence_mode.value
+            run = save_run(run)
         run = build_executor_for_run(
             run,
             provider=provider,
@@ -228,7 +272,7 @@ def resume(
             until=until,
             retry_failed=True,
         )
-    except (KeyError, ValueError, RuntimeError) as error:
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_run(run, "Workflow resumed")
@@ -332,6 +376,136 @@ def evidence_review(
     console.print(f"{evidence.id} · [bold]{evidence.status.value}[/bold]")
 
 
+def _show_source_suggestions(items) -> None:
+    table = Table(title="CapexGraph source review queue")
+    table.add_column("ID")
+    table.add_column("Authority")
+    table.add_column("Kind")
+    table.add_column("Status")
+    table.add_column("Title")
+    table.add_column("Provider")
+    for item in items:
+        table.add_row(
+            item.id,
+            item.authority.value,
+            item.kind.value,
+            item.status.value,
+            item.title,
+            f"{item.provider}@{item.provider_version}",
+        )
+    console.print(table)
+
+
+@sources_app.command("discover")
+def sources_discover(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    identifier: Annotated[
+        str | None,
+        typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
+    ] = None,
+    form: Annotated[
+        list[str] | None,
+        typer.Option("--form", help="SEC form to include; repeat for multiple forms"),
+    ] = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
+) -> None:
+    """Discover recent official SEC filings as suggestions."""
+    try:
+        items = SourceDiscoveryService().discover(
+            run_id,
+            identifier=identifier,
+            forms=form or (),
+            limit=limit,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions(items)
+
+
+@sources_app.command("add")
+def sources_add(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    url: Annotated[str, typer.Argument(help="Public issuer or regulator URL")],
+    title: Annotated[str, typer.Option("--title")],
+    kind: Annotated[EvidenceKind, typer.Option("--kind")] = EvidenceKind.COMPANY_DISCLOSURE,
+    publisher: Annotated[str | None, typer.Option("--publisher")] = None,
+    published_at: Annotated[str | None, typer.Option("--published-at")] = None,
+    issuer_domain: Annotated[
+        list[str] | None,
+        typer.Option("--issuer-domain", help="Known issuer domain; repeat as needed"),
+    ] = None,
+) -> None:
+    """Add a user-supplied URL to the suggestion queue without capturing it."""
+    try:
+        item = SourceDiscoveryService().suggest_url(
+            run_id,
+            url=url,
+            title=title,
+            kind=kind,
+            publisher=publisher,
+            published_at=date.fromisoformat(published_at) if published_at else None,
+            issuer_domains=issuer_domain or (),
+        )
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
+@sources_app.command("list")
+def sources_list(run_id: Annotated[str, typer.Argument(help="Research run ID")]) -> None:
+    """List the persisted source suggestion and capture queue."""
+    try:
+        items = SourceDiscoveryService().list(run_id)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions(items)
+
+
+@sources_app.command("capture")
+def sources_capture(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion ID")],
+) -> None:
+    """Download one suggestion and create captured evidence if it is unique."""
+    try:
+        item = SourceDiscoveryService().capture(run_id, suggestion_id)
+    except (KeyError, ValueError, SourceCaptureError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
+@sources_app.command("retry")
+def sources_retry(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion ID")],
+) -> None:
+    """Retry a persisted failed source capture."""
+    try:
+        item = SourceDiscoveryService().retry(run_id, suggestion_id)
+    except (KeyError, ValueError, SourceCaptureError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
+@sources_app.command("dismiss")
+def sources_dismiss(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion ID")],
+) -> None:
+    """Dismiss one uncaptured suggestion."""
+    try:
+        item = SourceDiscoveryService().dismiss(run_id, suggestion_id)
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
 @ticker_app.command("resolve")
 def ticker_resolve(query: Annotated[str, typer.Argument(help="Ticker, name, or alias")]) -> None:
     """Resolve a canonical, registry-backed ticker identity."""
@@ -369,6 +543,51 @@ def financials_import(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(f"[green]Imported[/green] {len(metrics)} financial metrics")
+
+
+@financials_app.command("extract")
+def financials_extract(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    identifier: Annotated[
+        str | None,
+        typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
+    ] = None,
+) -> None:
+    """Capture SEC Company Facts and persist versioned, source-linked facts."""
+    try:
+        facts = FinancialFactService().extract(run_id, identifier=identifier)
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    missing = sum(fact.fact_type.value == "missing" for fact in facts)
+    console.print(
+        f"[green]Extracted[/green] {len(facts)} financial facts · {missing} explicit missing"
+    )
+
+
+@financials_app.command("list")
+def financials_list(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+) -> None:
+    """List persisted filing-derived financial facts."""
+    try:
+        facts = FinancialFactService().list(run_id)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    table = Table(title="CapexGraph financial facts")
+    for heading in ("Metric", "Period", "Value", "Unit", "Type", "Source locator"):
+        table.add_column(heading)
+    for fact in facts:
+        table.add_row(
+            fact.metric,
+            str(fact.period_end or "—"),
+            str(fact.value if fact.value is not None else "—"),
+            fact.unit,
+            fact.fact_type.value,
+            fact.source_locator,
+        )
+    console.print(table)
 
 
 @tracking_app.command("add")
@@ -492,6 +711,95 @@ def report_render(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(f"[green]Rendered[/green] {path}")
+
+
+@db_app.command("status")
+def db_status(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Show the current and latest persisted schema versions."""
+    target = (path or state_db_path()).resolve()
+    try:
+        status = database_status(target)
+    except MigrationError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    pending = ", ".join(str(item) for item in status.pending_versions) or "none"
+    console.print(
+        Panel.fit(
+            f"path       {status.path}\n"
+            f"exists     {status.exists}\n"
+            f"legacy     {status.legacy}\n"
+            f"current    {status.current_version}\n"
+            f"latest     {status.latest_version}\n"
+            f"pending    {pending}",
+            title="CapexGraph database",
+            border_style="green" if status.up_to_date else "yellow",
+        )
+    )
+
+
+@db_app.command("upgrade")
+def db_upgrade(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Apply pending versioned migrations transactionally."""
+    target = (path or state_db_path()).resolve()
+    try:
+        status = upgrade_database(target)
+    except MigrationError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(
+        f"[green]Database ready[/green] {status.path} · schema {status.current_version}"
+    )
+
+
+@db_app.command("backup")
+def db_backup(
+    output: Annotated[Path, typer.Option("--output", "-o", resolve_path=True)],
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+    force: Annotated[bool, typer.Option("--force", help="Replace an existing backup")] = False,
+) -> None:
+    """Create a consistent SQLite backup."""
+    source = (path or state_db_path()).resolve()
+    try:
+        result = backup_database(source, output, overwrite=force)
+    except (FileNotFoundError, FileExistsError, ValueError, MigrationError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Backup created[/green] {result}")
+
+
+@db_app.command("restore")
+def db_restore(
+    backup: Annotated[Path, typer.Argument(exists=True, dir_okay=False, resolve_path=True)],
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Replace the target database after stopping the API"),
+    ] = False,
+) -> None:
+    """Restore a verified backup and bring it to the current schema."""
+    target = (path or state_db_path()).resolve()
+    try:
+        result = restore_database(backup, target, overwrite=force)
+    except (FileNotFoundError, FileExistsError, ValueError, MigrationError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print(f"[green]Database restored[/green] {result}")
 
 
 @app.command()
