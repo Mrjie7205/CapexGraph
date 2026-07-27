@@ -65,7 +65,12 @@ def test_evidence_review_detects_tampering(tmp_path, monkeypatch) -> None:
     run = create_run(RunMode.THEME, "test theme", "CN")
     client = httpx.Client(
         transport=httpx.MockTransport(
-            lambda request: httpx.Response(200, text="source", request=request)
+            lambda request: httpx.Response(
+                200,
+                headers={"content-type": "text/html"},
+                text="<html><body>source</body></html>",
+                request=request,
+            )
         )
     )
     collect_evidence_for_run(

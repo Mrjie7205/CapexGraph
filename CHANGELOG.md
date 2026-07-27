@@ -23,6 +23,12 @@ All notable changes to CapexGraph are documented here.
 - added a frozen v0.2 legacy database fixture and regression coverage for runs, checkpoints,
   tracking snapshots, and trigger events;
 - added consistent SQLite backup/restore plus `capexgraph db status|upgrade|backup|restore`.
+- added a durable `SourceSuggestion` queue that keeps discovery results separate from Evidence;
+- added SEC/EDGAR filing discovery and deterministic issuer/regulator URL suggestions;
+- added canonical-URL and content-hash deduplication, persisted capture failures, safe redirect
+  handling, and HTML/PDF content-type enforcement;
+- added source discovery, capture, retry, dismissal, and extracted-text paths across CLI, API, and
+  the Cockpit.
 
 ## 0.2.0 — 2026-07-17
 

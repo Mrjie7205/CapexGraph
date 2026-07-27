@@ -35,6 +35,7 @@ CapexGraph `0.2.0` is an **alpha research workspace** with:
 - a React/Vite Cockpit with run history, polling, dynamic graphs, and evidence review;
 - candidate/benchmark tracking, alpha scorecards, triggers, and stage boards;
 - self-contained HTML research reports;
+- SEC/EDGAR and manual official-source suggestion queues with explicit capture and review;
 - tests, multi-version CI, Windows bootstrap, and container setup.
 
 It produces research priorities for human review. It does not produce autonomous investment
@@ -125,6 +126,9 @@ capexgraph resume <run-id>
 
 # Live evidence and market data
 capexgraph ticker resolve 兆易创新
+capexgraph sources discover <run-id> --identifier GOOGL
+capexgraph sources add <run-id> <url> --title "Issuer filing"
+capexgraph sources capture <run-id> <suggestion-id>
 capexgraph evidence collect <run-id> <url> --id filing-1 --title "Filing"
 capexgraph evidence review <run-id> filing-1
 capexgraph market snapshot <run-id> 603986
@@ -155,6 +159,10 @@ POST /api/v1/runs/{id}/execute
 POST /api/v1/runs/{id}/resume
 GET  /api/v1/runs/{id}/checkpoints
 GET  /api/v1/runs/{id}/artifacts/{filename}
+POST /api/v1/runs/{id}/sources/discover
+POST /api/v1/runs/{id}/sources/suggest
+GET  /api/v1/runs/{id}/sources
+POST /api/v1/runs/{id}/sources/{suggestion-id}/capture
 POST /api/v1/runs/{id}/tracking
 GET  /api/v1/tracking
 POST /api/v1/tracking/{id}/snapshots

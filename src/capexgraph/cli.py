@@ -24,6 +24,7 @@ from capexgraph.runtime import (
     upgrade_database,
 )
 from capexgraph.runtime.store import state_db_path
+from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
 from capexgraph.tools import (
     EvidencePack,
     EvidenceSourceRequest,
@@ -50,6 +51,10 @@ tracking_app = typer.Typer(
     help="Track candidates and evaluate forward evidence.", no_args_is_help=True
 )
 report_app = typer.Typer(help="Render portable research reports.", no_args_is_help=True)
+sources_app = typer.Typer(
+    help="Discover, capture, and dismiss official-source suggestions.",
+    no_args_is_help=True,
+)
 db_app = typer.Typer(
     help="Inspect, upgrade, back up, and restore SQLite state.",
     no_args_is_help=True,
@@ -60,6 +65,7 @@ app.add_typer(market_app, name="market")
 app.add_typer(financials_app, name="financials")
 app.add_typer(tracking_app, name="tracking")
 app.add_typer(report_app, name="report")
+app.add_typer(sources_app, name="sources")
 app.add_typer(db_app, name="db")
 console = Console()
 
@@ -343,6 +349,136 @@ def evidence_review(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(f"{evidence.id} · [bold]{evidence.status.value}[/bold]")
+
+
+def _show_source_suggestions(items) -> None:
+    table = Table(title="CapexGraph source review queue")
+    table.add_column("ID")
+    table.add_column("Authority")
+    table.add_column("Kind")
+    table.add_column("Status")
+    table.add_column("Title")
+    table.add_column("Provider")
+    for item in items:
+        table.add_row(
+            item.id,
+            item.authority.value,
+            item.kind.value,
+            item.status.value,
+            item.title,
+            f"{item.provider}@{item.provider_version}",
+        )
+    console.print(table)
+
+
+@sources_app.command("discover")
+def sources_discover(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    identifier: Annotated[
+        str | None,
+        typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
+    ] = None,
+    form: Annotated[
+        list[str] | None,
+        typer.Option("--form", help="SEC form to include; repeat for multiple forms"),
+    ] = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
+) -> None:
+    """Discover recent official SEC filings as suggestions."""
+    try:
+        items = SourceDiscoveryService().discover(
+            run_id,
+            identifier=identifier,
+            forms=form or (),
+            limit=limit,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions(items)
+
+
+@sources_app.command("add")
+def sources_add(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    url: Annotated[str, typer.Argument(help="Public issuer or regulator URL")],
+    title: Annotated[str, typer.Option("--title")],
+    kind: Annotated[EvidenceKind, typer.Option("--kind")] = EvidenceKind.COMPANY_DISCLOSURE,
+    publisher: Annotated[str | None, typer.Option("--publisher")] = None,
+    published_at: Annotated[str | None, typer.Option("--published-at")] = None,
+    issuer_domain: Annotated[
+        list[str] | None,
+        typer.Option("--issuer-domain", help="Known issuer domain; repeat as needed"),
+    ] = None,
+) -> None:
+    """Add a user-supplied URL to the suggestion queue without capturing it."""
+    try:
+        item = SourceDiscoveryService().suggest_url(
+            run_id,
+            url=url,
+            title=title,
+            kind=kind,
+            publisher=publisher,
+            published_at=date.fromisoformat(published_at) if published_at else None,
+            issuer_domains=issuer_domain or (),
+        )
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
+@sources_app.command("list")
+def sources_list(run_id: Annotated[str, typer.Argument(help="Research run ID")]) -> None:
+    """List the persisted source suggestion and capture queue."""
+    try:
+        items = SourceDiscoveryService().list(run_id)
+    except KeyError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions(items)
+
+
+@sources_app.command("capture")
+def sources_capture(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion ID")],
+) -> None:
+    """Download one suggestion and create captured evidence if it is unique."""
+    try:
+        item = SourceDiscoveryService().capture(run_id, suggestion_id)
+    except (KeyError, ValueError, SourceCaptureError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
+@sources_app.command("retry")
+def sources_retry(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion ID")],
+) -> None:
+    """Retry a persisted failed source capture."""
+    try:
+        item = SourceDiscoveryService().retry(run_id, suggestion_id)
+    except (KeyError, ValueError, SourceCaptureError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
+
+
+@sources_app.command("dismiss")
+def sources_dismiss(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    suggestion_id: Annotated[str, typer.Argument(help="Suggestion ID")],
+) -> None:
+    """Dismiss one uncaptured suggestion."""
+    try:
+        item = SourceDiscoveryService().dismiss(run_id, suggestion_id)
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_source_suggestions([item])
 
 
 @ticker_app.command("resolve")

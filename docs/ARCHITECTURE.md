@@ -41,6 +41,13 @@ Tools own ticker identity, adjusted prices, financial imports, SSRF-safe public 
 content hashing, and report rendering. The built-in market adapter is no-key and best-effort;
 production deployments can replace it behind the same interface.
 
+Source discovery has its own trust boundary. `SourceSuggestion` records a provider result, official
+domain classification, reason, and queue state. It is not Evidence. Only a successful guarded
+capture creates `Evidence(status=captured)`; explicit human approval is still required for
+`reviewed`. SEC discovery uses official EDGAR JSON and document URLs. User-supplied URLs enter the
+same queue and are labeled issuer/regulator only when their domains match deterministic policy.
+Canonical URLs and content hashes are deduplicated independently.
+
 ### Evidence trust boundary
 
 ```text

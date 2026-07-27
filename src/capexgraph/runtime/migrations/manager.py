@@ -130,6 +130,36 @@ BASELINE_STATEMENTS = (
 
 MIGRATIONS: tuple[Migration, ...] = (
     Migration(version=1, name="v0_2_baseline", statements=BASELINE_STATEMENTS),
+    Migration(
+        version=2,
+        name="source_suggestion_queue",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS source_suggestions (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                canonical_url TEXT NOT NULL,
+                status TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                authority TEXT NOT NULL,
+                content_hash TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(run_id, canonical_url),
+                FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_source_suggestions_run_status
+            ON source_suggestions(run_id, status, updated_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_source_suggestions_content_hash
+            ON source_suggestions(run_id, content_hash)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

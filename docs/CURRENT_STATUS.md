@@ -37,8 +37,13 @@ substantial change, and update it in the same pull request whenever shipped capa
 - added `db status`, `db upgrade`, consistent backup, and verified restore commands; and
 - verified that a v0.2 database preserves its run, checkpoint, tracked candidate, snapshot, and
   trigger-event counts after upgrade.
+- added a persistent source-suggestion queue with SEC/EDGAR discovery and a deterministic manual
+  issuer/regulator URL path;
+- added canonical-URL and content-hash deduplication, persisted discovery/capture failures, retry,
+  dismissal, and guarded redirect handling; and
+- exposed the source queue and extracted evidence text in CLI, API, and the Cockpit.
 
-This does not complete the v0.3 live vertical slice. Source discovery, automatic filing extraction,
+This does not complete the v0.3 live vertical slice. Automatic filing extraction,
 financial-fact prompt/report integration, and autonomous non-fixture execution remain open.
 
 The M1 migration slice has targeted regression coverage; the full release matrix is rerun at each
@@ -66,8 +71,8 @@ reviewed but not built locally.
   live execution path.
 - The OpenAI provider returns structured outputs but does not autonomously search or fetch official
   sources. URLs must be captured and reviewed through the evidence tools.
-- The live collector starts from supplied URLs; source discovery and review-queue orchestration are
-  not implemented.
+- Official-source discovery currently covers SEC/EDGAR and deterministic user-supplied URLs. It
+  does not promise automatic A-share exchange search or broad web/news discovery.
 - Yahoo Chart is an unofficial, best-effort no-key adapter, not a licensed production feed.
 - Financial data is attached through normalized evidence-linked imports; automatic XBRL/filing
   extraction is not implemented.
@@ -84,10 +89,9 @@ reviewed but not built locally.
 Implement v0.3 in the execution order defined by
 [`docs/V0_3_PLAN.md`](V0_3_PLAN.md), `ROADMAP.md`, and the `roadmap` GitHub Issues:
 
-1. [#5 official-source discovery and review queue](https://github.com/Mrjie7205/CapexGraph/issues/5);
-2. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
-3. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7);
-4. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
+1. [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6);
+2. [#7 filing-derived normalized financial facts](https://github.com/Mrjie7205/CapexGraph/issues/7);
+3. explicit Cockpit coverage/failure states and v0.3.0 release hardening.
 
 Do not begin Catalyst Scan merely because the enum exists; trustworthy live evidence remains the
 higher priority.

@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   createRun,
   captureTrackingSnapshot,
+  evidenceTextUrl,
   executeRun,
   getDecision,
   getRun,
@@ -17,6 +18,7 @@ import {
   type Scorecard,
   type TrackingStage,
 } from "./api";
+import { SourceQueue } from "./SourceQueue";
 
 const FINAL_STATUSES = new Set(["needs_review", "completed", "failed", "cancelled"]);
 
@@ -261,7 +263,7 @@ function App() {
           <span className="brand-mark"><i>C</i><i>G</i></span>
           <span>CapexGraph<small>evidence-led research</small></span>
         </a>
-        <nav><a className="active" href="#runs">Runs</a><a href="#graph">Graph</a><a href="#radar">Radar</a><a href="#ledger">Evidence</a></nav>
+        <nav><a className="active" href="#runs">Runs</a><a href="#sources">Sources</a><a href="#graph">Graph</a><a href="#radar">Radar</a><a href="#ledger">Evidence</a></nav>
         <div className="system-state"><span /> Local research workspace</div>
       </header>
 
@@ -318,10 +320,16 @@ function App() {
         </article>
       </section>
 
+      <SourceQueue
+        run={selected}
+        onRunUpdated={setSelected}
+        onError={setError}
+      />
+
       <section className="lower-grid">
         <article className="ledger panel" id="ledger">
           <div className="panel-title"><span>Evidence ledger</span><b>{selected?.evidence.length ?? 0} ITEMS</b></div>
-          {selected?.evidence.map((item) => <div className="source-row" key={item.id}><span className={`source-status ${item.status}`}>{item.status}</span><div><strong>{item.title}</strong><small>{item.publisher ?? item.id}</small></div>{item.status === "captured" ? <div className="review-actions"><button onClick={() => review(item.id, true)}>Approve</button><button onClick={() => review(item.id, false)}>Reject</button></div> : item.source_url ? <a href={item.source_url} target="_blank" rel="noreferrer">Source ↗</a> : <span />}</div>)}
+          {selected?.evidence.map((item) => <div className="source-row" key={item.id}><span className={`source-status ${item.status}`}>{item.status}</span><div><strong>{item.title}</strong><small>{item.publisher ?? item.id}</small></div><div className="review-actions">{item.source_url && <a href={item.source_url} target="_blank" rel="noreferrer">Source ↗</a>}{item.local_path?.startsWith("sources/") && <a href={evidenceTextUrl(selected.id, item.id)} target="_blank" rel="noreferrer">Text ↗</a>}{item.status === "captured" && <><button onClick={() => review(item.id, true)}>Approve</button><button onClick={() => review(item.id, false)}>Reject</button></>}</div></div>)}
           {selected && selected.evidence.length === 0 && <p className="empty-state">Execute through the graph stage to populate evidence.</p>}
           {!selected && <p className="empty-state">Select a run to inspect its source ledger.</p>}
         </article>

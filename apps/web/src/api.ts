@@ -33,8 +33,39 @@ export interface EvidenceItem {
   title: string;
   publisher?: string;
   source_url?: string;
+  local_path?: string;
   excerpt: string;
   status: "proposed" | "captured" | "reviewed" | "rejected";
+}
+
+export type SourceSuggestionStatus =
+  | "suggested"
+  | "selected"
+  | "capture_pending"
+  | "captured"
+  | "dismissed"
+  | "capture_failed"
+  | "duplicate";
+
+export interface SourceSuggestion {
+  id: string;
+  run_id: string;
+  title: string;
+  url: string;
+  canonical_url: string;
+  kind: string;
+  publisher?: string;
+  authority: "regulator" | "issuer" | "other";
+  reason: string;
+  provider: string;
+  provider_version: string;
+  status: SourceSuggestionStatus;
+  published_at?: string;
+  evidence_id?: string;
+  final_url?: string;
+  duplicate_of?: string;
+  error: string;
+  metadata: Record<string, unknown>;
 }
 
 export interface Candidate {
@@ -153,6 +184,58 @@ export function reviewEvidence(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ approved }),
   });
+}
+
+export function evidenceTextUrl(runId: string, evidenceId: string): string {
+  return `/api/v1/runs/${encodeURIComponent(runId)}/evidence/${encodeURIComponent(evidenceId)}/text`;
+}
+
+export function listSourceSuggestions(runId: string): Promise<SourceSuggestion[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/sources`);
+}
+
+export function discoverSecSources(
+  runId: string,
+  identifier?: string,
+): Promise<SourceSuggestion[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/sources/discover`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider: "sec", identifier: identifier || undefined, limit: 10 }),
+  });
+}
+
+export function suggestManualSource(
+  runId: string,
+  input: { url: string; title: string; publisher?: string; issuer_domains?: string[] },
+): Promise<SourceSuggestion> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/sources/suggest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "company_disclosure", ...input }),
+  });
+}
+
+export function captureSourceSuggestion(
+  runId: string,
+  suggestionId: string,
+  retry = false,
+): Promise<SourceSuggestion> {
+  const action = retry ? "retry" : "capture";
+  return request(
+    `/api/v1/runs/${encodeURIComponent(runId)}/sources/${encodeURIComponent(suggestionId)}/${action}`,
+    { method: "POST" },
+  );
+}
+
+export function dismissSourceSuggestion(
+  runId: string,
+  suggestionId: string,
+): Promise<SourceSuggestion> {
+  return request(
+    `/api/v1/runs/${encodeURIComponent(runId)}/sources/${encodeURIComponent(suggestionId)}/dismiss`,
+    { method: "POST" },
+  );
 }
 
 export function getDecision(runId: string): Promise<DecisionArtifact> {

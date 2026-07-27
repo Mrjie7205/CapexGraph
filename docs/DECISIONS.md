@@ -86,3 +86,15 @@ migration registry owns the whole SQLite workspace. Migrations are transactional
 safe additive migrations may run on startup, while any migration marked non-automatic requires an
 explicit operator upgrade. Backup and restore use SQLite's consistent backup API and restore never
 overwrites an existing database without an explicit force flag.
+
+## D010 — Discovery suggestions are not Evidence
+
+- **Status:** accepted
+- **Date:** 2026-07-27
+
+Search and provider results are stored as `SourceSuggestion` objects with their own lifecycle:
+`suggested → selected → capture_pending → captured`, with durable dismissal, failure, and duplicate
+outcomes. A suggestion never becomes captured or reviewed merely because it came from SEC, an
+issuer domain, a user, or a model. Successful guarded download creates a separate Evidence object;
+human review remains a second explicit action. URL identity and downloaded-content identity are
+deduplicated separately and neither operation silently overwrites an existing capture.

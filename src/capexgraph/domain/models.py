@@ -53,6 +53,22 @@ class EvidenceStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class SourceSuggestionStatus(StrEnum):
+    SUGGESTED = "suggested"
+    SELECTED = "selected"
+    CAPTURE_PENDING = "capture_pending"
+    CAPTURED = "captured"
+    DISMISSED = "dismissed"
+    CAPTURE_FAILED = "capture_failed"
+    DUPLICATE = "duplicate"
+
+
+class SourceAuthority(StrEnum):
+    REGULATOR = "regulator"
+    ISSUER = "issuer"
+    OTHER = "other"
+
+
 class RelationshipType(StrEnum):
     SUPPLIES = "supplies"
     CUSTOMER = "customer"
@@ -81,6 +97,32 @@ class Evidence(BaseModel):
     content_type: str | None = None
     local_path: str | None = None
     status: EvidenceStatus = EvidenceStatus.PROPOSED
+
+
+class SourceSuggestion(BaseModel):
+    id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    url: HttpUrl
+    canonical_url: str = Field(min_length=1)
+    kind: EvidenceKind
+    publisher: str | None = None
+    authority: SourceAuthority = SourceAuthority.OTHER
+    reason: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    status: SourceSuggestionStatus = SourceSuggestionStatus.SUGGESTED
+    published_at: date | None = None
+    discovered_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    selected_at: datetime | None = None
+    captured_at: datetime | None = None
+    evidence_id: str | None = None
+    final_url: HttpUrl | None = None
+    content_hash: str | None = None
+    duplicate_of: str | None = None
+    error: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class TickerIdentity(BaseModel):

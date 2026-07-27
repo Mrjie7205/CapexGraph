@@ -10,7 +10,7 @@ from collections.abc import Callable
 from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from pydantic import BaseModel, Field, HttpUrl
@@ -22,6 +22,7 @@ from capexgraph.runtime.store import runs_dir
 from capexgraph.workflows import load_run, save_run
 
 MAX_SOURCE_BYTES = 20 * 1024 * 1024
+MAX_REDIRECTS = 5
 USER_AGENT = "CapexGraph/0.2 evidence-capture (+https://github.com/Mrjie7205/CapexGraph)"
 
 
@@ -149,38 +150,61 @@ class EvidenceCollector:
 
     def collect(self, run_id: str, source: EvidenceSourceRequest) -> CollectedDocument:
         evidence_id = _safe_evidence_id(source.id)
-        url = str(source.url)
-        _validate_public_url(
-            url,
-            allow_private=self.allow_private,
-            resolver=self.resolver,
-        )
+        current_url = str(source.url)
         raw_parts: list[bytes] = []
         size = 0
-        with self.client.stream(
-            "GET",
-            url,
-            headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/pdf,*/*"},
-            follow_redirects=True,
-        ) as response:
-            response.raise_for_status()
-            final_url = str(response.url)
+        response: httpx.Response | None = None
+        for redirect_count in range(MAX_REDIRECTS + 1):
             _validate_public_url(
-                final_url,
+                current_url,
                 allow_private=self.allow_private,
                 resolver=self.resolver,
             )
+            request = self.client.build_request(
+                "GET",
+                current_url,
+                headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/pdf"},
+            )
+            response = self.client.send(request, stream=True, follow_redirects=False)
+            if response.is_redirect:
+                location = response.headers.get("location")
+                response.close()
+                if not location:
+                    raise ValueError("Evidence redirect is missing a Location header")
+                if redirect_count >= MAX_REDIRECTS:
+                    raise ValueError(f"Evidence source exceeds {MAX_REDIRECTS} redirects")
+                current_url = urljoin(current_url, location)
+                continue
+            break
+        if response is None:
+            raise RuntimeError("Evidence source returned no response")
+        try:
+            response.raise_for_status()
+            final_url = str(response.url)
+            declared_length = response.headers.get("content-length")
+            if declared_length and int(declared_length) > self.max_bytes:
+                raise ValueError(f"Evidence source exceeds {self.max_bytes} bytes")
             for chunk in response.iter_bytes():
                 size += len(chunk)
                 if size > self.max_bytes:
                     raise ValueError(f"Evidence source exceeds {self.max_bytes} bytes")
                 raw_parts.append(chunk)
             content_type = response.headers.get("content-type", "application/octet-stream")
+        finally:
+            response.close()
 
         raw = b"".join(raw_parts)
+        normalized_content_type = content_type.split(";", 1)[0].strip().lower()
+        is_pdf = raw.startswith(b"%PDF") or normalized_content_type == "application/pdf"
+        is_html = normalized_content_type in {"text/html", "application/xhtml+xml"}
+        if not is_pdf and not is_html:
+            raise ValueError(
+                "Evidence source must be HTML or PDF; "
+                f"received {normalized_content_type or 'unknown'}"
+            )
         digest = hashlib.sha256(raw).hexdigest()
         text = _extract_text(raw, content_type)
-        extension = ".pdf" if "pdf" in content_type.lower() or raw.startswith(b"%PDF") else ".html"
+        extension = ".pdf" if is_pdf else ".html"
         relative_raw = Path("sources") / f"{evidence_id}{extension}"
         relative_text = Path("sources") / f"{evidence_id}.txt"
         run_dir = runs_dir() / run_id
@@ -219,12 +243,22 @@ def collect_evidence_for_run(
     if run is None:
         raise KeyError(f"Research run not found: {run_id}")
     document = (collector or EvidenceCollector()).collect(run_id, source)
+    attach_collected_document(run_id, document)
+    return document
+
+
+def attach_collected_document(run_id: str, document: CollectedDocument) -> Evidence:
+    """Attach an already downloaded document without fetching it a second time."""
+
+    run = load_run(run_id)
+    if run is None:
+        raise KeyError(f"Research run not found: {run_id}")
     _replace_evidence(run, document.evidence)
     providers = run.manifest.setdefault("data_providers", [])
     if "http-evidence" not in providers:
         providers.append("http-evidence")
     save_run(run)
-    return document
+    return document.evidence
 
 
 def collect_evidence_pack(
@@ -274,3 +308,18 @@ def review_run_evidence(run_id: str, evidence_id: str, *, approved: bool) -> Evi
     evidence.status = EvidenceStatus.REVIEWED if approved else EvidenceStatus.REJECTED
     save_run(run)
     return evidence
+
+
+def read_run_evidence_text(run_id: str, evidence_id: str) -> str:
+    run = load_run(run_id)
+    if run is None:
+        raise KeyError(f"Research run not found: {run_id}")
+    evidence = next((item for item in run.evidence if item.id == evidence_id), None)
+    if evidence is None:
+        raise KeyError(f"Evidence not found: {evidence_id}")
+    _evidence_file(run, evidence)
+    run_dir = (runs_dir() / run.id).resolve()
+    path = (run_dir / "sources" / f"{_safe_evidence_id(evidence.id)}.txt").resolve()
+    if not path.is_relative_to(run_dir) or not path.is_file():
+        raise KeyError(f"Extracted evidence text not found: {evidence_id}")
+    return path.read_text(encoding="utf-8")

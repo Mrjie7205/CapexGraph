@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
@@ -16,6 +16,8 @@ from capexgraph.domain import (
     ResearchRun,
     RunMode,
     RunStatus,
+    SourceSuggestion,
+    SourceSuggestionStatus,
     StepCheckpoint,
     TickerIdentity,
 )
@@ -24,11 +26,13 @@ from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import RunStore
 from capexgraph.runtime.store import runs_dir
+from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
 from capexgraph.tools import (
     EvidenceSourceRequest,
     TickerResolver,
     capture_market_snapshot,
     collect_evidence_for_run,
+    read_run_evidence_text,
     review_run_evidence,
 )
 from capexgraph.tools.financials import attach_financial_metric_items
@@ -86,6 +90,23 @@ class EvidenceCollectRequest(BaseModel):
 
 class EvidenceReviewRequest(BaseModel):
     approved: bool
+
+
+class SourceDiscoverRequest(BaseModel):
+    provider: str = Field(default="sec", pattern=r"^sec$")
+    identifier: str | None = Field(default=None, max_length=200)
+    forms: list[str] = Field(default_factory=list, max_length=20)
+    limit: int = Field(default=10, ge=1, le=100)
+
+
+class SourceSuggestRequest(BaseModel):
+    url: HttpUrl
+    title: str = Field(min_length=1, max_length=300)
+    kind: EvidenceKind = EvidenceKind.COMPANY_DISCLOSURE
+    publisher: str | None = Field(default=None, max_length=160)
+    published_at: date | None = None
+    issuer_domains: list[str] = Field(default_factory=list, max_length=20)
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class MarketCaptureRequest(BaseModel):
@@ -197,6 +218,7 @@ ARTIFACT_ALLOWLIST = {
     "candidates.json",
     "decision.json",
     "manifest.json",
+    "sources.json",
 }
 
 
@@ -238,6 +260,107 @@ def review_evidence(
 ) -> Evidence:
     try:
         return review_run_evidence(run_id, evidence_id, approved=request.approved)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/runs/{run_id}/evidence/{evidence_id}/text",
+    response_class=PlainTextResponse,
+)
+def get_evidence_text(run_id: str, evidence_id: str) -> PlainTextResponse:
+    try:
+        return PlainTextResponse(read_run_evidence_text(run_id, evidence_id))
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/sources/discover", response_model=list[SourceSuggestion])
+def discover_run_sources(
+    run_id: str,
+    request: SourceDiscoverRequest,
+) -> list[SourceSuggestion]:
+    try:
+        return SourceDiscoveryService().discover(
+            run_id,
+            identifier=request.identifier,
+            forms=request.forms,
+            limit=request.limit,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/runs/{run_id}/sources/suggest", response_model=SourceSuggestion)
+def suggest_run_source(
+    run_id: str,
+    request: SourceSuggestRequest,
+) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().suggest_url(
+            run_id,
+            url=str(request.url),
+            title=request.title,
+            kind=request.kind,
+            publisher=request.publisher,
+            published_at=request.published_at,
+            issuer_domains=request.issuer_domains,
+            reason=request.reason,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/runs/{run_id}/sources", response_model=list[SourceSuggestion])
+def list_run_sources(
+    run_id: str,
+    status: Annotated[SourceSuggestionStatus | None, Query()] = None,
+) -> list[SourceSuggestion]:
+    try:
+        return SourceDiscoveryService().list(run_id, status=status)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/sources/{suggestion_id}/capture",
+    response_model=SourceSuggestion,
+)
+def capture_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().capture(run_id, suggestion_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, SourceCaptureError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/sources/{suggestion_id}/retry",
+    response_model=SourceSuggestion,
+)
+def retry_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().retry(run_id, suggestion_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, SourceCaptureError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/sources/{suggestion_id}/dismiss",
+    response_model=SourceSuggestion,
+)
+def dismiss_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
+    try:
+        return SourceDiscoveryService().dismiss(run_id, suggestion_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except ValueError as error:

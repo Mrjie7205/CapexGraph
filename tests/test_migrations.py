@@ -50,11 +50,11 @@ def test_legacy_v0_2_upgrade_preserves_every_record(tmp_path) -> None:
 
     assert initial.legacy is True
     assert initial.current_version == 0
-    assert initial.pending_versions == (1,)
+    assert initial.pending_versions == tuple(item.version for item in MIGRATIONS)
 
     upgraded = upgrade_database(path)
 
-    assert upgraded.current_version == upgraded.latest_version == 1
+    assert upgraded.current_version == upgraded.latest_version == MIGRATIONS[-1].version
     assert upgraded.pending_versions == ()
     assert _counts(path) == before
     assert RunStore(path).load_run("legacy-theme-001") is not None
@@ -71,17 +71,21 @@ def test_fresh_and_repeated_upgrade_are_idempotent(tmp_path) -> None:
     first = upgrade_database(path)
     second = upgrade_database(path)
 
-    assert first.current_version == second.current_version == 1
-    assert first.applied_versions == second.applied_versions == (1,)
+    expected_versions = tuple(item.version for item in MIGRATIONS)
+    assert first.current_version == second.current_version == MIGRATIONS[-1].version
+    assert first.applied_versions == second.applied_versions == expected_versions
     with closing(sqlite3.connect(path)) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0] == 1
+        assert (
+            connection.execute("SELECT COUNT(*) FROM schema_migrations").fetchone()[0]
+            == len(MIGRATIONS)
+        )
 
 
 def test_failed_migration_rolls_back_its_schema_changes(tmp_path) -> None:
     path = _legacy_database(tmp_path / "failed.db")
     upgrade_database(path)
     failing = Migration(
-        version=2,
+        version=MIGRATIONS[-1].version + 1,
         name="intentional_failure",
         statements=(
             "CREATE TABLE should_rollback (id INTEGER PRIMARY KEY)",
@@ -103,7 +107,7 @@ def test_failed_migration_rolls_back_its_schema_changes(tmp_path) -> None:
             "SELECT version FROM schema_migrations ORDER BY version"
         ).fetchall()
     assert "should_rollback" not in tables
-    assert versions == [(1,)]
+    assert versions == [(item.version,) for item in MIGRATIONS]
     assert RunStore(path).load_run("legacy-theme-001") is not None
 
 
@@ -146,6 +150,6 @@ def test_database_cli_status_upgrade_and_backup(tmp_path) -> None:
     assert status.exit_code == 0
     assert "legacy" in status.stdout
     assert upgraded.exit_code == 0
-    assert "schema 1" in upgraded.stdout
+    assert f"schema {MIGRATIONS[-1].version}" in upgraded.stdout
     assert backup.exit_code == 0
     assert (tmp_path / "cli-backup.db").is_file()
