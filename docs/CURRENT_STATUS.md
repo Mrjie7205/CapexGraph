@@ -55,8 +55,8 @@ substantial change, and update it in the same pull request whenever shipped capa
   completed stages; it also verified coverage/readiness, financial-fact entry, portable-report
   sections, and visible persistence of a real SEC 403 provider failure.
 
-GitHub multi-version CI remains the final remote release gate and must be rechecked whenever this
-file is updated for a later build.
+GitHub CI passed for release PR #12 on Python 3.11, 3.12, 3.13, and the Web production build.
+Future code or documentation changes must pass the same remote release gate again.
 
 ## Honest capability boundaries
 
