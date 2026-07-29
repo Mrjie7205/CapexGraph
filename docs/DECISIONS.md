@@ -187,6 +187,33 @@ public; `observed_at` records when CapexGraph actually ingested it. Historical s
 metadata remains a `SourceSuggestion`; only guarded capture creates Evidence, and linking that
 Evidence appends a new event version instead of rewriting the discovery version.
 
+## D017 — Live aggregators provide signals, not Evidence
+
+- **Status:** accepted for the signal/Evidence boundary; channel-priority clause superseded by D019
+- **Date:** 2026-07-29
+
+The v0.5.1 live-event gateway uses three progressive provider paths: a frozen no-key feed for
+deterministic demos and CI, Jin10 MCP as a quota-aware polling fallback, and Jin10 Open Platform
+WebSocket as the preferred low-latency channel when a separate Secret-Key is configured. Provider
+adapters normalize into one append-only `LiveSignalVersion` boundary, so switching or recovering
+channels cannot change downstream analysis semantics or create duplicate alerts.
+
+The original MCP-fallback/WebSocket-preferred ordering above is retained as decision history only
+and must not guide implementation. D019 replaces that ordering with equal-priority channels while
+leaving every signal-versus-Evidence rule in this decision intact.
+
+A live aggregator message is a secondary market signal. It can be mapped to themes, entities,
+existing graph nodes, and research runs; it can also trigger an official-source search or a linked
+re-evaluation proposal. It is not `Evidence`, cannot become a `CorporateEventVersion` merely by
+arrival, and cannot raise a supply-chain relationship to medium/high confidence. The existing
+guarded capture, hash, and human-review path remains the only upgrade route.
+
+AI event analysis is optional and cost-gated. Its typed output must show direction, horizon,
+transmission path, price confirmation, evidence gaps, triggers, invalidations, model lineage, and
+failure state. It may propose ignore, watch, verify, attach, or linked re-evaluation actions. A
+human must explicitly accept any action that creates a run or changes research state; CapexGraph
+does not place orders or manage positions.
+
 ## D018 — Model protocol, authentication, and billing are separate boundaries
 
 - **Status:** accepted
@@ -205,3 +232,28 @@ explicit, and only credential-safe details enter checkpoints, manifests, reports
 or the Cockpit. CapexGraph never reads or persists ChatGPT OAuth files. Remote subscription proxies
 are rejected by default; an explicit opt-in does not weaken the operator's responsibility to secure
 that endpoint.
+
+## D019 — MCP and WebSocket are equal-priority live information channels
+
+- **Status:** accepted; supersedes only the channel-priority clause in D017
+- **Date:** 2026-07-29
+
+Jin10 MCP polling and Jin10 Open Platform WebSocket are two formal, equal-priority information
+channels. Delivery order is not trust order: MCP is the first channel connected to real data
+because its Bearer access is already available, while the WebSocket adapter is developed in
+parallel from the same provider-neutral contract. A missing Secret-Key blocks only WebSocket live
+smoke. Once available, WebSocket joins MCP in continuous operation; neither channel is a fallback,
+replacement, or automatic failover target for the other.
+
+Each channel owns its credential, checkpoint, freshness, retry/backoff, quota or connection health,
+and raw `SignalObservation`. The gateway matches overlapping observations into one canonical
+`LiveSignalVersion` and one alert while preserving channel identity, published/observed timestamps,
+field differences, revisions, and channel-only events. The Cockpit reports both channel states plus
+overlap, P50/P95 delay, missing events, and revision differences. It must not claim content parity
+until measured.
+
+Channel failure changes only that channel's status. MCP quota pressure may reduce MCP cadence but
+cannot disable or demote WebSocket; WebSocket disconnects may trigger its own reconnect and gap
+state but cannot change MCP cadence or role. Cross-channel data can corroborate delivery and improve
+coverage, but two aggregator observations still remain secondary signals. They do not satisfy the
+official-source capture and human-review gate established by D017.

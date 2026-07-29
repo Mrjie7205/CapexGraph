@@ -1,0 +1,479 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="CapexGraph v0.5.1 实时事件网关、MCP 与 WebSocket 同级双通道、AI 影响分析及 Live Desk 完整开发计划。">
+  <title>CapexGraph v0.5.1 · 实时事件网关开发计划</title>
+  <style>
+    :root {
+      --paper:#f3eee3; --deep:#e2d8c7; --ink:#1f1e1a; --muted:#71695e;
+      --line:rgba(35,31,25,.18); --wine:#721f2c; --copper:#a35b33;
+      --green:#2d6954; --gold:#d39a51; --night:#1d1d19; --cream:#f8f2e8;
+      --serif:"Iowan Old Style","Palatino Linotype","Noto Serif CJK SC","Songti SC",serif;
+      --sans:"Avenir Next","Noto Sans CJK SC","Source Han Sans SC","Microsoft YaHei",sans-serif;
+      --mono:"IBM Plex Mono","DM Mono","Cascadia Mono",Consolas,monospace;
+    }
+    *{box-sizing:border-box} html{scroll-behavior:smooth}
+    body{margin:0;color:var(--ink);font-family:var(--sans);line-height:1.65;background:
+      linear-gradient(rgba(31,29,25,.028) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(31,29,25,.028) 1px,transparent 1px),var(--paper);
+      background-size:24px 24px}
+    a{color:inherit}.shell{width:min(1480px,100%);margin:auto;background:rgba(243,238,227,.9)}
+    .progress{position:fixed;z-index:100;inset:0 auto auto 0;width:0;height:3px;background:var(--wine)}
+    .topbar{position:sticky;top:0;z-index:30;min-height:66px;padding:0 4vw;display:grid;
+      grid-template-columns:auto 1fr auto;align-items:center;gap:28px;border-bottom:1px solid var(--line);
+      background:rgba(243,238,227,.94);backdrop-filter:blur(14px)}
+    .brand{display:flex;align-items:center;gap:12px;text-decoration:none;font:700 19px var(--serif)}
+    .mark{width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--ink);
+      transform:rotate(45deg);font:10px var(--mono)}.mark i{transform:rotate(-45deg);color:var(--wine);font-style:normal}
+    nav{display:flex;justify-content:center;overflow:auto;scrollbar-width:none}
+    nav a{min-height:65px;padding:0 14px;display:grid;place-items:center;border-bottom:2px solid transparent;
+      color:var(--muted);text-decoration:none;font:9px var(--mono);letter-spacing:.1em;text-transform:uppercase;white-space:nowrap}
+    nav a:hover{color:var(--ink);border-color:var(--wine)}
+    .plan-state{display:flex;align-items:center;gap:9px;color:var(--wine);font:9px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .plan-state:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 5px rgba(211,154,81,.15)}
+
+    .hero{position:relative;overflow:hidden;padding:86px 5vw 72px;border-bottom:1px solid var(--line);
+      background:radial-gradient(circle at 84% 15%,rgba(114,31,44,.15),transparent 26%),var(--paper)}
+    .hero:after{content:"0.5.1";position:absolute;right:1.5vw;bottom:-83px;color:rgba(114,31,44,.055);
+      font:700 245px/.8 var(--serif);letter-spacing:-.08em;pointer-events:none}
+    .kicker,.section-label{display:block;color:var(--wine);font:9px var(--mono);letter-spacing:.15em;text-transform:uppercase}
+    .kicker{display:flex;align-items:center;gap:12px;margin-bottom:28px}.kicker:before{content:"";width:52px;height:1px;background:var(--wine)}
+    .hero-grid{position:relative;z-index:2;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(330px,.6fr);gap:7vw;align-items:end}
+    h1,h2,h3,p{margin-top:0}h1{max-width:940px;margin-bottom:28px;font:650 clamp(52px,7vw,103px)/.93 var(--serif);letter-spacing:-.065em}
+    h1 em{color:var(--wine);font-weight:500}.hero-copy{max-width:820px;margin:0;color:#514b42;font:20px/1.72 var(--serif)}
+    .hero-note{padding:25px;color:var(--cream);background:var(--night);box-shadow:18px 18px 0 rgba(114,31,44,.1)}
+    .hero-note span{color:var(--gold);font:9px var(--mono);letter-spacing:.13em;text-transform:uppercase}
+    .hero-note strong{display:block;margin:14px 0;font:600 23px/1.3 var(--serif)}
+    .hero-note p{margin:0;color:#bcb3a4;font:10px/1.7 var(--mono)}
+    .meta{display:grid;grid-template-columns:repeat(4,1fr);background:var(--deep);border-bottom:1px solid var(--line)}
+    .meta article{min-height:104px;padding:23px 2.4vw;border-right:1px solid var(--line)}.meta article:last-child{border:0}
+    .meta span,.meta small{display:block;color:var(--muted);font:8px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .meta strong{display:block;margin:7px 0 4px;font:19px var(--serif)}
+
+    .section{padding:74px 5vw;border-bottom:1px solid var(--line)}.dark{color:var(--cream);background:var(--night)}
+    .section-head{display:grid;grid-template-columns:minmax(260px,.55fr) minmax(0,1.45fr);gap:6vw;margin-bottom:45px}
+    .section-head h2{margin:8px 0 0;font:600 clamp(38px,4.8vw,68px)/1.02 var(--serif);letter-spacing:-.045em}
+    .section-head p{max-width:830px;margin:8px 0 0;color:var(--muted);font-size:16px}.dark .section-head p{color:#bcb3a4}
+    .rule{display:inline-flex;align-items:center;gap:10px;margin-top:20px;color:var(--wine);font:9px var(--mono);letter-spacing:.1em;text-transform:uppercase}
+    .rule:before{content:"";width:34px;height:1px;background:currentColor}
+    .cards3{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--line)}
+    .decision{min-height:225px;padding:27px;border-right:1px solid var(--line);background:rgba(255,255,255,.17)}.decision:last-child{border:0}
+    .decision b{color:var(--wine);font:11px var(--mono)}.decision h3{margin:35px 0 12px;font:24px/1.2 var(--serif)}
+    .decision p{margin:0;color:var(--muted);font-size:13px}.decision code{color:var(--wine);font:11px var(--mono)}
+    .table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;border:1px solid var(--line);background:rgba(255,255,255,.15)}
+    th,td{padding:15px 17px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    th{color:var(--muted);font:8px var(--mono);letter-spacing:.1em;text-transform:uppercase}td{font-size:13px}
+    td:first-child{font-weight:700}.tag{display:inline-block;margin:2px 4px 2px 0;padding:3px 7px;border:1px solid rgba(35,31,25,.35);
+      color:var(--muted);font:8px var(--mono);text-transform:uppercase;white-space:nowrap}.tag.live{color:var(--green);border-color:var(--green)}
+    .tag.plan{color:var(--wine);border-color:var(--wine)}.tag.guard{color:var(--copper);border-color:var(--copper)}
+
+    .mode-bar{display:flex;align-items:center;gap:8px;margin:-14px 0 22px}.mode-bar>span{margin-right:8px;color:#a99f90;font:9px var(--mono);text-transform:uppercase}
+    .mode-button{padding:8px 11px;border:1px solid rgba(255,255,255,.25);border-radius:0;color:#a99f90;background:transparent;
+      cursor:pointer;font:9px var(--mono);letter-spacing:.06em;text-transform:uppercase}.mode-button[aria-pressed=true]{color:var(--night);border-color:var(--gold);background:var(--gold)}
+    .diagram{padding:24px;overflow:auto;border:1px solid rgba(255,255,255,.16);background:
+      linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px),#171714;background-size:28px 28px}
+    svg.arch{display:block;min-width:1040px;width:100%;height:auto}.arch .box{fill:#27261f;stroke:rgba(248,242,232,.25);stroke-width:1.2}
+    .arch .accent{fill:#351f22;stroke:#a55160;stroke-width:1.5}.arch .output{fill:#1e3128;stroke:#579278;stroke-width:1.4}
+    .arch .title{fill:#f8f2e8;font:600 16px var(--serif)}.arch .sub{fill:#afa697;font:10px var(--mono)}
+    .arch .micro{fill:#d39a51;font:9px var(--mono);letter-spacing:.08em}.arch .line{fill:none;stroke:#907e66;stroke-width:1.6;marker-end:url(#arrow)}
+    .arch .live-line{stroke:#d39a51;stroke-width:2.4}.arch .safe-line{stroke:#579278;stroke-width:2}
+    .architecture[data-mode=ws] [data-path=mcp],.architecture[data-mode=mcp] [data-path=ws]{opacity:.2}.architecture [data-path]{transition:opacity .3s}
+    .caption{display:flex;flex-wrap:wrap;justify-content:space-between;gap:14px;margin-top:17px;color:#a99f90;font:9px/1.55 var(--mono)}
+    .caption strong{color:var(--gold);font-weight:500}
+    .trust{display:grid;grid-template-columns:.75fr 1.25fr;gap:28px;margin-top:38px}.stack{border:1px solid rgba(255,255,255,.16)}
+    .stack-row{display:grid;grid-template-columns:112px 1fr;min-height:67px;border-bottom:1px solid rgba(255,255,255,.13)}.stack-row:last-child{border:0}
+    .stack-row>b{display:grid;place-items:center;border-right:1px solid rgba(255,255,255,.13);color:var(--gold);font:9px var(--mono)}
+    .stack-row div{padding:13px 16px}.stack-row strong{display:block;font:15px var(--serif)}.stack-row small{color:#a99f90;font:9px/1.5 var(--mono)}
+    .boundary{display:grid;align-content:center;padding:30px;border-left:4px solid var(--gold);background:rgba(211,154,81,.075)}
+    .boundary strong{margin-bottom:13px;font:25px/1.25 var(--serif)}.boundary p{margin:0;color:#bcb3a4;font-size:13px}
+
+    .flow{counter-reset:step;display:grid;grid-template-columns:repeat(7,1fr);border:1px solid var(--line);background:rgba(255,255,255,.15)}
+    .flow article{position:relative;min-height:181px;padding:20px 16px;border-right:1px solid var(--line)}.flow article:last-child{border:0}
+    .flow article:before{counter-increment:step;content:"0" counter(step);display:block;margin-bottom:30px;color:var(--wine);font:11px var(--mono)}
+    .flow article:after{content:"→";position:absolute;z-index:2;top:18px;right:-10px;color:var(--wine);background:var(--paper);font:13px var(--mono)}
+    .flow article:last-child:after{display:none}.flow strong{display:block;margin-bottom:8px;font:17px/1.25 var(--serif)}.flow small{color:var(--muted);font:9px/1.55 var(--mono)}
+
+    .frame{padding:12px;border:1px solid rgba(35,31,25,.4);background:#d8cfbf;box-shadow:18px 18px 0 rgba(114,31,44,.1)}
+    .mock{overflow:hidden;border:1px solid #5d574d;background:var(--paper)}.mock-top{height:50px;padding:0 17px;display:grid;
+      grid-template-columns:180px 1fr auto;align-items:center;gap:20px;border-bottom:1px solid var(--line);font:8px var(--mono);text-transform:uppercase}
+    .mock-logo{font:700 15px var(--serif)}.mock-nav{display:flex;gap:17px;color:var(--muted)}.mock-nav b{padding:17px 0 14px;color:var(--wine);border-bottom:2px solid var(--wine)}
+    .connection{display:flex;gap:6px}.connection span{padding:4px 7px;border:1px solid var(--line);color:var(--muted)}.connection .on{color:var(--green);border-color:var(--green)}
+    .workspace{display:grid;grid-template-columns:29% 43% 28%;min-height:505px}.panel{min-width:0;border-right:1px solid var(--line)}.panel:last-child{border:0}
+    .panel-head{min-height:43px;padding:0 13px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);
+      color:var(--muted);font:8px var(--mono);text-transform:uppercase}.panel-head b{color:var(--wine);font-weight:500}
+    .filters{display:flex;gap:5px;padding:9px;border-bottom:1px solid var(--line)}.filters span{padding:4px 6px;border:1px solid var(--line);color:var(--muted);font:7px var(--mono)}
+    .filters .on{color:#fff;border-color:var(--wine);background:var(--wine)}.event{padding:13px 11px;display:grid;grid-template-columns:48px 1fr;gap:10px;border-bottom:1px solid var(--line)}
+    .event.active{background:rgba(114,31,44,.065);box-shadow:inset 3px 0 var(--wine)}.time{color:var(--wine);font:9px var(--mono)}
+    .event strong{display:block;font:11px/1.4 var(--serif)}.event small{display:block;margin-top:5px;color:var(--muted);font:7px var(--mono)}
+    .detail{padding:20px}.chips{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:18px}.chips span{padding:4px 6px;border:1px solid var(--line);color:var(--muted);font:7px var(--mono)}
+    .detail h3{max-width:470px;font:25px/1.2 var(--serif)}.detail p{color:#5b544b;font-size:11px}.impact{margin-top:24px;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .impact div{position:relative;padding:12px 8px;border:1px solid var(--line);text-align:center}.impact div:not(:last-child):after{content:"→";position:absolute;right:-11px;color:var(--wine)}
+    .impact strong{display:block;font:10px var(--serif)}.impact small{color:var(--muted);font:6px var(--mono)}
+    .analysis-card{padding:16px;border-bottom:1px solid var(--line)}.analysis-card>span{color:var(--wine);font:7px var(--mono);text-transform:uppercase}
+    .analysis-card h4{margin:8px 0 7px;font:17px var(--serif)}.analysis-card p{margin:0;color:var(--muted);font:8px/1.55 var(--mono)}
+    .score{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin-top:12px}.bar{height:5px;background:rgba(30,29,25,.1)}.bar i{display:block;width:74%;height:100%;background:var(--wine)}
+    .score b{color:var(--wine);font:12px var(--mono)}.actions{grid-column:1/-1;min-height:60px;padding:10px 14px;display:grid;grid-template-columns:1fr repeat(4,auto);gap:7px;align-items:center;border-top:1px solid var(--line);background:#e5ddcf}
+    .actions p{margin:0;color:var(--muted);font:8px/1.45 var(--mono)}.actions button{padding:8px 9px;border:1px solid var(--wine);border-radius:0;color:var(--wine);background:transparent;font:7px var(--mono);text-transform:uppercase}
+    .actions .primary{color:#fff;background:var(--wine)}.annotations{display:grid;grid-template-columns:repeat(3,1fr);margin-top:34px;border:1px solid var(--line)}
+    .annotations article{padding:18px;display:grid;grid-template-columns:48px 1fr;gap:12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .annotations article:nth-child(3n){border-right:0}.annotations article:nth-last-child(-n+3){border-bottom:0}.annotations b{width:34px;height:34px;display:grid;place-items:center;color:#fff;background:var(--wine);font:10px var(--mono)}
+    .annotations strong{display:block;margin-bottom:5px;font:15px var(--serif)}.annotations small{color:var(--muted);font:8px/1.5 var(--mono)}
+
+    .operations{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}.operation{min-height:345px;padding:25px;border:1px solid rgba(255,255,255,.16);background:#292823}
+    .operation>b{color:var(--gold);font:11px var(--mono)}.operation h3{margin:26px 0 18px;font:25px/1.2 var(--serif)}
+    .operation ol{margin:0;padding-left:18px;color:#bcb3a4;font-size:12px}.operation li{margin-bottom:11px;padding-left:3px}.operation code{color:var(--gold);font:10px var(--mono)}
+    .contracts{display:grid;grid-template-columns:1fr 1fr;gap:19px}.contract{min-width:0;border:1px solid var(--line);background:rgba(255,255,255,.15)}
+    .contract-head{min-height:46px;padding:0 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);
+      color:var(--muted);font:8px var(--mono);text-transform:uppercase}.contract-head b{color:var(--wine);font-weight:500}
+    pre{margin:0;padding:20px;overflow:auto;color:#e9dfcf;background:var(--night);font:10px/1.7 var(--mono)}
+    .endpoints{margin:0;padding:6px 17px 17px;list-style:none}.endpoints li{padding:11px 0;display:grid;grid-template-columns:62px 1fr;gap:10px;border-bottom:1px solid var(--line);font:10px/1.45 var(--mono)}
+    .endpoints li:last-child{border:0}.method{color:var(--wine);font-weight:700}
+
+    .milestones{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid var(--line)}.milestone{min-height:276px;padding:22px;border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .milestone:nth-child(4n){border-right:0}.milestone:nth-last-child(-n+4){border-bottom:0}.mid{color:var(--wine);font:12px var(--mono)}.priority{float:right;color:var(--muted);font:8px var(--mono)}
+    .milestone h3{margin:33px 0 10px;font:20px/1.25 var(--serif)}.milestone p{margin-bottom:14px;color:var(--muted);font-size:11px}
+    .milestone ul{margin:0;padding-left:16px;font-size:10px}.milestone li{margin-bottom:7px}.exit{display:block;margin-top:15px;padding-top:12px;border-top:1px solid var(--line);color:var(--green);font:8px/1.5 var(--mono);text-transform:uppercase}
+    .path{display:flex;align-items:center;gap:8px;margin-top:24px;overflow:auto;color:var(--muted);font:9px var(--mono)}.path span{min-width:max-content;padding:7px 9px;border:1px solid var(--line)}.path i{color:var(--wine);font-style:normal}
+    .dod{display:grid;grid-template-columns:1.2fr .8fr;gap:20px}.checks{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line)}
+    .check{position:relative;min-height:96px;padding:18px 18px 18px 52px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);font-size:12px}.check:nth-child(2n){border-right:0}.check:nth-last-child(-n+2){border-bottom:0}
+    .check:before{content:"□";position:absolute;left:18px;top:16px;color:var(--wine);font:20px var(--mono)}.check strong{display:block;margin-bottom:4px;font:15px var(--serif)}.check small{color:var(--muted);font:8px/1.5 var(--mono)}
+    .out{padding:27px;color:var(--cream);background:var(--night)}.out h3{font:24px var(--serif)}.out ul{margin:0;padding-left:18px;color:#bcb3a4;font-size:12px}.out li{margin-bottom:10px}
+    .risks{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.risk{min-height:190px;padding:20px;border:1px solid var(--line);background:rgba(255,255,255,.13)}
+    .risk b{color:#a63d32;font:9px var(--mono);text-transform:uppercase}.risk h3{margin:24px 0 8px;font:19px var(--serif)}.risk p{margin:0;color:var(--muted);font-size:11px}
+    .handoff{padding:43px 5vw;display:grid;grid-template-columns:1fr auto;align-items:center;gap:40px;color:var(--cream);background:var(--wine)}
+    .handoff h2{margin:0 0 8px;font:35px var(--serif)}.handoff p{max-width:780px;margin:0;color:#e4cbd0;font-size:13px}.links{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+    .links a,.print{min-height:38px;padding:0 12px;display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.46);color:#fff;background:transparent;text-decoration:none;cursor:pointer;font:8px var(--mono);text-transform:uppercase}
+    footer{padding:26px 5vw;display:flex;justify-content:space-between;gap:24px;color:var(--muted);background:#d9d0c1;font:8px var(--mono);text-transform:uppercase}
+
+    @media(max-width:1080px){
+      .topbar{grid-template-columns:auto 1fr}.plan-state{display:none}.hero-grid,.section-head,.trust,.dod{grid-template-columns:1fr}
+      .hero-note{max-width:620px}.cards3,.operations,.risks{grid-template-columns:1fr 1fr}.decision:last-child{grid-column:1/-1;border-top:1px solid var(--line)}
+      .flow{grid-template-columns:repeat(4,1fr)}.flow article:nth-child(4){border-right:0}.workspace{grid-template-columns:38% 62%}.panel.analysis{grid-column:1/-1;border-top:1px solid var(--line)}
+      .annotations,.milestones{grid-template-columns:repeat(2,1fr)}.annotations article:nth-child(3n),.milestone:nth-child(4n){border-right:1px solid var(--line)}
+      .annotations article:nth-child(2n),.milestone:nth-child(2n){border-right:0}.milestone:nth-last-child(-n+4){border-bottom:1px solid var(--line)}.milestone:nth-last-child(-n+2){border-bottom:0}
+    }
+    @media(max-width:720px){
+      .topbar{position:relative;padding:16px 20px;grid-template-columns:1fr}nav{justify-content:flex-start;margin:0 -20px -16px;padding:0 10px;border-top:1px solid var(--line)}nav a{min-height:46px;padding:0 10px}
+      .hero{padding:55px 22px}.hero:after{font-size:145px;bottom:-45px}h1{font-size:50px}.hero-copy{font-size:17px}.meta{grid-template-columns:1fr 1fr}.meta article:nth-child(2){border-right:0}.meta article:nth-child(-n+2){border-bottom:1px solid var(--line)}
+      .section{padding:58px 22px}.cards3,.operations,.risks,.contracts,.annotations,.milestones,.checks{grid-template-columns:1fr}
+      .decision,.annotations article,.milestone,.check{border-right:0!important;border-bottom:1px solid var(--line)!important}.decision:last-child,.annotations article:last-child,.milestone:last-child,.check:last-child{grid-column:auto;border-bottom:0!important}
+      .flow{grid-template-columns:1fr}.flow article{border-right:0;border-bottom:1px solid var(--line)}.flow article:after{content:"↓";top:auto;right:18px;bottom:-12px}.flow article:last-child{border-bottom:0}
+      .frame{padding:6px;overflow:auto}.mock{min-width:880px}.handoff{grid-template-columns:1fr}.links{justify-content:flex-start}footer{flex-direction:column}table{min-width:760px}
+    }
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{transition:none!important}}
+    @media print{@page{size:A4 landscape;margin:10mm}.topbar,.progress,.mode-bar,.print{display:none!important}.shell{width:100%;background:#fff}.hero,.section{padding:28px 18px}.hero:after{display:none}.dark{print-color-adjust:exact}.diagram,.frame,.milestones,.contract,table{break-inside:avoid}}
+  </style>
+</head>
+<body>
+  <div class="progress" id="progress" aria-hidden="true"></div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="#top"><span class="mark"><i>CG</i></span><span>CapexGraph</span></a>
+      <nav aria-label="文档章节">
+        <a href="#decision">定位</a><a href="#architecture">架构</a><a href="#frontend">前端</a>
+        <a href="#usage">操作</a><a href="#contracts">契约</a><a href="#milestones">里程碑</a><a href="#acceptance">验收</a>
+      </nav>
+      <span class="plan-state">Plan · not shipped</span>
+    </header>
+
+    <main id="top">
+      <section class="hero">
+        <div class="kicker">Product & Engineering Plan · 2026-07-29</div>
+        <div class="hero-grid">
+          <div>
+            <h1>v0.5.1<br><em>实时事件网关</em></h1>
+            <p class="hero-copy">让金十 MCP 自适应轮询与开放平台 WebSocket 作为两个同级信息通道，分别采集、独立计量、交叉合流，再经过确定性过滤、AI 影响分析、官方补证和人工确认，将“发生了什么”转化为可审计的研究优先级与条件式行动建议。</p>
+          </div>
+          <aside class="hero-note">
+            <span>One-line decision</span>
+            <strong>MCP 先运行，WebSocket 同步开发；双通道同级，官方来源定案。</strong>
+            <p>“先用 MCP”只代表交付顺序，不代表长期主备关系。v0.5.1 不宣称已经完成 v0.4 主线政策，不把聚合资讯升级为 Evidence，也不连接券商自动下单。</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="meta" aria-label="计划元信息">
+        <article><span>计划状态</span><strong>Approved design</strong><small>尚未进入实现</small></article>
+        <article><span>开发基线</span><strong>v0.5 branch</strong><small>SEC 事件底座已存在</small></article>
+        <article><span>运行策略</span><strong>MCP + WebSocket</strong><small>同级 · 独立健康度</small></article>
+        <article><span>安全底线</span><strong>Human confirm</strong><small>建议不等于订单</small></article>
+      </section>
+
+      <section class="section" id="decision">
+        <div class="section-head">
+          <div><span class="section-label">01 / Product decision</span><h2>先把角色分清，<br>再谈实时。</h2></div>
+          <div><p>这不是给现有 Sources 页面多加一个新闻列表，而是增加一层独立的“市场信号系统”。它负责发现和解释时效性，不拥有事实最终裁决权。当前的公司官方事件、日线历史和 Evidence 账本继续保持各自边界。</p><span class="rule">实时性不能绕过证据门禁</span></div>
+        </div>
+        <div class="cards3">
+          <article class="decision"><b>D1 / INPUT</b><h3>双通道，同等优先</h3><p><code>Jin10McpPollSource</code> 与 <code>Jin10OpenWebSocketSource</code> 都是正式信息通道。前期 MCP 先上线，WebSocket 适配器同步开发；双开后两路持续运行，以观察记录合流，不发生主备切换。</p></article>
+          <article class="decision"><b>D2 / TRUST</b><h3>信号不是证据</h3><p>金十快讯、日历和行情属于发现与市场环境层。它们可以触发研究，但不能直接让供应链关系进入中高置信度；官方公告捕获与人工审核仍是 Evidence 入口。</p></article>
+          <article class="decision"><b>D3 / ACTION</b><h3>建议必须带条件</h3><p>AI 输出方向、时间窗、触发条件、证伪条件、价格确认和覆盖缺口。默认动作为忽略、观察、补证、重评或建立计划，不产生券商订单。</p></article>
+        </div>
+        <div class="table-wrap" style="margin-top:30px">
+          <table>
+            <thead><tr><th>系统层</th><th>数据源</th><th>v0.5.1 职责</th><th>明确不能做</th></tr></thead>
+            <tbody>
+              <tr><td>实时信号层</td><td><span class="tag live">Jin10 MCP</span><span class="tag live">Jin10 WS</span></td><td>两路独立采集突发快讯、宏观公布和获准行情；合流后测量覆盖、延迟与字段差异。</td><td>不能证明公司披露、客户关系或供应链事实，也不能假定两路内容完全等价。</td></tr>
+              <tr><td>历史价格层</td><td><span class="tag">EODHD</span><span class="tag">Yahoo fallback</span></td><td>日线、相对强弱、事件前后反应和跟踪基线。</td><td>不提供主题历史真相，也不替代实时快讯。</td></tr>
+              <tr><td>官方证据层</td><td><span class="tag guard">SEC</span><span class="tag plan">CNINFO / DART</span></td><td>补证、捕获、哈希、审核和版本化公司事件。</td><td>不能被聚合商摘要或模型推断替代。</td></tr>
+              <tr><td>研究判断层</td><td><span class="tag">Rules</span><span class="tag">Optional LLM</span></td><td>相关性、影响路径、优先级、条件式行动和重评提案。</td><td>不自动下单，不把不确定性藏在一句“买入”中。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="section dark architecture" id="architecture" data-mode="both">
+        <div class="section-head">
+          <div><span class="section-label">02 / System architecture</span><h2>一条事件，<br>四层判断。</h2></div>
+          <p>数据连接、确定性处理、模型判断和用户动作彼此解耦。MCP 与 WebSocket 各有独立 checkpoint、健康度和成本边界；任一路故障只降低该路状态，不会触发通道角色切换。浏览器通过 CapexGraph 的 SSE 接收合流后的提醒，金十凭证永远只存在后端。</p>
+        </div>
+        <div class="mode-bar" role="group" aria-label="架构通道高亮">
+          <span>Inspect channel</span>
+          <button class="mode-button" type="button" data-mode="both" aria-pressed="true">双通道并行</button>
+          <button class="mode-button" type="button" data-mode="mcp" aria-pressed="false">查看 MCP</button>
+          <button class="mode-button" type="button" data-mode="ws" aria-pressed="false">查看 WebSocket</button>
+        </div>
+        <div class="diagram">
+          <svg class="arch" viewBox="0 0 1280 620" role="img" aria-labelledby="arch-title arch-desc">
+            <title id="arch-title">CapexGraph v0.5.1 实时事件架构</title>
+            <desc id="arch-desc">金十 MCP 与 WebSocket 作为同级通道并行进入事件网关，各自保留观察谱系，经跨通道匹配、规则、AI、官方补证和价格确认后推送前端供用户确认。</desc>
+            <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10z" fill="#907e66"/></marker></defs>
+            <text x="32" y="31" class="micro">01 · PROVIDERS</text><text x="335" y="31" class="micro">02 · EVENT GATEWAY</text><text x="660" y="31" class="micro">03 · ANALYSIS</text><text x="1016" y="31" class="micro">04 · USER OUTPUT</text>
+            <g data-path="mcp"><rect x="32" y="62" width="238" height="105" rx="2" class="accent"/><text x="53" y="94" class="title">Jin10 MCP</text><text x="53" y="119" class="sub">FIRST LIVE · adaptive polling</text><text x="53" y="144" class="sub">Bearer · cursor · own checkpoint</text><path d="M270 114 C305 114 305 152 335 152" class="line live-line"/></g>
+            <g data-path="ws"><rect x="32" y="190" width="238" height="105" rx="2" class="accent"/><text x="53" y="222" class="title">Jin10 WebSocket</text><text x="53" y="247" class="sub">CO-DEVELOP · flash · calendar</text><text x="53" y="272" class="sub">Secret-Key · push · own health</text><path d="M270 242 C305 242 305 184 335 184" class="line live-line"/></g>
+            <rect x="32" y="318" width="238" height="105" rx="2" class="box"/><text x="53" y="350" class="title">Frozen live fixture</text><text x="53" y="375" class="sub">No-key replay · clock control</text><text x="53" y="400" class="sub">CI / demo / regression</text><path d="M270 370 C305 370 305 215 335 215" class="line"/>
+            <rect x="335" y="94" width="260" height="175" rx="2" class="accent"/><text x="360" y="129" class="title">Live Event Gateway</text><text x="360" y="156" class="sub">schema validation · channel observation</text><text x="360" y="181" class="sub">cross-channel match · revision · retention</text><text x="360" y="206" class="sub">independent heartbeat · backoff · gap state</text><text x="360" y="231" class="sub">per-channel checkpoint · coverage metrics</text>
+            <rect x="335" y="306" width="260" height="117" rx="2" class="box"/><text x="360" y="339" class="title">Deterministic filter</text><text x="360" y="366" class="sub">keywords · category · entity · theme</text><text x="360" y="391" class="sub">novelty · cooldown · injection guard</text><path d="M465 269 L465 306" class="line"/>
+            <rect x="660" y="94" width="278" height="117" rx="2" class="box"/><text x="685" y="128" class="title">L0 · Rules-only score</text><text x="685" y="155" class="sub">No model key · milliseconds</text><text x="685" y="180" class="sub">relevance · urgency · verification gap</text><path d="M595 365 C631 365 625 152 660 152" class="line"/>
+            <rect x="660" y="239" width="278" height="135" rx="2" class="accent"/><text x="685" y="273" class="title">L1 · AI impact analyst</text><text x="685" y="300" class="sub">direction · horizon · transmission path</text><text x="685" y="325" class="sub">affected nodes · trigger · invalidation</text><text x="685" y="350" class="sub">optional model · cost gate</text><path d="M799 211 L799 239" class="line"/>
+            <rect x="660" y="402" width="278" height="139" rx="2" class="box"/><text x="685" y="436" class="title">L2 · Verification &amp; context</text><text x="685" y="463" class="sub">official-source task · EODHD reaction</text><text x="685" y="488" class="sub">existing run / candidate / graph match</text><text x="685" y="513" class="sub">evidence status stays explicit</text><path d="M799 374 L799 402" class="line"/>
+            <rect x="1016" y="94" width="232" height="105" rx="2" class="output"/><text x="1041" y="128" class="title">Live Desk SSE</text><text x="1041" y="155" class="sub">alert stream · connection state</text><text x="1041" y="178" class="sub">browser notification</text><path d="M938 151 L1016 151" class="line safe-line"/>
+            <rect x="1016" y="238" width="232" height="117" rx="2" class="output"/><text x="1041" y="272" class="title">Research proposal</text><text x="1041" y="299" class="sub">watch · verify · rerun · plan</text><text x="1041" y="324" class="sub">human confirmation required</text><path d="M938 307 L1016 307" class="line safe-line"/>
+            <rect x="1016" y="402" width="232" height="139" rx="2" class="output"/><text x="1041" y="436" class="title">Linked run / Evidence</text><text x="1041" y="463" class="sub">new immutable Theme / Anchor run</text><text x="1041" y="488" class="sub">official capture enters ledger</text><text x="1041" y="513" class="sub">original signal stays secondary</text><path d="M938 471 L1016 471" class="line safe-line"/>
+            <path d="M1132 199 L1132 238" class="line safe-line"/><path d="M1132 355 L1132 402" class="line safe-line"/>
+          </svg>
+          <div class="caption"><span><strong>首发运行：</strong>MCP → Gateway → Rules → AI → Verification → SSE</span><span><strong>稳定形态：</strong>MCP ∥ WebSocket → Observation match；两路同级、持续消费、分别计量</span></div>
+        </div>
+        <div class="trust">
+          <div class="stack">
+            <div class="stack-row"><b>SIGNAL</b><div><strong>市场信号</strong><small>金十快讯、宏观数据、跨资产报价；可快，不可直接定案。</small></div></div>
+            <div class="stack-row"><b>PROPOSAL</b><div><strong>研究提案</strong><small>规则和模型形成方向、路径、动作与缺口；版本化、可追溯。</small></div></div>
+            <div class="stack-row"><b>EVIDENCE</b><div><strong>官方证据</strong><small>监管/公司原文经过安全捕获、哈希和人工审核后进入账本。</small></div></div>
+            <div class="stack-row"><b>DECISION</b><div><strong>用户决定</strong><small>研究者接受、忽略、重评或建立计划；系统不提交订单。</small></div></div>
+          </div>
+          <aside class="boundary"><strong>为什么不复用 CorporateEventVersion？</strong><p>公司官方事件是证据化系统对象；聚合快讯可能修订、重复、误传或只有二手摘要。v0.5.1 新增独立的 <code>LiveSignalVersion</code> 与 <code>ResearchActionProposal</code>，只有找到官方原文后，才通过现有 SourceSuggestion → Evidence → CorporateEventVersion 链路升级。</p></aside>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><div><span class="section-label">03 / Event lifecycle</span><h2>从突发到可行动，<br>必须经过七关。</h2></div><p>每一关都产生可检查状态，任何失败都不能被“AI 已分析”掩盖。低相关事件在规则层结束；高价值事件才消耗模型费用和官方补证成本。</p></div>
+        <div class="flow">
+          <article><strong>接收</strong><small>MCP 拉取与 WS 推送分别写入 observation；各自记录 channel、external_id、published_at、observed_at。</small></article>
+          <article><strong>规范化</strong><small>统一 ID、分类、时间、链接和内容哈希；非法结构进入 dead letter。</small></article>
+          <article><strong>合流</strong><small>同一事件的双通道观察合并到一个 signal_key；重放、修订和来源差异仍完整保留。</small></article>
+          <article><strong>筛选</strong><small>主题、实体、重要度、新颖度、静默期和排除词；无需模型 Key。</small></article>
+          <article><strong>分析</strong><small>越过阈值的事件生成影响路径、方向、时间窗和证伪条件。</small></article>
+          <article><strong>补证</strong><small>寻找 SEC、巨潮、交易所或公司 IR；检查价格反应。</small></article>
+          <article><strong>确认</strong><small>用户选择忽略、观察、补证、创建 Run 或重评；留下审计动作。</small></article>
+        </div>
+      </section>
+
+      <section class="section" id="frontend">
+        <div class="section-head"><div><span class="section-label">04 / Frontend presentation</span><h2>Live Desk，<br>不是新闻瀑布流。</h2></div><div><p>前端新增一级入口 <strong>Live Desk / 市场脉搏</strong>；现有 Radar 改名为 Candidates / 候选池。页面中心不是标题，而是“事件为什么重要、影响谁、还缺什么证据、下一步做什么”。</p><span class="rule">一屏完成发现、判断、补证与转研究</span></div></div>
+        <div class="frame" aria-label="Live Desk 前端线框图">
+          <div class="mock">
+            <div class="mock-top"><div class="mock-logo">CapexGraph</div><div class="mock-nav"><b>Live Desk</b><span>Runs</span><span>Sources</span><span>Graph</span><span>Candidates</span></div><div class="connection"><span class="on">● MCP ACTIVE</span><span>○ WS WAIT KEY</span><span>AI SELECTIVE</span></div></div>
+            <div class="workspace">
+              <aside class="panel">
+                <div class="panel-head"><span>实时事件流</span><b>12 unread</b></div>
+                <div class="filters"><span class="on">关注主题</span><span>A股</span><span>美港</span><span>宏观</span></div>
+                <div class="event active"><span class="time">10:31</span><div><strong>示例：存储厂商更新资本开支计划</strong><small>高相关 · 待官方补证 · NEW</small></div></div>
+                <div class="event"><span class="time">10:26</span><div><strong>美元兑人民币出现快速波动</strong><small>市场环境 · 中等重要度</small></div></div>
+                <div class="event"><span class="time">10:18</span><div><strong>海外指数半导体分项走弱</strong><small>价格确认 · 低新颖度</small></div></div>
+                <div class="event"><span class="time">10:02</span><div><strong>宏观数据实际值偏离预期</strong><small>日历事件 · 已公布</small></div></div>
+              </aside>
+              <section class="panel">
+                <div class="panel-head"><span>事件详情 / 影响路径</span><b>signal only</b></div>
+                <div class="detail">
+                  <div class="chips"><span>JIN10 MCP</span><span>1 CHANNEL</span><span>A股快讯</span><span>10:31:08</span><span>未验证</span></div>
+                  <h3>新增信息是否足以改变存储链条的研究优先级？</h3>
+                  <p>原始快讯在当前会话中展示。系统已识别“资本开支—设备/材料—产能投放”传导路径，但尚未找到公司公告，因此不能把事件升级为事实。</p>
+                  <div class="impact"><div><strong>资本开支</strong><small>event</small></div><div><strong>设备/材料</strong><small>bottleneck</small></div><div><strong>候选节点</strong><small>graph match</small></div><div><strong>价格确认</strong><small>pending</small></div></div>
+                </div>
+              </section>
+              <aside class="panel analysis">
+                <div class="panel-head"><span>AI 影响分析</span><b>7.4 / 10</b></div>
+                <div class="analysis-card"><span>方向 / 时间窗</span><h4>偏多 · 1–12 周</h4><p>如果资本开支是增量而非预算口径重述，设备与关键材料的订单能见度可能改善。</p></div>
+                <div class="analysis-card"><span>证据缺口</span><h4>官方原文缺失</h4><p>需要确认金额、同比口径、投产时间，以及是否已被近期价格充分反映。</p></div>
+                <div class="analysis-card"><span>行动建议</span><h4>先补证，再重评</h4><p>不直接改变候选评级。建议创建官方源任务并对现有存储 Run 发起链接重评。</p><div class="score"><div class="bar"><i></i></div><b>74</b></div></div>
+              </aside>
+              <div class="actions"><p>所有动作写入审计记录；“加入研究”保存的是选择和来源引用，不自动批准资讯内容。</p><button>忽略</button><button>查官方原文</button><button>加入当前 Run</button><button class="primary">创建链接重评</button></div>
+            </div>
+          </div>
+        </div>
+        <div class="annotations">
+          <article><b>A</b><div><strong>双通道状态</strong><small>MCP 与 WS 分别显示 ACTIVE、WAIT KEY、DEGRADED 或 OFF；不再出现 FALLBACK，也不显示密钥。</small></div></article>
+          <article><b>B</b><div><strong>事件流</strong><small>按主题、市场、来源、重要度和验证状态筛选；支持已读、静音和冷却。</small></div></article>
+          <article><b>C</b><div><strong>原始上下文</strong><small>展示允许显示的原文、时间和链接；明确 secondary / unverified。</small></div></article>
+          <article><b>D</b><div><strong>影响路径</strong><small>事件 → 产业环节 → 图节点 → 候选 → 价格确认，避免只给情绪标签。</small></div></article>
+          <article><b>E</b><div><strong>AI 分析卡</strong><small>方向、时间窗、置信度、证据缺口、触发和证伪条件始终同时出现。</small></div></article>
+          <article><b>F</b><div><strong>人工动作栏</strong><small>忽略、补证、加入 Run、创建 Theme/Anchor 重评；没有“自动买入”。</small></div></article>
+        </div>
+      </section>
+
+      <section class="section dark" id="usage">
+        <div class="section-head"><div><span class="section-label">05 / User operations</span><h2>用户怎么用，<br>从第一天讲清楚。</h2></div><p>v0.5.1 保留渐进式安装，但不建立主备等级：没有任何 Key 可跑冻结演示；前期配置 MCP 即可开始真实轮询；WebSocket 适配器同步开发，获得 Secret-Key 后作为第二条同级通道加入持续采集；模型或本地模型只负责可选 AI 增强。</p></div>
+        <div class="operations">
+          <article class="operation"><b>PATH 01</b><h3>首次连接</h3><ol><li>进入 Settings → Data connections。</li><li>先在后端配置 MCP Bearer，并选择自适应轮询计划。</li><li>点击“测试 MCP”，只返回权限、预算和健康状态。</li><li>取得试用后，再配置 <code>CAPEXGRAPH_JIN10_OPEN_SECRET_KEY</code> 并单独测试 WS。</li><li>两个开关彼此独立；启用 WS 不会停掉 MCP。</li><li>最后保存类别、关键词、排除词和静默时段。</li></ol></article>
+          <article class="operation"><b>PATH 02</b><h3>每日监控</h3><ol><li>启动服务，Gateway 分别恢复 MCP 与 WS checkpoint。</li><li>打开 Live Desk 查看两路新鲜度、调用预算和未读事件。</li><li>普通事件只经过规则层，静默进入信息流。</li><li>高分事件触发 AI 快速分析和浏览器提醒。</li><li>任一路异常只标记该通道 DEGRADED，另一通道继续原频率运行。</li><li>同一事件匹配后只提醒一次，但保留两路观察、延迟和字段差异。</li></ol></article>
+          <article class="operation"><b>PATH 03</b><h3>从提醒到研究</h3><ol><li>先看来源、时间和验证状态。</li><li>阅读影响路径、价格反应和证据缺口。</li><li>点击“查官方原文”，进入 SourceSuggestion 队列。</li><li>捕获并审核公告后，事件才进入 Evidence。</li><li>选择加入现有 Run 或创建链接重评。</li><li>系统保留原始运行，不用新信息改写历史判断。</li></ol></article>
+        </div>
+        <div class="table-wrap" style="margin-top:28px">
+          <table><thead><tr><th>用户模式</th><th>所需配置</th><th>前端体验</th><th>限制</th></tr></thead><tbody>
+            <tr><td>Demo</td><td>无 Key</td><td>冻结事件按模拟时钟推送；规则分析完整可见。</td><td>不是当前资讯，不能用于实时判断。</td></tr>
+            <tr><td>MCP first-live</td><td>MCP Bearer</td><td>前期正式运行；自适应轮询、游标、本地调用预算和新鲜度提示。</td><td>不是推送；默认目标不超过 1200 次/工具/日，为重试和回补留额度。</td></tr>
+            <tr><td>WebSocket channel</td><td>Open Platform Secret-Key</td><td>与 MCP 同级的低延迟通道；独立认证、心跳、重连、checkpoint 和健康度。</td><td>产品权限和留存范围按金十合同执行；启用后不替代 MCP。</td></tr>
+            <tr><td>Dual-channel steady</td><td>Bearer + Secret-Key</td><td>两路持续采集，事件合流，前端显示覆盖、延迟、修订和字段差异。</td><td>不能预设内容完全一致；必须用实测覆盖指标说明差异。</td></tr>
+            <tr><td>AI enhanced</td><td>模型 API 或本地模型</td><td>高优先事件自动形成结构化影响分析。</td><td>默认 selective；费用、失败和模型版本必须可见。</td></tr>
+          </tbody></table>
+        </div>
+      </section>
+
+      <section class="section" id="contracts">
+        <div class="section-head"><div><span class="section-label">06 / Contracts & API</span><h2>先定契约，<br>供应商才可替换。</h2></div><p>金十专有字段只停留在 Provider adapter。核心系统保存规范化信号、版本、保留策略、分析谱系和用户动作。许可不允许长期保存的正文只在内存中进入当次分析，数据库保存哈希、来源引用和允许的最小元数据。</p></div>
+        <div class="contracts">
+          <article class="contract"><div class="contract-head"><span>Domain model</span><b>LiveSignalVersion</b></div><pre><code>signal_key
+version / version_hash
+observations[]:
+  provider / channel / external_id
+  published_at / observed_at
+  source_url / content_hash
+match_status / channel_coverage
+category / normalized_title
+retention_class:
+  ephemeral | metadata_only | licensed_archive
+importance / verification_state
+replaces_version / revision_reason</code></pre></article>
+          <article class="contract"><div class="contract-head"><span>Analysis model</span><b>ResearchActionProposal</b></div><pre><code>signal_key / analysis_version
+ruleset_version
+model_provider / model / prompt_hash
+themes / entities / graph_nodes
+direction / horizon / novelty
+impact_score / confidence
+transmission_path / price_confirmation
+evidence_gaps
+recommended_action
+trigger_conditions / invalidations
+human_status</code></pre></article>
+          <article class="contract"><div class="contract-head"><span>Frontend API</span><b>/api/v1/live</b></div><ul class="endpoints">
+            <li><span class="method">GET</span><span>/status — 每条通道的连接、新鲜度、调用预算</span></li><li><span class="method">GET</span><span>/stream — 浏览器 SSE 合流提醒</span></li>
+            <li><span class="method">GET</span><span>/events — 筛选、观察来源、分页、已读状态</span></li><li><span class="method">GET</span><span>/coverage — 重合率、P50/P95 延迟、缺失与修订差异</span></li>
+            <li><span class="method">PATCH</span><span>/settings — 两路独立开关、类别、关键词、阈值、通知</span></li>
+            <li><span class="method">POST</span><span>/events/{id}/analyze — 按需或重试分析</span></li><li><span class="method">POST</span><span>/events/{id}/verify — 建立官方补证任务</span></li>
+          </ul></article>
+          <article class="contract"><div class="contract-head"><span>Run integration</span><b>Immutable links</b></div><ul class="endpoints">
+            <li><span class="method">POST</span><span>/events/{id}/runs — 创建链接 Theme/Anchor Run</span></li><li><span class="method">POST</span><span>/runs/{id}/live-context — 选择性加入上下文</span></li>
+            <li><span class="method">POST</span><span>/events/{id}/dismiss — 忽略并记录原因</span></li><li><span class="method">POST</span><span>/events/{id}/mute — 主题/实体冷却</span></li>
+            <li><span class="method">GET</span><span>/events/{id}/audit — 版本、分析、交付与动作</span></li><li><span class="method">GET</span><span>/settings/schema — 前端动态能力说明</span></li>
+          </ul></article>
+        </div>
+        <div class="table-wrap" style="margin-top:28px"><table>
+          <thead><tr><th>持久化对象</th><th>保存内容</th><th>不保存/不暴露</th><th>恢复用途</th></tr></thead><tbody>
+            <tr><td>ProviderCheckpoint</td><td>每条通道各自的最后事件 ID、观察时间、断线区间和调用预算。</td><td>Secret-Key、Bearer Token。</td><td>独立恢复连接或轮询，不改变另一通道角色。</td></tr>
+            <tr><td>SignalObservation</td><td>通道、外部 ID、发布时间、观察时间、允许保存的哈希与字段。</td><td>未经授权的原始全文归档。</td><td>测量覆盖、延迟、缺失、修订和字段差异。</td></tr>
+            <tr><td>LiveSignalVersion</td><td>规范化事件、关联 observations、版本、匹配和验证状态。</td><td>未经授权的原始全文归档。</td><td>审计“系统何时从哪些通道看到了什么”。</td></tr>
+            <tr><td>SignalAnalysis</td><td>结构化输出、规则/模型/提示版本、失败。</td><td>密钥、未脱敏请求日志。</td><td>重放、模型比较、成本追踪。</td></tr>
+            <tr><td>AlertDelivery</td><td>创建、展示、读取、静音和失败状态。</td><td>浏览器隐私数据。</td><td>通知幂等和未读恢复。</td></tr>
+            <tr><td>ResearchActionProposal</td><td>条件、证伪、用户决策和链接 Run。</td><td>券商订单、自动持仓动作。</td><td>完整研究决策链。</td></tr>
+          </tbody></table></div>
+      </section>
+
+      <section class="section" id="milestones">
+        <div class="section-head"><div><span class="section-label">07 / Delivery plan</span><h2>八个里程碑，<br>每个都可回滚。</h2></div><p>先用冻结消息建立共同契约；MCP 作为首个真实运行切片交付，WebSocket 适配器从同一契约并行开发，Secret-Key 只阻塞 live smoke，不阻塞实现。双开后两路同级持续运行。前端“补证”只展示实际覆盖，不用模型填空。</p></div>
+        <div class="milestones">
+          <article class="milestone"><span class="mid">M0</span><span class="priority">P0 · foundation</span><h3>决策、许可与契约</h3><p>冻结观察、信号、分析、保留和动作语义，确认双通道同级及聚合资讯与 Evidence 分层。</p><ul><li>SignalObservation</li><li>LiveSignalVersion</li><li>RetentionPolicy</li><li>D017 / D019</li></ul><span class="exit">Exit · schema、同级通道与信任边界测试通过</span></article>
+          <article class="milestone"><span class="mid">M1</span><span class="priority">P0 · no-key</span><h3>双通道接口与冻结流</h3><p>建立共同连接接口、每路独立 checkpoint、模拟时钟和可重放双源事件序列。</p><ul><li>LiveEventSource protocol</li><li>per-channel health</li><li>FrozenEventFeed</li><li>matched / divergent fixture</li></ul><span class="exit">Exit · 无 Key 双源合流演示可运行</span></article>
+          <article class="milestone"><span class="mid">M2</span><span class="priority">P0 · first live</span><h3>MCP 正式轮询通道</h3><p>首个真实运行切片：实现初始化、structuredContent、游标、自适应频率和本地调用预算。</p><ul><li>list_flash / calendar</li><li>30s / 120s / 300s schedule</li><li>1200 target / 1500 hard guard</li><li>credential-safe status</li></ul><span class="exit">Exit · MCP-only Live Desk 可持续运行且预算可控</span></article>
+          <article class="milestone"><span class="mid">M3</span><span class="priority">P0 · co-develop</span><h3>WebSocket 同级通道</h3><p>与 M2 共用契约并行实现 flash、calendar、quotes、认证、心跳、退避和订阅。</p><ul><li>Secret-Key auth</li><li>frozen protocol tests</li><li>jittered reconnect</li><li>independent checkpoint</li></ul><span class="exit">Exit · 无 Key 合约测试通过；有 Key live smoke 通过</span></article>
+          <article class="milestone"><span class="mid">M4</span><span class="priority">P0 · reconcile</span><h3>双通道合流与确定性规则</h3><p>匹配两路 observation，同时完成版本、去重、覆盖指标、重要度、冷却、实体别名和现有图匹配。</p><ul><li>match / divergence state</li><li>coverage / P50 / P95</li><li>ruleset / novelty</li><li>entity / theme mapping</li></ul><span class="exit">Exit · 单次提醒、双路谱系、低价值事件零模型费用</span></article>
+          <article class="milestone"><span class="mid">M5</span><span class="priority">P1 · optional AI</span><h3>AI 影响分析器</h3><p>高优先事件输出结构化影响路径、条件、证伪、缺口和成本谱系。</p><ul><li>rules-only baseline</li><li>selective model gate</li><li>typed output</li><li>failure / retry / cost</li></ul><span class="exit">Exit · 无模型与有模型路径均诚实</span></article>
+          <article class="milestone"><span class="mid">M6</span><span class="priority">P0 · Cockpit</span><h3>Live Desk 前端</h3><p>实现双通道状态、覆盖差异、实时流、事件详情、影响分析、筛选、通知和用户动作。</p><ul><li>independent channel chips</li><li>coverage / source filter</li><li>SSE reconnect</li><li>responsive settings</li></ul><span class="exit">Exit · MCP 首发与双通道桌面/窄屏路径通过</span></article>
+          <article class="milestone"><span class="mid">M7</span><span class="priority">P0 · release</span><h3>补证、链接重评与发布</h3><p>把高价值信号连接到官方源队列、不可变 Run、审计、迁移与发布验证。</p><ul><li>official-source task</li><li>linked run</li><li>audit timeline</li><li>CI / wheel / Web / docs</li></ul><span class="exit">Exit · Definition of Done 全部满足</span></article>
+        </div>
+        <div class="path"><span>M0 契约</span><i>→</i><span>M1 双源冻结流</span><i>→</i><span>M2 MCP 首发 ∥ M3 WS 并行</span><i>→</i><span>M4 合流规则</span><i>→</i><span>M5 AI</span><i>→</i><span>M6 前端</span><i>→</i><span>M7 发布</span></div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><div><span class="section-label">08 / Test matrix</span><h2>实时系统的质量，<br>藏在断线时。</h2></div><p>测试重点不是“收到一条消息”，而是重复、修订、时区、断线、回补、限额、模型失败、浏览器重连和官方补证都不会破坏历史或制造虚假确定性。</p></div>
+        <div class="table-wrap"><table>
+          <thead><tr><th>测试层</th><th>必测场景</th><th>关键断言</th></tr></thead><tbody>
+            <tr><td>契约</td><td>时间、版本、保留级别、来源、修订与缺失字段。</td><td>非法信号不进入分析；修订只追加版本。</td></tr>
+            <tr><td>WebSocket</td><td>认证失败、心跳、半开连接、退避、断网、乱序、重放。</td><td>自身状态可见；重连无重复；故障不改变 MCP 的频率或角色。</td></tr>
+            <tr><td>MCP</td><td>initialize、structuredContent、cursor、isError、JSON-RPC error、限额。</td><td>不以文本为主要解析源；预算不足只降低 MCP 频率，不影响 WS。</td></tr>
+            <tr><td>跨通道</td><td>同一事件先由 MCP 后由 WS 到达、反向到达、字段冲突或只在一路出现。</td><td>只有一个 signal_key；保留全部 observations、差异、延迟和覆盖状态。</td></tr>
+            <tr><td>规则</td><td>关键词、排除、实体别名、主题映射、冷却、新旧闻。</td><td>同一输入与 ruleset 产生相同评分。</td></tr>
+            <tr><td>AI</td><td>超时、空响应、schema 错误、提示注入、模型更换。</td><td>失败不升级置信度；prompt/model/hash 可追溯。</td></tr>
+            <tr><td>证据</td><td>快讯无原文、官方源找到、捕获失败、审核拒绝。</td><td>Signal 永远不自动变 Evidence；审核链保持原语义。</td></tr>
+            <tr><td>前端</td><td>SSE 重连、筛选、已读、静音、窄屏、通知权限拒绝。</td><td>状态准确；关键动作唯一；失败和数据陈旧可见。</td></tr>
+            <tr><td>迁移/发布</td><td>新装、旧库升级、黄金案例、Ruff、pytest、Web、wheel、密钥扫描。</td><td>旧记录不变；no-key 路径工作；公库无凭证和授权原始数据。</td></tr>
+          </tbody></table></div>
+      </section>
+
+      <section class="section" id="acceptance">
+        <div class="section-head"><div><span class="section-label">09 / Definition of Done</span><h2>什么叫真的完成。</h2></div><p>单独出现 WebSocket 客户端、新闻卡片或模型摘要都不算完成。真实用户路径、断线恢复、成本与密钥边界、证据门禁和无 Key 回归必须同时成立。</p></div>
+        <div class="dod">
+          <div class="checks">
+            <div class="check"><strong>同级双通道</strong><small>MCP 与 WebSocket 可独立启动、同时运行并分别显示真实状态；不存在隐含主备。</small></div>
+            <div class="check"><strong>一次提醒、两路谱系</strong><small>重放、断线和跨通道合流有确定性测试；匹配后不重复提醒但不丢来源差异。</small></div>
+            <div class="check"><strong>密钥后端隔离</strong><small>API、日志、manifest、HTML、浏览器和 Git 都不出现凭证。</small></div>
+            <div class="check"><strong>许可驱动留存</strong><small>正文保留由 retention_class 决定，默认不归档授权不明数据。</small></div>
+            <div class="check"><strong>规则路径无模型 Key</strong><small>用户仍能获得过滤、主题映射、重要度和人工研究入口。</small></div>
+            <div class="check"><strong>AI 失败可见</strong><small>模型、版本、成本、超时、重试和结构错误进入审计。</small></div>
+            <div class="check"><strong>信号与证据分离</strong><small>任何金十消息都不能绕过官方捕获与人工审核。</small></div>
+            <div class="check"><strong>操作可逆且需确认</strong><small>忽略、静音、补证和链接重评可追溯，不产生自动订单。</small></div>
+            <div class="check"><strong>前端解释完整</strong><small>来源、时间、验证、路径、条件、证伪和缺口同屏呈现。</small></div>
+            <div class="check"><strong>完整发布门禁</strong><small>Ruff、pytest、Web build、wheel、升级和浏览器 QA 通过。</small></div>
+          </div>
+          <aside class="out"><span class="section-label" style="color:var(--gold)">Explicitly out of scope</span><h3>v0.5.1 不做什么</h3><ul>
+            <li>不宣称已经完成 v0.4 点时主题宇宙、主线分类与盘后调度。</li><li>不把金十或其他聚合商资讯当作公司官方 Evidence。</li>
+            <li>不提供券商下单、自动仓位管理或个性化投资顾问服务。</li><li>不提交 Secret-Key、Bearer、授权原始快讯或完整历史数据。</li>
+            <li>不承诺金十报价覆盖 A 股个股实时行情；以实际产品权限为准。</li><li>不在缺少模型 Key 时伪装成已经完成 AI 自动分析。</li>
+            <li>不因实时推送而提前启动 v0.6 一致预期或 v0.7 Catalyst Scan。</li>
+          </ul></aside>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><div><span class="section-label">10 / Risks & controls</span><h2>把失败设计在<br>成功之前。</h2></div><p>主要风险来自供应商权限、实时连接、资讯噪声、模型过度解读和 24 小时运行。每个风险必须有前端状态、持久化状态和测试，不只写在日志里。</p></div>
+        <div class="risks">
+          <article class="risk"><b>R1 · Access</b><h3>试用权限未获批</h3><p>MCP 先承担真实运行；WebSocket 适配器继续用冻结协议和 mock server 开发，只有 live smoke 等待 Secret-Key。权限缺失不把 MCP 降格为兜底。</p></article>
+          <article class="risk"><b>R2 · Disconnect</b><h3>长连接静默失效</h3><p>WS 使用心跳、新鲜度阈值、退避重连和独立 checkpoint；前端只把 WS 标为 DEGRADED，MCP 继续按自身计划轮询。</p></article>
+          <article class="risk"><b>R3 · Duplicate</b><h3>双通道造成重复提醒</h3><p>每路先保存 observation，再以外部 ID、时间、规范化文本和内容哈希匹配 signal；提醒、分析和用户动作分别幂等。</p></article>
+          <article class="risk"><b>R4 · Noise</b><h3>每条快讯都调用模型</h3><p>确定性 L0 评分、主题白名单、排除词、冷却和 selective 模式；默认模型费用关闭或受阈值控制。</p></article>
+          <article class="risk"><b>R5 · Hallucination</b><h3>模型把标题变成事实</h3><p>结构化 evidence_gaps、官方补证、置信度门禁和提示注入清洗；未经审核不能升级关系置信度。</p></article>
+          <article class="risk"><b>R6 · Runtime</b><h3>本地电脑关闭后无提醒</h3><p>v0.5.1 明确要求服务进程持续运行；浏览器通知只在允许时发送，VPS/NAS 常驻部署作为后续运维指南。</p></article>
+        </div>
+      </section>
+
+      <section class="handoff">
+        <div><h2>下一步：M0 / M1 后，M2 首发、M3 并行。</h2><p>先完成双通道契约、迁移草案、独立 checkpoint、双源冻结流和无 Key Live Desk 原型；随后让 MCP 进入真实持续运行，同时用 mock server 完成 WebSocket 适配器。拿到 Secret-Key 后只补 live smoke，稳定形态是两路同级常开。</p></div>
+        <div class="links"><a href="../ROADMAP.md">Roadmap</a><a href="V0_5_PLAN.md">v0.5 Plan</a><a href="V0_4_PLAN.md">v0.4 Dependencies</a><a href="DECISIONS.md">Decisions</a><button class="print" type="button" onclick="window.print()">打印 / 导出 PDF</button></div>
+      </section>
+    </main>
+    <footer><span>CapexGraph / v0.5.1 planning artifact</span><span>Research infrastructure · not autonomous trading</span><span>Last updated 2026-07-29</span></footer>
+  </div>
+  <script>
+    const architecture=document.querySelector(".architecture");
+    document.querySelectorAll(".mode-button").forEach(button=>button.addEventListener("click",()=>{
+      architecture.dataset.mode=button.dataset.mode;
+      document.querySelectorAll(".mode-button").forEach(item=>item.setAttribute("aria-pressed",String(item===button)));
+    }));
+    const progress=document.getElementById("progress");
+    const update=()=>{const total=document.documentElement.scrollHeight-innerHeight;progress.style.width=total>0?`${scrollY/total*100}%`:"0"};
+    addEventListener("scroll",update,{passive:true});update();
+  </script>
+</body>
+</html>

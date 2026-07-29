@@ -12,6 +12,10 @@ All notable changes to CapexGraph are documented here.
 - locked provider and model identity after execution starts, persisted transport/billing provenance
   plus model-call counts, and exposed redacted model readiness through CLI, API, Cockpit, and
   portable reports;
+- approved and documented the v0.5.1 live-event gateway plan, including a frozen no-key event feed,
+  equal-priority Jin10 MCP and Open Platform WebSocket channels, MCP-first real-data delivery with
+  WebSocket co-development, cross-channel observation matching, deterministic filtering, optional
+  AI impact analysis, Cockpit Live Desk flows, and explicit signal-versus-Evidence boundaries;
 - started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
   source-public/system-observed timestamps, effective/expected dates, and canonical entities;
 - added append-only migration 5, semantic idempotency, immutable event versions, current/history

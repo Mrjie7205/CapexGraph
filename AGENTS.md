@@ -18,13 +18,15 @@ Read these files in order:
 1. `docs/CURRENT_STATUS.md` — what is actually shipped and what is not;
 2. `ROADMAP.md` — the next approved priorities and acceptance criteria;
 3. `docs/V0_5_PLAN.md` — active official-disclosure and event-calendar execution order;
-4. `docs/V0_4_PLAN.md` — incomplete market/theme/mainline dependency plan;
-5. `docs/V0_3_PLAN.md` — completed v0.3 execution record;
-6. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
-7. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
-8. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
-9. the workflow-specific document under `docs/`; and
-10. `CONTRIBUTING.md` — validation and documentation contract.
+4. `docs/V0_5_1_PLAN.html` — planned live-event gateway, equal-priority MCP/WebSocket channels,
+   and Cockpit path;
+5. `docs/V0_4_PLAN.md` — incomplete market/theme/mainline dependency plan;
+6. `docs/V0_3_PLAN.md` — completed v0.3 execution record;
+7. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
+8. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
+9. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
+10. the workflow-specific document under `docs/`; and
+11. `CONTRIBUTING.md` — validation and documentation contract.
 
 When documentation and code disagree, verify the implementation and tests, fix the documentation
 in the same change, and record material design changes in `docs/DECISIONS.md`.

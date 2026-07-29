@@ -19,7 +19,13 @@ which must also update `docs/DECISIONS.md` and `docs/CURRENT_STATUS.md`.
 The user has explicitly advanced active development to the isolated v0.5 official-event foundation
 after the first v0.4 market-data slice. Point-in-time theme universes and mainline monitoring remain
 incomplete dependencies; starting event contracts does not waive them or make automatic
-re-evaluation production-ready. The product sequence remains:
+re-evaluation production-ready. The user has also approved a scoped `v0.5.1` live-event gateway:
+Jin10 MCP polling and Open Platform WebSocket are equal-priority information channels with
+independent checkpoints and health. MCP is the first real-data runtime slice while the WebSocket
+adapter is developed in parallel; once credentials are available, both continue running and feed
+cross-channel observation matching. Frozen events preserve the no-key path. This extension may
+create research and re-evaluation proposals, but it does not complete the missing v0.4 mainline
+policy. The product sequence remains:
 
 1. market history and historical theme membership;
 2. official disclosures, filing facts, and event calendars;
@@ -143,6 +149,52 @@ Detailed implementation order and the current SEC-first boundary are in
 - Filing/event updates append versions and never rewrite what an earlier run knew.
 - Missing official coverage remains visible and cannot be silently filled with model prose.
 - Licensed aggregators remain optional accelerators; official captures remain the evidence anchor.
+
+### v0.5.1 planned extension — live event gateway
+
+The complete product, architecture, frontend, operation, delivery, and test plan is the standalone
+HTML artifact [`docs/V0_5_1_PLAN.html`](docs/V0_5_1_PLAN.html).
+
+Goals:
+
+1. Add a provider-neutral live-event gateway with three executable paths:
+   - a frozen no-key event stream for deterministic demos and tests;
+   - Jin10 MCP adaptive polling, delivered first with cursor and daily-call-budget protection; and
+   - Jin10 Open Platform WebSocket, co-developed from the same contract for `flash`, `calendar`,
+     and permitted quote subscriptions.
+   MCP and WebSocket are equal-priority production channels, not primary and fallback. Enabling or
+   recovering one never disables, demotes, or changes the schedule of the other.
+2. Normalize live aggregator messages into append-only `LiveSignalVersion` records that remain
+   separate from official `CorporateEventVersion` and Evidence. Preserve each channel arrival as a
+   `SignalObservation`, then match overlapping observations without erasing source, delay, revision,
+   or field differences.
+3. Apply deterministic deduplication, revisions, relevance, entity/theme mapping, novelty, cooldown,
+   retention policy, and prompt-injection controls before optional model analysis.
+4. Generate typed, conditional `ResearchActionProposal` outputs with direction, horizon, impact
+   path, confidence, price confirmation, evidence gaps, triggers, and invalidations.
+5. Add a Cockpit Live Desk with connection health, event stream, filters, event detail, AI analysis,
+   official-source tasks, and explicit user actions to ignore, watch, attach, or launch linked
+   re-evaluation.
+
+Acceptance criteria:
+
+- WebSocket reconnect and MCP polling/recovery have independent frozen deterministic tests. A
+  disconnected, stale, or quota-constrained channel is shown as degraded without changing the
+  other channel's priority, cadence, or health.
+- Cross-channel matching emits one canonical alert while preserving all observations. The product
+  reports overlap, channel-only events, revision/field differences, and P50/P95 delivery delay
+  instead of claiming that MCP and WebSocket content are identical.
+- Provider credentials stay backend-only and licensed raw data is never committed or exported.
+- No-key fixtures and rules-only analysis remain useful without Jin10 or model credentials.
+- A Jin10 signal cannot become Evidence or raise a relationship to medium/high confidence without
+  the existing guarded official-source capture and human-review path.
+- Model analysis is optional and cost-gated; failures, provider/model versions, prompt hashes, and
+  retries remain visible.
+- The Live Desk works on desktop and narrow layouts, shows MCP and WebSocket state independently,
+  exposes channel coverage, delivers matched updates through SSE, and requires an explicit human
+  action before creating a linked run or research action.
+- The extension creates research priorities and conditional plans only. It does not place orders,
+  manage positions, or claim the unfinished v0.4 mainline policy is production-ready.
 
 ## v0.6 — Consensus revisions and expectation-aware regime analysis
 

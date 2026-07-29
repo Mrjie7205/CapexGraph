@@ -3,6 +3,9 @@
 - Last verified: 2026-07-29
 - Release: `v0.3.0` — Trustworthy live research
 - Active target: `v0.5` — official disclosure events, by explicit user priority
+- Approved planned extension: `v0.5.1` — provider-neutral live-event gateway with equal-priority
+  Jin10 MCP and Open Platform WebSocket channels, a frozen no-key feed, optional AI analysis, and
+  a Cockpit Live Desk; MCP is first-live while WebSocket is co-developed; plan only, not implemented
 - Incomplete dependency: `v0.4` — cross-market data foundation and mainline monitoring; the market
   slice exists, while theme/mainline automation remains open
 - Active development branch: `codex/v0-5-official-events`
@@ -36,6 +39,13 @@ substantial change, and update it in the same pull request whenever shipped capa
 This is the first US official-source vertical, not a v0.5 release. CNINFO/SSE/SZSE/BSE, OpenDART,
 KIND/KRX, issuer calendars, cross-market fact taxonomy, event-triggered re-evaluation, and the
 Cockpit event view remain open. The detailed boundary is in `docs/V0_5_PLAN.md`.
+
+The approved v0.5.1 live-event design is documented in `docs/V0_5_1_PLAN.html`. MCP polling and
+WebSocket are equal-priority information channels: MCP is the first real-data runtime slice, the
+WebSocket adapter is developed in parallel, and both remain active after the Secret-Key is
+available. No live gateway, Jin10 adapter, signal schema, automatic AI event analysis, SSE stream,
+or Live Desk has been implemented yet. A Jin10 signal remains a secondary discovery input and
+cannot become Evidence without the existing guarded official-source capture and human-review path.
 
 ## Verified for the current v0.5 slice
 
@@ -174,12 +184,15 @@ Future code or documentation changes must pass the same remote release gate agai
 
 Continue v0.5 from [the execution plan](V0_5_PLAN.md):
 
-1. configure a real SEC contact User-Agent for optional live smoke, then add historical submission
+1. start v0.5.1 M0/M1 dual-channel contracts and frozen feed, then ship the MCP first-live M2
+   while developing the WebSocket M3 adapter in parallel; the Secret-Key gates only live smoke,
+   and the complete HTML plan is [here](V0_5_1_PLAN.html);
+2. configure a real SEC contact User-Agent for optional live smoke, then add historical submission
    files and backfill;
-2. add CNINFO plus Shanghai/Shenzhen/Beijing official announcement discovery;
-3. add OpenDART and KIND/KRX official disclosure paths;
-4. normalize cross-market filing facts and evidence-linked event extraction; and
-5. connect events to monitoring proposals and the Cockpit without fabricating the unfinished v0.4
+3. add CNINFO plus Shanghai/Shenzhen/Beijing official announcement discovery;
+4. add OpenDART and KIND/KRX official disclosure paths;
+5. normalize cross-market filing facts and evidence-linked event extraction; and
+6. connect events to monitoring proposals and the Cockpit without fabricating the unfinished v0.4
    mainline policy.
 
 The remaining v0.4 work stays recorded in [its execution plan](V0_4_PLAN.md) and must be resumed

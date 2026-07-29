@@ -68,6 +68,14 @@ This is a US-first foundation. It does not yet include CNINFO/SSE/SZSE/BSE, Open
 calendars, filing-content event extraction, or event-triggered automated re-evaluation. See
 [the v0.5 execution plan](docs/V0_5_PLAN.md).
 
+The approved [v0.5.1 live-event gateway plan](docs/V0_5_1_PLAN.html) defines Jin10 MCP polling and
+Open Platform WebSocket as two equal-priority live information channels. MCP is the first channel
+scheduled to run with real data while the WebSocket adapter is developed in parallel; once
+credentials are available, both remain active with independent health and cross-channel matching.
+The plan also preserves a frozen no-key feed, optional AI impact analysis, and a Cockpit Live Desk.
+It is not shipped behavior: aggregator messages remain secondary signals and must pass through
+official capture and human review before becoming Evidence.
+
 ## v0.4 development preview
 
 The active v0.4 branch now contains the first market-data foundation slice:
