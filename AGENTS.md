@@ -65,6 +65,7 @@ src/capexgraph/providers/    fixture and optional model adapters
 src/capexgraph/financials/   immutable filing facts and persistence
 src/capexgraph/market/       daily providers, quality gates, sync, persistence
 src/capexgraph/events/       official event mapping, versions, point-in-time calendar
+src/capexgraph/live/         live-signal source contract, frozen replay, matching, persistence
 src/capexgraph/tools/        evidence, identity, market, financial tools
 src/capexgraph/tracking/     snapshots, triggers, scorecards, stages
 src/capexgraph/api/          FastAPI application

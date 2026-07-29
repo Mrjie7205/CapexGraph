@@ -24,6 +24,12 @@ from capexgraph.domain import (
 )
 from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
+from capexgraph.live import (
+    FrozenClock,
+    LiveSignalService,
+    LiveSignalStore,
+    load_frozen_dual_channel_feeds,
+)
 from capexgraph.market import (
     MarketDataService,
     MarketSettings,
@@ -65,6 +71,10 @@ evidence_app = typer.Typer(help="Capture and review research evidence.", no_args
 ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
 market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
 model_app = typer.Typer(help="Inspect structured model channels.", no_args_is_help=True)
+live_app = typer.Typer(
+    help="Replay and inspect provider-neutral live-signal streams.",
+    no_args_is_help=True,
+)
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
 events_app = typer.Typer(help="Discover and inspect corporate events.", no_args_is_help=True)
 tracking_app = typer.Typer(
@@ -83,6 +93,7 @@ app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
 app.add_typer(model_app, name="model")
+app.add_typer(live_app, name="live")
 app.add_typer(financials_app, name="financials")
 app.add_typer(events_app, name="events")
 app.add_typer(tracking_app, name="tracking")
@@ -747,6 +758,83 @@ def model_providers(
             "providers": ModelSettings.from_environment().provider_status(
                 probe_codex=probe_codex
             )
+        }
+    )
+
+
+@live_app.command("demo")
+def live_demo(
+    until: Annotated[
+        str | None,
+        typer.Option(
+            "--until",
+            help="Replay observations available by this timezone-aware ISO timestamp",
+        ),
+    ] = None,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Replay the synthetic MCP/WebSocket dual-channel fixture without keys."""
+
+    clock = None
+    if until is not None:
+        try:
+            parsed = datetime.fromisoformat(until.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise typer.BadParameter("--until must be an ISO timestamp") from error
+        if parsed.tzinfo is None:
+            raise typer.BadParameter("--until must include a timezone")
+        clock = FrozenClock(parsed)
+    store = LiveSignalStore(path)
+    service = LiveSignalService(store)
+    feeds = load_frozen_dual_channel_feeds(clock=clock)
+    results = [service.poll_source(feed) for feed in feeds]
+    console.print_json(
+        data={
+            "fixture": "jin10-dual-channel-synthetic-v1",
+            "notice": "Synthetic replay only; not current market data.",
+            "channels": [
+                {
+                    "channel": result.batch.descriptor.channel.value,
+                    "observations": len(result.batch.observations),
+                    "created_versions": result.created_versions,
+                    "cursor": result.batch.checkpoint.cursor,
+                    "health": result.batch.checkpoint.health.value,
+                }
+                for result in results
+            ],
+            "signals": [
+                signal.model_dump(mode="json")
+                for signal in store.list_signals(latest_only=True)
+            ],
+        }
+    )
+
+
+@live_app.command("status")
+def live_status(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Show persisted channel checkpoints and canonical live signals."""
+
+    store = LiveSignalStore(path)
+    console.print_json(
+        data={
+            "checkpoints": [
+                item.model_dump(mode="json") for item in store.list_checkpoints()
+            ],
+            "signals": [
+                item.model_dump(mode="json")
+                for item in store.list_signals(latest_only=True)
+            ],
+            "dead_letters": [
+                item.model_dump(mode="json") for item in store.list_dead_letters()
+            ],
         }
     )
 

@@ -79,6 +79,27 @@ capture creates `Evidence(status=captured)`; explicit human approval is still re
 same queue and are labeled issuer/regulator only when their domains match deterministic policy.
 Canonical URLs and content hashes are deduplicated independently.
 
+### Live signal gateway
+
+The in-development v0.5.1 gateway is deliberately separate from both official events and
+Evidence. Each provider delivery becomes a `SignalObservation` with its own channel, external ID,
+published/observed timestamps, content hash, and retention class. `LiveSignalService` preserves
+those observations and appends a `LiveSignalVersion` when a second channel, revision, or content
+variant changes the canonical view. A match therefore emits one current signal without erasing
+channel-only, delay, or divergent-content history.
+
+`LiveEventSource` is the common boundary for frozen, MCP, and WebSocket sources. Checkpoints are
+keyed by provider, channel, and stream; health, cursor, freshness, and call budget remain
+independent. A failed source can degrade only its own checkpoint. Raw validation failures enter a
+metadata-only dead-letter record containing a hash and safe schema errors, not the unlicensed or
+potentially sensitive payload.
+
+M0/M1 currently provide only a synthetic, controllable-clock dual-channel feed and the
+`capexgraph live demo` / `live status` inspection path. Real Jin10 transports, scheduling,
+cross-event fuzzy matching, model analysis, SSE, notifications, and the Live Desk are later
+milestones. A `signal_only` record cannot become Evidence or an official corporate event without
+the existing guarded capture and human-review boundary.
+
 ### Corporate event calendar
 
 `CorporateEventVersion` is the durable v0.5 event contract. It separates the source-public
@@ -148,12 +169,16 @@ records.
 Schema version 5 adds append-only corporate event versions. It is additive and does not rewrite
 market bars, financial facts, source suggestions, tracking history, or run payloads.
 
+Schema version 6 adds live observations, append-only canonical signal versions and their links,
+independent provider/channel checkpoints, redacted dead letters, and human-gated action proposals.
+It is additive and does not modify prior research, market, official-event, or tracking history.
+
 ### Applications
 
 - FastAPI exposes runs, evidence review, official events, artifacts, market sync/status, tracking,
   and HTML reports.
 - React/Vite provides the live Research Cockpit and stage board.
-- CLI supports local, batch, tracking, and portable-report workflows.
+- CLI supports local, batch, tracking, portable-report, and synthetic live-signal replay workflows.
 
 ## Runtime lifecycle
 

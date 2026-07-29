@@ -21,3 +21,9 @@ access controls and TLS. Never expose a personal subscription relay as a shared 
 The Codex subscription and official OpenAI API channels never fall back to each other. This prevents
 a local proxy outage from creating an unexpected Platform API charge and prevents an API failure
 from consuming personal subscription capacity.
+
+The v0.5.1 live-signal contract keeps provider content retention explicit. `ephemeral` and
+`metadata_only` observations persist allowed metadata and a content hash, not the raw body;
+validation dead letters persist only a payload hash and safe schema errors. The bundled
+dual-channel feed is synthetic. Future Jin10 credentials must remain backend-only and must never
+enter checkpoints, API responses, portable artifacts, logs, or committed fixtures.

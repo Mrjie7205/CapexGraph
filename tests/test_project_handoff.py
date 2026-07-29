@@ -14,6 +14,7 @@ def test_cross_session_handoff_files_exist() -> None:
         "AGENTS.md",
         "ROADMAP.md",
         "docs/V0_5_PLAN.md",
+        "docs/V0_5_1_PLAN.html",
         "docs/V0_4_PLAN.md",
         "docs/V0_3_PLAN.md",
         "docs/PROJECT_CONTEXT.md",
@@ -41,6 +42,7 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     v03_plan = (ROOT / "docs/V0_3_PLAN.md").read_text(encoding="utf-8")
     v04_plan = (ROOT / "docs/V0_4_PLAN.md").read_text(encoding="utf-8")
     v05_plan = (ROOT / "docs/V0_5_PLAN.md").read_text(encoding="utf-8")
+    v051_plan = (ROOT / "docs/V0_5_1_PLAN.html").read_text(encoding="utf-8")
     market_data = (ROOT / "docs/MARKET_DATA.md").read_text(encoding="utf-8")
     architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
     decisions = (ROOT / "docs/DECISIONS.md").read_text(encoding="utf-8")
@@ -68,6 +70,16 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
         )
     )
     assert "v0.5" in status and "official disclosure events" in status
+    assert all(
+        term in v051_plan
+        for term in (
+            "D019",
+            "SignalObservation",
+            "M0 / M1 complete",
+            "MCP 与 WebSocket 同级",
+        )
+    )
+    assert "real Jin10 MCP or WebSocket adapter" in status
     assert all(
         term in market_data
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")

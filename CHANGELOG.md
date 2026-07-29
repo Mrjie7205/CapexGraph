@@ -16,6 +16,12 @@ All notable changes to CapexGraph are documented here.
   equal-priority Jin10 MCP and Open Platform WebSocket channels, MCP-first real-data delivery with
   WebSocket co-development, cross-channel observation matching, deterministic filtering, optional
   AI impact analysis, Cockpit Live Desk flows, and explicit signal-versus-Evidence boundaries;
+- implemented the v0.5.1 M0/M1 foundation with typed live observations, append-only signal
+  versions, retention and verification states, per-channel checkpoints, redacted dead letters,
+  human-gated action proposals, and additive schema migration 6;
+- added a common live-source protocol, deterministic service/store, frozen synthetic MCP/WebSocket
+  feeds with independent cursors and health, matched/divergent examples, and no-key `live demo` /
+  `live status` CLI paths without claiming a real Jin10 connection;
 - started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
   source-public/system-observed timestamps, effective/expected dates, and canonical entities;
 - added append-only migration 5, semantic idempotency, immutable event versions, current/history

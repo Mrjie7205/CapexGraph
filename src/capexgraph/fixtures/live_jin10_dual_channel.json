@@ -1,0 +1,91 @@
+{
+  "fixture": {
+    "id": "jin10-dual-channel-synthetic-v1",
+    "provider": "jin10-fixture",
+    "provider_version": "1",
+    "stream": "flash-calendar",
+    "description": "Synthetic, frozen MCP/WebSocket observations for deterministic tests. Not current market data."
+  },
+  "events": [
+    {
+      "channel": "websocket",
+      "external_id": "fixture-ws-capex-001",
+      "event_key": "fixture:memory-capex-plan",
+      "category": "flash",
+      "title": "合成演示：存储厂商更新资本开支计划",
+      "content": "这是用于测试的合成消息，不代表真实公司或当前市场事件。",
+      "source_url": "https://example.com/capexgraph-fixture/memory-capex-plan",
+      "published_at": "2026-07-29T09:30:00+08:00",
+      "observed_at": "2026-07-29T09:30:01+08:00",
+      "retention_class": "fixture",
+      "metadata": {
+        "synthetic": true,
+        "importance": 4
+      }
+    },
+    {
+      "channel": "mcp",
+      "external_id": "fixture-mcp-capex-001",
+      "event_key": "fixture:memory-capex-plan",
+      "category": "flash",
+      "title": "合成演示：存储厂商更新资本开支计划",
+      "content": "这是用于测试的合成消息，不代表真实公司或当前市场事件。",
+      "source_url": "https://example.com/capexgraph-fixture/memory-capex-plan",
+      "published_at": "2026-07-29T09:30:00+08:00",
+      "observed_at": "2026-07-29T09:30:24+08:00",
+      "retention_class": "fixture",
+      "metadata": {
+        "synthetic": true,
+        "importance": 4
+      }
+    },
+    {
+      "channel": "mcp",
+      "external_id": "fixture-mcp-calendar-001",
+      "event_key": "fixture:macro-calendar-release",
+      "category": "calendar",
+      "title": "合成演示：宏观数据公布值偏离一致预期",
+      "content": "前值100，预期101，合成公布值104；仅用于日历契约测试。",
+      "source_url": "https://example.com/capexgraph-fixture/macro-calendar",
+      "published_at": "2026-07-29T10:00:00+08:00",
+      "observed_at": "2026-07-29T10:00:21+08:00",
+      "retention_class": "fixture",
+      "metadata": {
+        "synthetic": true,
+        "star": 4
+      }
+    },
+    {
+      "channel": "websocket",
+      "external_id": "fixture-ws-guidance-001",
+      "event_key": "fixture:memory-guidance-rumor",
+      "category": "flash",
+      "title": "合成演示：市场传闻存储厂商可能上调产能指引",
+      "content": "合成WebSocket版本称公司正在评估上调产能指引。",
+      "source_url": "https://example.com/capexgraph-fixture/memory-guidance",
+      "published_at": "2026-07-29T10:05:00+08:00",
+      "observed_at": "2026-07-29T10:05:01+08:00",
+      "retention_class": "fixture",
+      "metadata": {
+        "synthetic": true,
+        "importance": 3
+      }
+    },
+    {
+      "channel": "mcp",
+      "external_id": "fixture-mcp-guidance-001",
+      "event_key": "fixture:memory-guidance-rumor",
+      "category": "flash",
+      "title": "合成演示：市场传闻存储厂商可能上调产能指引",
+      "content": "合成MCP版本称公司已经决定上调产能指引，字段与另一通道故意不一致。",
+      "source_url": "https://example.com/capexgraph-fixture/memory-guidance",
+      "published_at": "2026-07-29T10:05:00+08:00",
+      "observed_at": "2026-07-29T10:05:29+08:00",
+      "retention_class": "fixture",
+      "metadata": {
+        "synthetic": true,
+        "importance": 3
+      }
+    }
+  ]
+}

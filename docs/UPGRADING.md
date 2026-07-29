@@ -42,6 +42,17 @@ Version 5 is additive and safe for startup. It does not rewrite earlier event kn
 event table existed before it, and it does not modify runs, source suggestions, financial facts,
 market bars, or tracking history.
 
+The v0.5.1 live-signal foundation adds version 6:
+
+6. channel observations, append-only canonical signal versions and observation links, independent
+   provider/channel checkpoints, metadata-only dead letters, and human-gated research-action
+   proposals.
+
+Version 6 is additive and safe for startup. It does not rewrite existing runs, checkpoints,
+Evidence, financial facts, market bars, official events, or tracking history. Fixture observations
+may retain their synthetic content; `ephemeral` and `metadata_only` observations persist only
+allowed metadata and the original content hash.
+
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
 to run `capexgraph db upgrade`.

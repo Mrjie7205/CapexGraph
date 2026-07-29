@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
@@ -93,6 +95,70 @@ class CorporateEventStatus(StrEnum):
     REVISED = "revised"
     OCCURRED = "occurred"
     CANCELLED = "cancelled"
+
+
+class LiveChannel(StrEnum):
+    MCP = "mcp"
+    WEBSOCKET = "websocket"
+    FIXTURE = "fixture"
+
+
+class LiveSignalCategory(StrEnum):
+    FLASH = "flash"
+    CALENDAR = "calendar"
+    QUOTE = "quote"
+    NEWS = "news"
+    OTHER = "other"
+
+
+class LiveRetentionClass(StrEnum):
+    EPHEMERAL = "ephemeral"
+    METADATA_ONLY = "metadata_only"
+    LICENSED_ARCHIVE = "licensed_archive"
+    FIXTURE = "fixture"
+
+
+class LiveMatchStatus(StrEnum):
+    SINGLE_CHANNEL = "single_channel"
+    MATCHED = "matched"
+    DIVERGENT = "divergent"
+
+
+class LiveVerificationState(StrEnum):
+    SIGNAL_ONLY = "signal_only"
+    OFFICIAL_SOURCE_PENDING = "official_source_pending"
+    EVIDENCE_LINKED = "evidence_linked"
+
+
+class LiveProviderHealth(StrEnum):
+    NOT_CONFIGURED = "not_configured"
+    ACTIVE = "active"
+    DEGRADED = "degraded"
+    OFF = "off"
+    EXHAUSTED = "exhausted"
+    REPLAY = "replay"
+
+
+class ResearchAction(StrEnum):
+    IGNORE = "ignore"
+    WATCH = "watch"
+    VERIFY = "verify"
+    ATTACH = "attach"
+    LINKED_REEVALUATION = "linked_reevaluation"
+
+
+class ProposalHumanStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
+
+
+class ImpactDirection(StrEnum):
+    POSITIVE = "positive"
+    NEGATIVE = "negative"
+    MIXED = "mixed"
+    NEUTRAL = "neutral"
+    UNKNOWN = "unknown"
 
 
 class QualitySeverity(StrEnum):
@@ -314,6 +380,190 @@ class CorporateEventVersion(BaseModel):
             raise ValueError("occurred events require occurred_date or effective_date")
         if self.status == CorporateEventStatus.CANCELLED and self.cancelled_date is None:
             raise ValueError("cancelled events require cancelled_date")
+        return self
+
+
+class SignalObservation(BaseModel):
+    id: str = Field(default="", min_length=1)
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    channel: LiveChannel
+    stream: str = Field(min_length=1)
+    external_id: str = Field(min_length=1)
+    event_key: str = Field(default="", min_length=1)
+    category: LiveSignalCategory
+    title: str = Field(min_length=1)
+    content: str = ""
+    source_url: HttpUrl | None = None
+    published_at: datetime
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    content_hash: str = Field(default="", pattern=r"^[0-9a-f]{64}$")
+    retention_class: LiveRetentionClass = LiveRetentionClass.METADATA_ONLY
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="before")
+    @classmethod
+    def derive_identity(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        provider = str(payload.get("provider", "")).strip()
+        channel = str(payload.get("channel", "")).strip()
+        external_id = str(payload.get("external_id", "")).strip()
+        if not payload.get("event_key") and provider and external_id:
+            payload["event_key"] = f"{provider}:{external_id}"
+        if not payload.get("content_hash"):
+            semantic = {
+                "title": str(payload.get("title", "")).strip(),
+                "content": str(payload.get("content", "")).strip(),
+                "source_url": str(payload.get("source_url") or ""),
+                "category": str(payload.get("category", "")).strip(),
+            }
+            raw = json.dumps(
+                semantic,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+            payload["content_hash"] = hashlib.sha256(raw).hexdigest()
+        if not payload.get("id") and provider and channel and external_id:
+            identity = (
+                f"{provider}:{channel}:{external_id}:{payload['content_hash']}".encode()
+            )
+            payload["id"] = f"observation-{hashlib.sha256(identity).hexdigest()[:24]}"
+        return payload
+
+    @model_validator(mode="after")
+    def validate_observation_timeline(self) -> SignalObservation:
+        if self.published_at.tzinfo is None or self.observed_at.tzinfo is None:
+            raise ValueError("signal published_at and observed_at must be timezone-aware")
+        self.published_at = self.published_at.astimezone(UTC)
+        self.observed_at = self.observed_at.astimezone(UTC)
+        if self.published_at > self.observed_at:
+            raise ValueError("signal cannot be observed before it was published")
+        return self
+
+
+class LiveSignalVersion(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    version: int = Field(ge=1)
+    version_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    category: LiveSignalCategory
+    title: str = Field(min_length=1)
+    published_at: datetime
+    first_observed_at: datetime
+    last_observed_at: datetime
+    observation_ids: list[str] = Field(min_length=1)
+    channels: list[LiveChannel] = Field(min_length=1)
+    match_status: LiveMatchStatus
+    verification_state: LiveVerificationState = LiveVerificationState.SIGNAL_ONLY
+    revision_reason: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_signal_version(self) -> LiveSignalVersion:
+        timestamps = (
+            self.published_at,
+            self.first_observed_at,
+            self.last_observed_at,
+        )
+        if any(item.tzinfo is None for item in timestamps):
+            raise ValueError("live signal timestamps must be timezone-aware")
+        self.published_at = self.published_at.astimezone(UTC)
+        self.first_observed_at = self.first_observed_at.astimezone(UTC)
+        self.last_observed_at = self.last_observed_at.astimezone(UTC)
+        if self.first_observed_at > self.last_observed_at:
+            raise ValueError("first_observed_at cannot follow last_observed_at")
+        self.observation_ids = sorted(set(self.observation_ids))
+        self.channels = sorted(set(self.channels), key=lambda item: item.value)
+        if self.match_status == LiveMatchStatus.MATCHED and len(self.channels) < 2:
+            raise ValueError("matched signals require at least two channels")
+        return self
+
+
+class LiveProviderCheckpoint(BaseModel):
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    channel: LiveChannel
+    stream: str = Field(min_length=1)
+    cursor: str = ""
+    last_external_id: str | None = None
+    last_published_at: datetime | None = None
+    last_observed_at: datetime | None = None
+    health: LiveProviderHealth
+    calls_used: int = Field(default=0, ge=0)
+    call_budget: int | None = Field(default=None, ge=1)
+    budget_date: date | None = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    error: str = ""
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def key(self) -> str:
+        return f"{self.provider}:{self.channel.value}:{self.stream}"
+
+    @model_validator(mode="after")
+    def validate_checkpoint_timestamps(self) -> LiveProviderCheckpoint:
+        for name in ("last_published_at", "last_observed_at", "updated_at"):
+            value = getattr(self, name)
+            if value is not None:
+                if value.tzinfo is None:
+                    raise ValueError(f"{name} must be timezone-aware")
+                setattr(self, name, value.astimezone(UTC))
+        return self
+
+
+class LiveDeadLetter(BaseModel):
+    id: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    channel: LiveChannel
+    stream: str = Field(min_length=1)
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    payload_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    error: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_dead_letter_time(self) -> LiveDeadLetter:
+        if self.observed_at.tzinfo is None:
+            raise ValueError("dead-letter observed_at must be timezone-aware")
+        self.observed_at = self.observed_at.astimezone(UTC)
+        return self
+
+
+class ResearchActionProposal(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    analysis_version: int = Field(ge=1)
+    ruleset_version: str = Field(min_length=1)
+    model_provider: str | None = None
+    model: str | None = None
+    prompt_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    themes: list[str] = Field(default_factory=list)
+    entities: list[str] = Field(default_factory=list)
+    graph_nodes: list[str] = Field(default_factory=list)
+    direction: ImpactDirection = ImpactDirection.UNKNOWN
+    horizon: str = Field(min_length=1)
+    novelty: float = Field(ge=0, le=1)
+    impact_score: float = Field(ge=0, le=100)
+    confidence: float = Field(ge=0, le=1)
+    transmission_path: list[str] = Field(default_factory=list)
+    price_confirmation: str = ""
+    evidence_gaps: list[str] = Field(default_factory=list)
+    recommended_action: ResearchAction
+    trigger_conditions: list[str] = Field(default_factory=list)
+    invalidations: list[str] = Field(default_factory=list)
+    human_status: ProposalHumanStatus = ProposalHumanStatus.PENDING
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_proposal(self) -> ResearchActionProposal:
+        if self.created_at.tzinfo is None:
+            raise ValueError("proposal created_at must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        if self.model_provider is None and (self.model is not None or self.prompt_hash is not None):
+            raise ValueError("model metadata requires model_provider")
         return self
 
 

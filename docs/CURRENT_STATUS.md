@@ -3,15 +3,35 @@
 - Last verified: 2026-07-29
 - Release: `v0.3.0` — Trustworthy live research
 - Active target: `v0.5` — official disclosure events, by explicit user priority
-- Approved planned extension: `v0.5.1` — provider-neutral live-event gateway with equal-priority
-  Jin10 MCP and Open Platform WebSocket channels, a frozen no-key feed, optional AI analysis, and
-  a Cockpit Live Desk; MCP is first-live while WebSocket is co-developed; plan only, not implemented
+- Active extension: `v0.5.1` — provider-neutral live-event gateway with equal-priority Jin10 MCP
+  and Open Platform WebSocket channels; M0 contracts/persistence and the M1 frozen no-key
+  dual-channel replay are implemented, while both real adapters, AI analysis, SSE, and Live Desk
+  remain open
 - Incomplete dependency: `v0.4` — cross-market data foundation and mainline monitoring; the market
   slice exists, while theme/mainline automation remains open
-- Active development branch: `codex/v0-5-official-events`
+- Active development branch: `codex/v0-5-1-live-event-gateway`
 
 This is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
+
+## Implemented on the v0.5.1 development branch
+
+- typed `SignalObservation`, append-only `LiveSignalVersion`, channel/match/retention/verification
+  states, independent `LiveProviderCheckpoint`, redacted dead letters, and human-gated
+  `ResearchActionProposal` contracts;
+- additive migration 6 for observations, canonical signal versions and their links, per-channel
+  checkpoints, dead letters, and research-action proposals;
+- a provider-neutral `LiveEventSource` protocol and deterministic `LiveSignalService` that preserves
+  every channel observation, emits `single_channel`, `matched`, or `divergent` signal versions, and
+  does not let one channel failure change the other channel's checkpoint or health;
+- a frozen synthetic Jin10-shaped MCP/WebSocket fixture with a controllable clock, independent
+  cursors, identical and divergent cross-channel examples, and deterministic replay; and
+- no-key `capexgraph live demo` and `capexgraph live status` commands for replaying and inspecting
+  the persisted foundation without presenting fixture events as current market information.
+
+This completes the scoped M0/M1 foundation, not the v0.5.1 product. The repository still has no
+real Jin10 MCP or WebSocket adapter, polling scheduler, live credentials, AI event-analysis
+runtime, frontend API/SSE stream, browser notification path, or Live Desk.
 
 ## Implemented on the v0.5 development branch
 
@@ -40,21 +60,25 @@ This is the first US official-source vertical, not a v0.5 release. CNINFO/SSE/SZ
 KIND/KRX, issuer calendars, cross-market fact taxonomy, event-triggered re-evaluation, and the
 Cockpit event view remain open. The detailed boundary is in `docs/V0_5_PLAN.md`.
 
-The approved v0.5.1 live-event design is documented in `docs/V0_5_1_PLAN.html`. MCP polling and
-WebSocket are equal-priority information channels: MCP is the first real-data runtime slice, the
-WebSocket adapter is developed in parallel, and both remain active after the Secret-Key is
-available. No live gateway, Jin10 adapter, signal schema, automatic AI event analysis, SSE stream,
-or Live Desk has been implemented yet. A Jin10 signal remains a secondary discovery input and
-cannot become Evidence without the existing guarded official-source capture and human-review path.
+The approved v0.5.1 design is documented in `docs/V0_5_1_PLAN.html`. MCP polling and WebSocket are
+equal-priority information channels: MCP is the first real-data runtime slice, the WebSocket
+adapter is developed in parallel, and both remain active after the Secret-Key is available. The
+shared gateway contract, storage, and frozen replay now exist; actual Jin10 transport adapters do
+not. A future Jin10 signal remains a secondary discovery input and cannot become Evidence without
+the existing guarded official-source capture and human-review path.
 
-## Verified for the current v0.5 slice
+## Verified for the current development slice
 
-- 78 Python tests pass and Ruff passes;
+- 97 Python tests pass and Ruff passes;
 - the React/Vite production build passes;
-- a clean isolated wheel build succeeds and contains `capexgraph.events` plus the shared
-  configuration loader;
-- fresh and legacy migration tests reach schema version 5 without rewriting prior run, checkpoint,
-  source, financial-fact, market, or tracking records;
+- a clean isolated wheel build succeeds and contains `capexgraph.events`, the complete
+  `capexgraph.live` package, the synthetic dual-channel fixture, and the shared configuration
+  loader;
+- fresh and legacy migration tests reach schema version 6 without rewriting prior run, checkpoint,
+  source, financial-fact, market, official-event, or tracking records;
+- frozen live-gateway tests cover timezone enforcement, retention, independent checkpoints and
+  failure health, idempotency, matched/divergent/single-channel versions, redacted dead letters,
+  human-gated actions, and the no-key CLI path;
 - frozen SEC tests cover acceptance timestamps, conservative form classification, idempotent
   discovery, capture-to-Evidence versioning, point-in-time history, CLI, API, and artifacts; and
 - the official SEC schema was probed successfully with an identifying test User-Agent. A real
@@ -173,6 +197,9 @@ Future code or documentation changes must pass the same remote release gate agai
 - ETF/index/vendor membership is planned as market-recognition evidence, not proof of industrial
   exposure or supplier/customer relationships.
 - Monitoring remains manually invoked. Scheduling and automatic re-evaluation belong to v0.4.
+- The v0.5.1 live-event path currently replays an explicitly synthetic fixture. It does not poll
+  Jin10, open a WebSocket, receive current events, run continuously, call a model, or expose a
+  Live Desk yet.
 - SEC filing metadata can now populate an event calendar, but content-level event extraction,
   issuer calendars, and CN/KR official sources are not implemented.
 - The application is local-first and single-user. Cloud authentication and team permissions are not
@@ -184,9 +211,9 @@ Future code or documentation changes must pass the same remote release gate agai
 
 Continue v0.5 from [the execution plan](V0_5_PLAN.md):
 
-1. start v0.5.1 M0/M1 dual-channel contracts and frozen feed, then ship the MCP first-live M2
-   while developing the WebSocket M3 adapter in parallel; the Secret-Key gates only live smoke,
-   and the complete HTML plan is [here](V0_5_1_PLAN.html);
+1. implement the MCP first-live M2 and WebSocket M3 adapters against the completed M0/M1 contract;
+   the Secret-Key gates only WebSocket live smoke, and the complete HTML plan is
+   [here](V0_5_1_PLAN.html);
 2. configure a real SEC contact User-Agent for optional live smoke, then add historical submission
    files and backfill;
 3. add CNINFO plus Shanghai/Shenzhen/Beijing official announcement discovery;

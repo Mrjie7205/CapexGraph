@@ -284,6 +284,121 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=6,
+        name="live_signal_gateway_foundation",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_observations (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                provider_version TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                event_key TEXT NOT NULL,
+                category TEXT NOT NULL,
+                published_at TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                retention_class TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (provider, channel, external_id, content_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_observations_event_key
+            ON live_signal_observations(event_key, observed_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_observations_channel_observed
+            ON live_signal_observations(provider, channel, observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_versions (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                version_hash TEXT NOT NULL,
+                category TEXT NOT NULL,
+                published_at TEXT NOT NULL,
+                first_observed_at TEXT NOT NULL,
+                last_observed_at TEXT NOT NULL,
+                match_status TEXT NOT NULL,
+                verification_state TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (signal_key, version),
+                UNIQUE (signal_key, version_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_signals_last_observed
+            ON live_signal_versions(last_observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_observation_links (
+                signal_version_id TEXT NOT NULL,
+                observation_id TEXT NOT NULL,
+                PRIMARY KEY (signal_version_id, observation_id),
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE,
+                FOREIGN KEY (observation_id)
+                    REFERENCES live_signal_observations(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_signal_links_observation
+            ON live_signal_observation_links(observation_id, signal_version_id)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_provider_checkpoints (
+                provider TEXT NOT NULL,
+                provider_version TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                cursor TEXT NOT NULL DEFAULT '',
+                last_external_id TEXT,
+                last_published_at TEXT,
+                last_observed_at TEXT,
+                health TEXT NOT NULL,
+                calls_used INTEGER NOT NULL DEFAULT 0,
+                call_budget INTEGER,
+                budget_date TEXT,
+                updated_at TEXT NOT NULL,
+                error TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL,
+                PRIMARY KEY (provider, channel, stream)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_dead_letters (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                payload_hash TEXT NOT NULL,
+                error TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_dead_letters_observed
+            ON live_dead_letters(observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS research_action_proposals (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                analysis_version INTEGER NOT NULL,
+                human_status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (signal_key, analysis_version)
+            )
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

@@ -68,13 +68,16 @@ This is a US-first foundation. It does not yet include CNINFO/SSE/SZSE/BSE, Open
 calendars, filing-content event extraction, or event-triggered automated re-evaluation. See
 [the v0.5 execution plan](docs/V0_5_PLAN.md).
 
-The approved [v0.5.1 live-event gateway plan](docs/V0_5_1_PLAN.html) defines Jin10 MCP polling and
-Open Platform WebSocket as two equal-priority live information channels. MCP is the first channel
-scheduled to run with real data while the WebSocket adapter is developed in parallel; once
-credentials are available, both remain active with independent health and cross-channel matching.
-The plan also preserves a frozen no-key feed, optional AI impact analysis, and a Cockpit Live Desk.
-It is not shipped behavior: aggregator messages remain secondary signals and must pass through
-official capture and human review before becoming Evidence.
+The [v0.5.1 live-event gateway plan](docs/V0_5_1_PLAN.html) defines Jin10 MCP polling and Open
+Platform WebSocket as two equal-priority live information channels. Its M0/M1 development
+foundation now includes typed signal/retention/action contracts, additive migration 6, independent
+per-channel checkpoints, deterministic cross-channel versions, and a frozen no-key dual-channel
+replay. Run `capexgraph live demo` and then `capexgraph live status` to inspect that synthetic path.
+
+Real Jin10 MCP/WebSocket adapters, continuous polling, optional AI impact analysis, SSE, and the
+Cockpit Live Desk remain planned work. The frozen fixture is not current market data. Future
+aggregator messages remain secondary signals and must pass through official capture and human
+review before becoming Evidence.
 
 ## v0.4 development preview
 
@@ -290,6 +293,12 @@ capexgraph events list <run-id>
 capexgraph sources capture <run-id> <suggestion-id>
 capexgraph events list <run-id> --history
 capexgraph events list <run-id> --as-of 2026-07-23
+
+# Synthetic live-signal foundation (no provider or model key)
+capexgraph live demo
+capexgraph live status
+capexgraph live demo --until 2026-07-29T02:06:00Z --path .\data\live-demo.db
+capexgraph live status --path .\data\live-demo.db
 
 # Forward tracking and reports
 capexgraph tracking add <run-id> <node-id> --market-provider eodhd
