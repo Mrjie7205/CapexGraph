@@ -41,14 +41,27 @@ capexgraph demo-alphabet-q2
 The Alphabet fixture deliberately stops at evidence-backed infrastructure layers. It does not
 convert product mentions or aggregate capital expenditure into named supplier relationships.
 
-### OpenAI
+### Codex subscription
+
+`--provider codex_subscription` uses the same strict Pydantic/Responses contract through a
+loopback CLIProxyAPI bridge. It requires `CAPEXGRAPH_CODEX_MODEL`,
+`CAPEXGRAPH_CODEX_PROXY_KEY`, and a running authenticated proxy. The proxy key is a local access
+credential, not an OpenAI Platform key or ChatGPT OAuth token. CapexGraph never reads the proxy's
+OAuth files and never falls back to the official API when this channel fails.
+
+```powershell
+capexgraph model providers --probe-codex
+capexgraph theme "AI数据中心电力" --provider codex_subscription --execute
+```
+
+### OpenAI API
 
 `--provider openai` uses `client.responses.parse` with each stage's Pydantic output model. Install the optional dependency and configure both variables:
 
 ```powershell
 python -m pip install -e ".[openai]"
 $env:OPENAI_API_KEY = "..."
-$env:CAPEXGRAPH_MODEL = "your-model"
+$env:CAPEXGRAPH_OPENAI_MODEL = "your-model"
 ```
 
 The OpenAI adapter does not search or fetch sources on its own. Model-proposed evidence remains a
@@ -62,6 +75,11 @@ coverage. Every stage receives bounded extracted text from captured/reviewed sou
 versioned financial facts; the prompt does not receive only titles or URLs. `partial` mode can
 continue with explicit low-confidence gaps. `strict` mode checkpoints a failure until at least one
 reviewed, hash-valid source exists and blocks unsupported medium/high relationship proposals.
+
+The selected provider and model are locked when execution starts. Resume may retry the same
+channel, but switching a partially executed run to another authentication or billing channel is
+rejected; create a new run instead. Provider failures record a safe category and retryability, and
+run manifests retain model-call counts without storing credentials.
 
 See `docs/LIVE_RESEARCH.md` for the capture and review contract.
 

@@ -186,3 +186,22 @@ public; `observed_at` records when CapexGraph actually ingested it. Historical s
 `observed_at`, so a document backfilled today cannot appear in what an earlier run knew. Discovery
 metadata remains a `SourceSuggestion`; only guarded capture creates Evidence, and linking that
 Evidence appends a new event version instead of rewriting the discovery version.
+
+## D018 — Model protocol, authentication, and billing are separate boundaries
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+CapexGraph keeps `fixture`, `codex_subscription`, and `openai` as three explicit research-model
+providers. The Codex subscription provider may use an OpenAI-compatible Responses surface through
+a loopback CLIProxyAPI bridge, but protocol compatibility does not make it the OpenAI Platform API:
+it uses a separate local proxy credential, delegates ChatGPT OAuth to the proxy, and consumes the
+operator's ChatGPT/Codex subscription boundary. The `openai` provider uses a Platform API key and
+separate API billing. The fixture provider uses neither.
+
+No provider silently falls back to another. Provider and model are locked after a run starts so
+resumed stages cannot diverge from the durable manifest. Failures are categorized, retryability is
+explicit, and only credential-safe details enter checkpoints, manifests, reports, API responses,
+or the Cockpit. CapexGraph never reads or persists ChatGPT OAuth files. Remote subscription proxies
+are rejected by default; an explicit opt-in does not weaken the operator's responsibility to secure
+that endpoint.

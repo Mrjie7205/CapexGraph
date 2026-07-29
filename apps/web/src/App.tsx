@@ -6,6 +6,8 @@ import {
   executeRun,
   getDecision,
   getRun,
+  isProvider,
+  listModelProviders,
   listRuns,
   listTracking,
   reviewEvidence,
@@ -13,6 +15,7 @@ import {
   trackCandidate,
   type DecisionArtifact,
   type EvidenceMode,
+  type ModelProviderStatus,
   type Provider,
   type ResearchRun,
   type RunMode,
@@ -100,6 +103,7 @@ function App() {
   const [market, setMarket] = useState("CN");
   const [subject, setSubject] = useState("A股半导体硅片");
   const [runs, setRuns] = useState<ResearchRun[]>([]);
+  const [modelProviders, setModelProviders] = useState<ModelProviderStatus[]>([]);
   const [selected, setSelected] = useState<ResearchRun | null>(null);
   const [decision, setDecision] = useState<DecisionArtifact | null>(null);
   const [tracking, setTracking] = useState<Scorecard[]>([]);
@@ -120,6 +124,7 @@ function App() {
   useEffect(() => {
     refreshRuns().catch(() => setError("API unavailable · run `capexgraph serve` first."));
     listTracking().then(setTracking).catch(() => undefined);
+    listModelProviders(true).then(setModelProviders).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -147,7 +152,11 @@ function App() {
   }, [selected?.id, selected?.status]);
 
   async function startRun(run: ResearchRun, resume = false, until?: string) {
-    const runProvider = String(run.manifest.model_provider || provider) as Provider;
+    const persistedProvider = run.manifest.model_provider;
+    if (persistedProvider && !isProvider(persistedProvider)) {
+      throw new Error(`Run records an unsupported model provider: ${String(persistedProvider)}`);
+    }
+    const runProvider = isProvider(persistedProvider) ? persistedProvider : provider;
     await executeRun(run.id, runProvider, resume, { evidenceMode, until });
     setSelected({ ...run, status: "running" });
     setPolling(true);
@@ -288,6 +297,12 @@ function App() {
   const trackedNodeIds = new Set(
     tracking.filter((card) => card.tracked.run_id === selected?.id).map((card) => card.tracked.node_id),
   );
+  const selectedProviderStatus = modelProviders.find((item) => item.name === provider);
+  const providerReadiness = selectedProviderStatus
+    ? selectedProviderStatus.configured
+      ? `${selectedProviderStatus.reachability} · ${selectedProviderStatus.billing_mode}`
+      : `not configured · missing ${selectedProviderStatus.missing.join(", ") || "valid settings"}`
+    : "status unavailable";
 
   return (
     <main>
@@ -314,13 +329,13 @@ function App() {
               <button type="button" className={mode === "anchor" ? "selected" : ""} onClick={() => { setMode("anchor"); setSubject("兆易创新"); }}><span>Anchor Scan</span><small>个股 → 邻居</small></button>
             </div>
             <div className="composer-options">
-              <label>Provider<select value={provider} onChange={(event) => setProvider(event.target.value as Provider)}><option value="fixture">Fixture · no key</option><option value="openai">OpenAI</option></select></label>
+              <label>Model channel<select value={provider} onChange={(event) => { if (isProvider(event.target.value)) setProvider(event.target.value); }}><option value="fixture">Fixture · no model</option><option value="codex_subscription">Codex subscription · local</option><option value="openai">OpenAI API · metered</option></select></label>
               <label>Evidence<select value={evidenceMode} onChange={(event) => setEvidenceMode(event.target.value as EvidenceMode)}><option value="partial">Partial · continue with gaps</option><option value="strict">Strict · reviewed first</option></select></label>
               <label>Market<input value={market} onChange={(event) => setMarket(event.target.value)} maxLength={12} /></label>
             </div>
             <label htmlFor="subject">{mode === "theme" ? "Investment theme" : "Ticker or company"}</label>
             <div className="subject-row"><input id="subject" value={subject} onChange={(event) => setSubject(event.target.value)} /><button className="launch" disabled={busy}>{busy ? "Creating…" : "Create workspace ↗"}</button></div>
-            <p className="composer-note">创建工作区、找信源、审核和 SEC 财务抽取无需模型 Key；只有 OpenAI 研究执行需要配置 Key。</p>
+            <p className="composer-note">通道状态：{providerReadiness}。Fixture 无需配置；Codex 订阅需要本机代理和登录；OpenAI API 使用独立 API Key 计费。</p>
             <button className="demo-launch" type="button" disabled={busy} onClick={runGoldenDemo}>Run {mode} golden case · 无需 API Key</button>
             {error && <p className="run-error">{error}</p>}
           </form>

@@ -37,10 +37,11 @@ from capexgraph.market import (
     build_market_provider,
     provider_capabilities,
 )
-from capexgraph.providers import ProviderName
+from capexgraph.providers import ModelSettings, ProviderName, redact_provider_secrets
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.research.context import EvidenceCoverage, refresh_evidence_coverage
+from capexgraph.research.model_runtime import select_run_provider
 from capexgraph.runtime import RunStore
 from capexgraph.runtime.store import runs_dir
 from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
@@ -523,6 +524,17 @@ def market_provider_status() -> dict[str, object]:
     }
 
 
+@app.get("/api/v1/model/providers")
+def model_provider_status(probe_codex: bool = False) -> dict[str, object]:
+    """Expose model-channel readiness without returning credentials."""
+
+    return {
+        "providers": ModelSettings.from_environment().provider_status(
+            probe_codex=probe_codex
+        )
+    }
+
+
 @app.post("/api/v1/market/sync", response_model=list[MarketSyncResult])
 def sync_market_history(request: MarketSyncRequest) -> list[MarketSyncResult]:
     try:
@@ -691,7 +703,9 @@ def _background_execute(
         current = load_run(run_id)
         if current is not None:
             current.status = RunStatus.FAILED
-            current.manifest["background_error"] = f"{type(error).__name__}: {error}"
+            current.manifest["background_error"] = (
+                f"{type(error).__name__}: {redact_provider_secrets(error)}"
+            )
             save_run(current)
 
 
@@ -708,11 +722,14 @@ def execute_run(
         if request.evidence_mode is not None:
             run.manifest["evidence_mode"] = request.evidence_mode.value
             run = save_run(run)
+        selected_provider = request.provider
+        if run.mode in {RunMode.THEME, RunMode.ANCHOR}:
+            selected_provider = select_run_provider(run, request.provider)
         if request.background:
             background_tasks.add_task(
                 _background_execute,
                 run_id,
-                request.provider,
+                selected_provider,
                 request.max_attempts,
                 request.until,
                 False,
@@ -720,7 +737,7 @@ def execute_run(
             return run
         return build_executor_for_run(
             run,
-            provider=request.provider,
+            provider=selected_provider,
             max_attempts=request.max_attempts,
         ).execute(
             run_id,
@@ -745,11 +762,14 @@ def resume_run(
         if request.evidence_mode is not None:
             run.manifest["evidence_mode"] = request.evidence_mode.value
             run = save_run(run)
+        selected_provider = request.provider
+        if run.mode in {RunMode.THEME, RunMode.ANCHOR}:
+            selected_provider = select_run_provider(run, request.provider)
         if request.background:
             background_tasks.add_task(
                 _background_execute,
                 run_id,
-                request.provider,
+                selected_provider,
                 request.max_attempts,
                 request.until,
                 True,
@@ -757,7 +777,7 @@ def resume_run(
             return run
         return build_executor_for_run(
             run,
-            provider=request.provider,
+            provider=selected_provider,
             max_attempts=request.max_attempts,
         ).execute(
             run_id,

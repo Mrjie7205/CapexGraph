@@ -1,6 +1,23 @@
 export type RunMode = "theme" | "anchor";
-export type Provider = "fixture" | "openai";
+export type Provider = "fixture" | "codex_subscription" | "openai";
 export type EvidenceMode = "partial" | "strict";
+
+export function isProvider(value: unknown): value is Provider {
+  return value === "fixture" || value === "codex_subscription" || value === "openai";
+}
+
+export interface ModelProviderStatus {
+  name: Provider;
+  configured: boolean;
+  model?: string;
+  setup_kind: string;
+  billing_mode: string;
+  endpoint_scope: string;
+  reachability: string;
+  missing: string[];
+  errors: string[];
+  legacy_model_setting?: boolean;
+}
 
 export interface PipelineStep {
   key: string;
@@ -178,6 +195,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function listRuns(): Promise<ResearchRun[]> {
   return request("/api/v1/runs?limit=30");
+}
+
+export async function listModelProviders(probeCodex = false): Promise<ModelProviderStatus[]> {
+  const payload = await request<{ providers: ModelProviderStatus[] }>(
+    `/api/v1/model/providers?probe_codex=${probeCodex ? "true" : "false"}`,
+  );
+  return payload.providers;
 }
 
 export function getRun(runId: string): Promise<ResearchRun> {

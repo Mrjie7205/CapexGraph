@@ -35,7 +35,28 @@ to runtime-only scaffold handlers and be presented as completed research.
 
 ### Tools and providers
 
-Provider interfaces prevent the workflow from depending on one model vendor. The built-in fixture provider loads a curated evidence pack and needs no key. The optional OpenAI provider uses structured Responses API output and is loaded only when selected.
+Provider interfaces prevent the workflow from depending on one model vendor or confusing a shared
+wire protocol with a shared authentication and billing boundary. Theme and Anchor expose three
+explicit model channels:
+
+```text
+fixture             → bundled outputs                    → no credential or usage
+codex_subscription  → loopback CLIProxyAPI / Responses  → ChatGPT OAuth and subscription pool
+openai              → official Responses API            → Platform API key and API billing
+```
+
+The two live adapters share Pydantic structured-output machinery, but their configuration,
+provider identity, error state, and usage boundary are separate. A selected channel never falls
+back to another. CLIProxyAPI owns ChatGPT OAuth; CapexGraph sees only a loopback Responses endpoint
+and a local proxy access key. Remote Codex proxy endpoints require an explicit opt-in.
+
+A run records provider, adapter version, model, transport, authentication mode, billing mode,
+endpoint scope, and model-call count before or during its first checkpoint. The provider and model
+are then locked for that run. Resume may reuse completed checkpoints and retry the same channel,
+but must not execute later stages under a different identity while retaining an older manifest.
+Provider errors are typed as configuration, authentication, unavailable, rate-limit, protocol, or
+output-validation failures. Only retryable failures consume the workflow retry budget; SDK-level
+automatic retries are disabled.
 
 Tools own ticker identity, market prices, financial facts/imports, SSRF-safe public source
 retrieval, content hashing, and report rendering. The market-data boundary has two current

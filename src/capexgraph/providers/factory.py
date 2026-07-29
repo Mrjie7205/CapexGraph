@@ -17,6 +17,10 @@ def create_research_model(
     selected = ProviderName(provider)
     if selected == ProviderName.FIXTURE:
         return FixtureResearchModel(subject, mode=mode)
+    if selected == ProviderName.CODEX_SUBSCRIPTION:
+        from capexgraph.providers.codex_subscription import CodexSubscriptionResearchModel
+
+        return CodexSubscriptionResearchModel(model=model, client=client)
     if selected == ProviderName.OPENAI:
         from capexgraph.providers.openai import OpenAIResearchModel
 

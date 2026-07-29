@@ -21,6 +21,7 @@ def test_cross_session_handoff_files_exist() -> None:
         "docs/DECISIONS.md",
         "docs/ARCHITECTURE.md",
         "docs/MARKET_DATA.md",
+        "SECURITY.md",
         "CONTRIBUTING.md",
         ".github/pull_request_template.md",
     ]
@@ -41,6 +42,9 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     v04_plan = (ROOT / "docs/V0_4_PLAN.md").read_text(encoding="utf-8")
     v05_plan = (ROOT / "docs/V0_5_PLAN.md").read_text(encoding="utf-8")
     market_data = (ROOT / "docs/MARKET_DATA.md").read_text(encoding="utf-8")
+    architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    decisions = (ROOT / "docs/DECISIONS.md").read_text(encoding="utf-8")
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
 
     assert __version__ == package_version == web_version
@@ -69,3 +73,16 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")
     )
     assert ".env" in gitignore
+    assert all(
+        term in architecture
+        for term in ("fixture", "codex_subscription", "openai", "never falls")
+    )
+    assert "D018" in decisions and "billing are separate boundaries" in decisions
+    assert all(
+        term in readme
+        for term in (
+            "CAPEXGRAPH_CODEX_PROXY_KEY",
+            "CAPEXGRAPH_OPENAI_MODEL",
+            "capexgraph model providers",
+        )
+    )

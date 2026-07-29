@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from collections.abc import Callable
 from typing import Any
 
@@ -23,6 +22,12 @@ from capexgraph.research.context import (
     enforce_evidence_preflight,
     evidence_is_reviewed_and_unchanged,
     refresh_evidence_coverage,
+)
+from capexgraph.research.model_runtime import (
+    bind_model_identity,
+    provider_setup_error,
+    record_model_call,
+    select_run_provider,
 )
 from capexgraph.research.theme_schemas import (
     BottleneckScoreOutput,
@@ -64,6 +69,24 @@ def _prompt(run: ResearchRun, task: str, context: dict[str, Any]) -> str:
 def _record_output(run: ResearchRun, key: str, output: Any) -> None:
     outputs = run.manifest.setdefault("agent_outputs", {})
     outputs[key] = output.model_dump(mode="json")
+
+
+def _generate_model(
+    model: ResearchModel,
+    run: ResearchRun,
+    output_model: type[Any],
+    *,
+    system_prompt: str,
+    user_prompt: str,
+) -> Any:
+    try:
+        return model.generate(
+            output_model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+        )
+    finally:
+        record_model_call(run, model)
 
 
 def _write_run_artifact(run: ResearchRun, filename: str, payload: Any) -> None:
@@ -115,29 +138,14 @@ def _validate_graph(run: ResearchRun) -> None:
 
 def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
     def intake(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        run.manifest.update(
-            {
-                "model_provider": model.provider_name,
-                "model": model.model_name,
-                "model_provider_details": {
-                    "name": model.provider_name,
-                    "version": getattr(model, "provider_version", "unknown"),
-                    "model": model.model_name,
-                },
-                "evidence_policy": model.evidence_policy.value,
-                "as_of_date": run.as_of_date.isoformat(),
-                "report_language": (
-                    "zh-CN"
-                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
-                    else "en"
-                ),
-            }
-        )
+        bind_model_identity(run, model)
         enforce_evidence_preflight(
             run,
             curated=model.evidence_policy == EvidencePolicy.CURATED,
         )
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             ThemeBoundaryOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -150,7 +158,9 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Theme boundary defined", "scope": output.scope}
 
     def census(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             PlayerCensusOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -164,7 +174,9 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Player census built", "node_count": len(run.nodes)}
 
     def graph(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             ThemeGraphOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -243,7 +255,9 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         }
 
     def audit(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             EvidenceAuditOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -291,7 +305,9 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Evidence audit completed", "accepted_edges": len(run.edges)}
 
     def score(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             BottleneckScoreOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -329,7 +345,9 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Bottleneck candidates scored", "candidate_count": len(candidates)}
 
     def debate(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             DebateOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -346,7 +364,9 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Bull / bear review completed", "review_count": len(output.reviews)}
 
     def decision(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             DecisionOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -401,28 +421,26 @@ def build_executor_for_run(
     max_attempts: int = 2,
 ) -> WorkflowExecutor:
     """Rehydrate the correct agent handlers from the run manifest."""
-    selected = provider or run.manifest.get("model_provider")
     if run.mode != RunMode.THEME:
         return WorkflowExecutor(max_attempts=max_attempts)
-    if not selected:
-        raise ValueError("Theme Scan execution requires --provider fixture or --provider openai")
+    selected = select_run_provider(run, provider)
     try:
         model = create_research_model(
             selected,
             subject=run.subject,
             mode="theme",
-            model=os.getenv("CAPEXGRAPH_MODEL"),
         )
+        bind_model_identity(run, model)
     except Exception as error:  # noqa: BLE001 - setup failures become durable checkpoints
-        message = f"Provider setup failed: {type(error).__name__}: {error}"
+        setup_error = provider_setup_error(error, provider=selected)
 
         def fail_setup(
             _run: ResearchRun,
             _step: PipelineStep,
             *,
-            detail: str = message,
+            detail: Exception = setup_error,
         ) -> dict[str, Any]:
-            raise RuntimeError(detail)
+            raise detail
 
         return WorkflowExecutor(
             handlers={step.key: fail_setup for step in run.pipeline},

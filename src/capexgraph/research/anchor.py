@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from capexgraph.domain import (
@@ -25,10 +24,16 @@ from capexgraph.research.context import (
     evidence_is_reviewed_and_unchanged,
     refresh_evidence_coverage,
 )
+from capexgraph.research.model_runtime import (
+    bind_model_identity,
+    provider_setup_error,
+    select_run_provider,
+)
 from capexgraph.research.theme import (
     SYSTEM_PROMPT,
     ThemeHandler,
     _evidence_identity_matches,
+    _generate_model,
     _merge_nodes,
     _prompt,
     _record_output,
@@ -57,29 +62,14 @@ def _merge_evidence(run: ResearchRun, proposals: list[Any]) -> None:
 
 def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
     def intake(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        run.manifest.update(
-            {
-                "model_provider": model.provider_name,
-                "model": model.model_name,
-                "model_provider_details": {
-                    "name": model.provider_name,
-                    "version": getattr(model, "provider_version", "unknown"),
-                    "model": model.model_name,
-                },
-                "evidence_policy": model.evidence_policy.value,
-                "as_of_date": run.as_of_date.isoformat(),
-                "report_language": (
-                    "zh-CN"
-                    if any("\u4e00" <= character <= "\u9fff" for character in run.subject)
-                    else "en"
-                ),
-            }
-        )
+        bind_model_identity(run, model)
         enforce_evidence_preflight(
             run,
             curated=model.evidence_policy == EvidencePolicy.CURATED,
         )
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             AnchorIdentityOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -95,7 +85,9 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Anchor identity resolved", "anchor_node_id": output.anchor.id}
 
     def cause(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             RepricingCauseOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -121,7 +113,9 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         }
 
     def graph(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             AnchorGraphOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -186,7 +180,9 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Anchor neighbour graph drafted", "edge_count": len(run.edges)}
 
     def audit(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             EvidenceAuditOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -229,7 +225,9 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Anchor relationship audit completed", "accepted_edges": len(run.edges)}
 
     def compare(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             NeighbourComparisonOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -276,7 +274,9 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Neighbour fundamentals compared", "candidate_count": len(candidates)}
 
     def debate(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             DebateOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -291,7 +291,9 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Anchor candidate debate completed", "review_count": len(output.reviews)}
 
     def decision(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
-        output = model.generate(
+        output = _generate_model(
+            model,
+            run,
             DecisionOutput,
             system_prompt=SYSTEM_PROMPT,
             user_prompt=_prompt(
@@ -336,25 +338,29 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
 
 
 def build_anchor_executor(
-    run: ResearchRun, *, provider: str, max_attempts: int = 2
+    run: ResearchRun,
+    *,
+    provider: str | None,
+    max_attempts: int = 2,
 ) -> WorkflowExecutor:
+    selected = select_run_provider(run, provider)
     try:
         model = create_research_model(
-            provider,
+            selected,
             subject=run.subject,
             mode="anchor",
-            model=os.getenv("CAPEXGRAPH_MODEL"),
         )
+        bind_model_identity(run, model)
     except Exception as error:  # noqa: BLE001 - setup failures become durable checkpoints
-        message = f"Provider setup failed: {type(error).__name__}: {error}"
+        setup_error = provider_setup_error(error, provider=selected)
 
         def fail_setup(
             _run: ResearchRun,
             _step: PipelineStep,
             *,
-            detail: str = message,
+            detail: Exception = setup_error,
         ) -> dict[str, Any]:
-            raise RuntimeError(detail)
+            raise detail
 
         return WorkflowExecutor(
             handlers={step.key: fail_setup for step in run.pipeline},

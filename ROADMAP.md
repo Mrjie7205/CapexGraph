@@ -53,6 +53,21 @@ re-evaluation production-ready. The product sequence remains:
 Completed in `v0.3.0`; the execution record and test matrix remain in
 [`docs/V0_3_PLAN.md`](docs/V0_3_PLAN.md).
 
+## Cross-cutting model-channel isolation
+
+The active development branch now keeps three model execution channels explicit:
+
+1. `fixture` for frozen no-key demos and regression tests;
+2. `codex_subscription` for a personal loopback CLIProxyAPI bridge using the operator's
+   ChatGPT/Codex subscription boundary; and
+3. `openai` for the separately billed official OpenAI Platform API.
+
+The channels share typed research schemas but never share credentials, model settings, billing
+identity, fallback, or durable provider records. A run locks its provider and model when execution
+starts. CLI, API, Cockpit, manifests, failures, and reports expose the actual channel without
+returning secrets. The local relay is an optional adapter, not a dependency for fixtures, evidence,
+market data, official events, or the OpenAI API path.
+
 ## v0.4 — Cross-market data foundation and mainline monitoring
 
 Detailed execution order, provider boundaries, data contracts, tests, and Definition of Done are in

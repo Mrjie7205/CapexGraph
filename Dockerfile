@@ -13,7 +13,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /workspace
 COPY --from=builder /build/dist/*.whl /tmp/
-RUN python -m pip install --no-cache-dir /tmp/*.whl && rm -f /tmp/*.whl
+RUN WHEEL="$(find /tmp -name '*.whl' -print -quit)" \
+    && python -m pip install --no-cache-dir "${WHEEL}[openai]" \
+    && rm -f /tmp/*.whl
 RUN useradd --create-home --uid 10001 capexgraph && mkdir -p /workspace/runs && chown -R capexgraph:capexgraph /workspace
 USER capexgraph
 

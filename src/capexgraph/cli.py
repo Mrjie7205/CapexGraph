@@ -30,7 +30,7 @@ from capexgraph.market import (
     build_market_provider,
     provider_capabilities,
 )
-from capexgraph.providers import ProviderName
+from capexgraph.providers import ModelSettings, ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import (
@@ -64,6 +64,7 @@ app = typer.Typer(
 evidence_app = typer.Typer(help="Capture and review research evidence.", no_args_is_help=True)
 ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
 market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
+model_app = typer.Typer(help="Inspect structured model channels.", no_args_is_help=True)
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
 events_app = typer.Typer(help="Discover and inspect corporate events.", no_args_is_help=True)
 tracking_app = typer.Typer(
@@ -81,6 +82,7 @@ db_app = typer.Typer(
 app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
+app.add_typer(model_app, name="model")
 app.add_typer(financials_app, name="financials")
 app.add_typer(events_app, name="events")
 app.add_typer(tracking_app, name="tracking")
@@ -122,7 +124,8 @@ def _create(
 ) -> None:
     if mode in {RunMode.THEME, RunMode.ANCHOR} and execute and provider is None:
         raise typer.BadParameter(
-            f"{mode.value.title()} Scan execution requires --provider fixture or --provider openai"
+            f"{mode.value.title()} Scan execution requires --provider "
+            "fixture, codex_subscription, or openai"
         )
     try:
         as_of_date = date.fromisoformat(as_of) if as_of else None
@@ -139,6 +142,8 @@ def _create(
             console.print(f"[red]{error}[/red]")
             raise typer.Exit(1) from error
     _show_run(run, "CapexGraph run created")
+    if execute and run.status == RunStatus.FAILED:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -155,7 +160,10 @@ def theme(
     execute: Annotated[bool, typer.Option("--execute", "-x")] = False,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Structured research provider: fixture or openai"),
+        typer.Option(
+            "--provider",
+            help="Structured research provider: fixture, codex_subscription, or openai",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode,
@@ -174,7 +182,10 @@ def anchor(
     execute: Annotated[bool, typer.Option("--execute", "-x")] = False,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Structured research provider: fixture or openai"),
+        typer.Option(
+            "--provider",
+            help="Structured research provider: fixture, codex_subscription, or openai",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode,
@@ -231,7 +242,10 @@ def run_command(
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
+        typer.Option(
+            "--provider",
+            help="Provider selection; locked after the first execution attempt",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode | None,
@@ -266,7 +280,10 @@ def resume(
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
+        typer.Option(
+            "--provider",
+            help="Provider selection; locked after the first execution attempt",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode | None,
@@ -709,6 +726,27 @@ def market_providers() -> None:
                 capability.model_dump(mode="json")
                 for capability in provider_capabilities()
             ],
+        }
+    )
+
+
+@model_app.command("providers")
+def model_providers(
+    probe_codex: Annotated[
+        bool,
+        typer.Option(
+            "--probe-codex",
+            help="Check the configured local proxy through GET /v1/models",
+        ),
+    ] = False,
+) -> None:
+    """Show model-channel configuration without revealing secrets."""
+
+    console.print_json(
+        data={
+            "providers": ModelSettings.from_environment().provider_status(
+                probe_codex=probe_codex
+            )
         }
     )
 

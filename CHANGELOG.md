@@ -4,6 +4,14 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- added three explicit, non-fallback model channels: frozen fixtures, a local CLIProxyAPI-backed
+  Codex subscription adapter, and the separately billed official OpenAI API;
+- isolated model names and credentials per channel, enforced loopback-by-default proxy URLs,
+  retained strict Responses/Pydantic parsing, disabled nested SDK retries, and categorized
+  credential-safe provider failures;
+- locked provider and model identity after execution starts, persisted transport/billing provenance
+  plus model-call counts, and exposed redacted model readiness through CLI, API, Cockpit, and
+  portable reports;
 - started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
   source-public/system-observed timestamps, effective/expected dates, and canonical entities;
 - added append-only migration 5, semantic idempotency, immutable event versions, current/history

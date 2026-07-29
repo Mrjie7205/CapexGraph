@@ -28,7 +28,8 @@ CapexGraph `0.3.0` is an **alpha research workspace** with:
 - seven-stage Theme and Anchor Scan agent workflows;
 - typed, schema-validated outputs and code-enforced integrity checks;
 - curated no-key semiconductor-wafer and 兆易创新 golden cases;
-- an optional OpenAI Responses API provider;
+- three explicit model channels: no-key fixtures, a local Codex-subscription bridge, and the
+  separately billed OpenAI Responses API;
 - resumable foreground or background execution with SQLite checkpoints;
 - SSRF-safe HTML/PDF evidence capture, hashing, and explicit review;
 - deterministic ticker identity, no-key market snapshots, and legacy financial imports;
@@ -104,14 +105,55 @@ reproducible product demos, not current investment reports. `demo-alphabet-q2` r
 Alphabet Q2 2026 AI CapEx acceptance case; its live-capture baseline and known gaps are documented
 under `cases/alphabet_q2_2026/`.
 
-### Optional OpenAI provider
+### Model execution channels
+
+CapexGraph never treats a compatible HTTP protocol as proof that authentication or billing is the
+same. Each run explicitly selects one channel and keeps it for the lifetime of that run:
+
+| Provider | Setup | Usage boundary |
+| --- | --- | --- |
+| `fixture` | none | bundled, frozen golden cases |
+| `codex_subscription` | local CLIProxyAPI plus ChatGPT/Codex login | ChatGPT/Codex subscription pool |
+| `openai` | OpenAI Platform API key | separately billed OpenAI API |
+
+Inspect configuration without exposing credentials:
+
+```powershell
+capexgraph model providers
+capexgraph model providers --probe-codex
+```
+
+For personal local Codex-subscription execution, keep CLIProxyAPI bound to loopback, give it a
+separate local access key, and configure:
+
+```dotenv
+CAPEXGRAPH_CODEX_BASE_URL=http://127.0.0.1:8317/v1
+CAPEXGRAPH_CODEX_PROXY_KEY=your-local-proxy-key
+CAPEXGRAPH_CODEX_MODEL=the-model-slug-exposed-by-your-proxy
+```
+
+Then run:
+
+```powershell
+capexgraph theme "AI数据中心电力" --provider codex_subscription --execute
+```
+
+CapexGraph talks only to the proxy's Responses-compatible endpoint. It does not read or persist
+ChatGPT OAuth files. Remote proxy URLs are rejected unless
+`CAPEXGRAPH_ALLOW_REMOTE_CODEX_PROXY=1` is explicitly set. A proxy, authentication, quota, or
+schema failure is persisted on the selected run and never falls back to the OpenAI API or fixture.
+
+For the separately billed official OpenAI API channel:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pip install -e ".[dev,openai]"
 $env:OPENAI_API_KEY = "..."
-$env:CAPEXGRAPH_MODEL = "your-structured-output-capable-model"
+$env:CAPEXGRAPH_OPENAI_MODEL = "your-structured-output-capable-model"
 .\.venv\Scripts\python.exe -m capexgraph.cli theme "AI数据中心电力" --provider openai --execute
 ```
+
+`CAPEXGRAPH_MODEL` remains a legacy OpenAI-only fallback. It is never reused by the Codex
+subscription channel.
 
 Model-proposed sources remain `low` confidence until the source is captured, hash-verified, and
 explicitly reviewed. The model cannot promote an unreviewed claim by wording it confidently.
@@ -160,10 +202,11 @@ EODHD without a token fails clearly instead of silently changing providers.
 ```
 
 Open `http://127.0.0.1:5173`. Creating a workspace, discovering/capturing/reviewing sources, and
-extracting SEC facts do not require a model key. OpenAI-backed research execution does require its
-API key and model configuration. The Cockpit can run one durable stage at a time, run all remaining
-stages, retry a failed checkpoint, inspect coverage and provider failures, render the real graph,
-open the portable report, and manage forward tracking.
+extracting SEC facts do not require a model key. The Cockpit shows all three model channels and
+their credential-safe readiness state. Codex subscription execution requires the local bridge;
+OpenAI execution requires its separately billed API key. The Cockpit can run one durable stage at
+a time, run all remaining stages, retry a failed checkpoint, inspect coverage and provider
+failures, render the real graph, open the portable report, and manage forward tracking.
 
 ## Research artifact contract
 
@@ -207,7 +250,9 @@ See [the upgrade guide](docs/UPGRADING.md) before restoring or moving a workspac
 
 ```powershell
 # Research
+capexgraph model providers --probe-codex
 capexgraph theme "AI数据中心电力" --market CN --provider openai
+capexgraph theme "AI数据中心电力" --market CN --provider codex_subscription
 capexgraph sources add <run-id> <url> --title "Issuer filing"
 capexgraph sources capture <run-id> <suggestion-id>
 capexgraph evidence review <run-id> <evidence-id>
@@ -274,6 +319,7 @@ GET  /api/v1/runs/{id}/financials
 POST /api/v1/runs/{id}/events/discover
 POST /api/v1/runs/{id}/events/refresh
 GET  /api/v1/runs/{id}/events
+GET  /api/v1/model/providers
 GET  /api/v1/market/providers
 POST /api/v1/market/sync
 POST /api/v1/runs/{id}/market
@@ -294,6 +340,9 @@ docker compose up --build
 ```
 
 This starts the API on `http://127.0.0.1:8000` and persists the SQLite workspace in a named volume.
+The local Codex bridge is a native-local default. A container can reach a deliberately exposed
+host bridge only through an explicit `host.docker.internal` configuration and the remote-proxy
+opt-in; CapexGraph never changes that network boundary silently.
 
 ## Design principles
 

@@ -8,7 +8,7 @@ if (-not (Test-Path -LiteralPath ".venv\Scripts\python.exe")) {
 }
 
 & ".venv\Scripts\python.exe" -m pip install --upgrade pip
-& ".venv\Scripts\python.exe" -m pip install -e ".[dev]"
+& ".venv\Scripts\python.exe" -m pip install -e ".[dev,openai]"
 
 Push-Location "apps\web"
 try {

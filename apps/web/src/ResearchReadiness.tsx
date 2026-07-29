@@ -92,9 +92,14 @@ export function ResearchReadiness({
     run?.manifest.model_provider_details ?? {
       name: run?.manifest.model_provider,
       model: run?.manifest.model,
-      version: "legacy",
+      version: "selected",
     },
   );
+  const executionContext =
+    run?.manifest.model_execution_context &&
+    typeof run.manifest.model_execution_context === "object"
+      ? (run.manifest.model_execution_context as Record<string, unknown>)
+      : {};
   const sourceFailures = [
     ...(Array.isArray(run?.manifest.source_discovery_errors)
       ? run.manifest.source_discovery_errors
@@ -133,6 +138,10 @@ export function ResearchReadiness({
               <strong>{modelProvider}</strong>
               <p>
                 Research date {run.as_of_date} · {String(run.manifest.evidence_policy ?? "policy pending")}
+              </p>
+              <p>
+                {String(executionContext.transport ?? "transport pending")} ·{" "}
+                {String(executionContext.billing_mode ?? "billing pending")}
               </p>
               <a href={reportUrl(run.id)} target="_blank" rel="noreferrer">
                 Open current report ↗

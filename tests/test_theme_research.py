@@ -24,6 +24,10 @@ def test_golden_theme_scan_produces_auditable_artifacts(tmp_path, monkeypatch) -
     assert completed.status == RunStatus.NEEDS_REVIEW
     assert completed.manifest["model_provider"] == "fixture"
     assert completed.manifest["evidence_policy"] == "curated"
+    assert completed.manifest["model_provider_locked"] is True
+    assert completed.manifest["model_usage"]["calls"] == 7
+    assert completed.manifest["model_provider_details"]["transport"] == "bundled_fixture"
+    assert completed.manifest["model_provider_details"]["billing_mode"] == "none"
     assert len(completed.nodes) == 6
     assert len(completed.edges) == 4
     assert len(completed.evidence) == 4

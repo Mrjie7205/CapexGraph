@@ -12,6 +12,12 @@ substantial change, and update it in the same pull request whenever shipped capa
 
 ## Implemented on the v0.5 development branch
 
+- three isolated model-execution channels: no-key fixtures, a loopback CLIProxyAPI
+  `codex_subscription` adapter using the ChatGPT/Codex subscription boundary, and the separately
+  billed official OpenAI API adapter;
+- per-channel model configuration, strict Responses/Pydantic output, provider/model locking after
+  execution starts, typed retry policy, credential-safe provider status in CLI/API/Cockpit, and
+  manifest/report transport plus billing provenance without silent fallback;
 - typed `CorporateEventVersion`, event taxonomy, lifecycle state, canonical entity, official source,
   effective/expected dates, `known_at`, and `observed_at`;
 - append-only migration 5 and an idempotent event store with current, full-history, filter, and
@@ -133,8 +139,12 @@ Future code or documentation changes must pass the same remote release gate agai
 - Catalyst Scan is only a scaffold. It has no research schemas, handlers, audit, golden fixture, or
   live execution path.
 - Creating a workspace, collecting/reviewing sources, replaying fixtures, and extracting SEC facts
-  need no model key. A real OpenAI agent execution still requires `OPENAI_API_KEY` and
-  `CAPEXGRAPH_MODEL`.
+  need no model key. Live execution explicitly selects either a local
+  `codex_subscription` bridge with its own proxy key/model or the separately billed OpenAI API with
+  `OPENAI_API_KEY` and `CAPEXGRAPH_OPENAI_MODEL`; neither channel falls back to the other.
+- The CLIProxyAPI adapter is source-contract and mock-transport verified. A real subscription call
+  still requires the operator to install, authenticate, and run the third-party local proxy; this
+  checkout does not bundle it or claim an official OpenAI support contract for that relay.
 - CapexGraph does not autonomously browse the broad Web. Official discovery currently covers
   SEC/EDGAR plus user-supplied official URLs.
 - Automatic filing facts currently cover a bounded US-GAAP metric set through SEC Company Facts.

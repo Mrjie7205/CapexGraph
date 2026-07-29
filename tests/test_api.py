@@ -41,6 +41,31 @@ async def test_market_provider_status_redacts_credentials(monkeypatch) -> None:
 
 
 @pytest.mark.anyio
+async def test_model_provider_status_redacts_both_credentials(monkeypatch) -> None:
+    openai_key = "official-api-secret"
+    proxy_key = "local-proxy-secret"
+    monkeypatch.setenv("OPENAI_API_KEY", openai_key)
+    monkeypatch.setenv("CAPEXGRAPH_OPENAI_MODEL", "openai-model")
+    monkeypatch.setenv("CAPEXGRAPH_CODEX_PROXY_KEY", proxy_key)
+    monkeypatch.setenv("CAPEXGRAPH_CODEX_MODEL", "codex-model")
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/v1/model/providers")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["name"] for item in payload["providers"]] == [
+        "fixture",
+        "codex_subscription",
+        "openai",
+    ]
+    assert openai_key not in response.text
+    assert proxy_key not in response.text
+
+
+@pytest.mark.anyio
 async def test_create_theme_run(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
     async with AsyncClient(
@@ -84,6 +109,34 @@ async def test_create_only_strict_workspace_and_read_coverage(tmp_path, monkeypa
         assert coverage.status_code == 200
         assert coverage.json()["status"] == "empty"
         assert coverage.json()["strict_ready"] is False
+
+
+@pytest.mark.anyio
+async def test_create_codex_subscription_workspace_needs_no_platform_key(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.post(
+            "/api/v1/runs/theme",
+            json={
+                "subject": "Memory supply chain",
+                "market": "CN",
+                "provider": "codex_subscription",
+                "execute": False,
+            },
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "created"
+    assert payload["manifest"]["model_provider"] == "codex_subscription"
+    assert payload["manifest"].get("model_provider_locked") is not True
 
 
 @pytest.mark.anyio
@@ -143,6 +196,38 @@ async def test_execute_and_resume_endpoints(tmp_path, monkeypatch) -> None:
         checkpoints = await client.get(f"/api/v1/runs/{created['id']}/checkpoints")
         assert checkpoints.status_code == 200
         assert len(checkpoints.json()) == len(resumed.json()["pipeline"])
+
+
+@pytest.mark.anyio
+async def test_started_run_rejects_model_provider_switch(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        created = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={
+                    "subject": "A股半导体硅片",
+                    "market": "CN",
+                    "provider": "fixture",
+                },
+            )
+        ).json()
+        started = await client.post(
+            f"/api/v1/runs/{created['id']}/execute",
+            json={"provider": "fixture", "until": "intake", "max_attempts": 1},
+        )
+        assert started.status_code == 200
+
+        switched = await client.post(
+            f"/api/v1/runs/{created['id']}/resume",
+            json={"provider": "codex_subscription", "max_attempts": 1},
+        )
+
+    assert switched.status_code == 409
+    assert "locked to model provider fixture" in switched.json()["detail"]
 
 
 @pytest.mark.anyio
@@ -253,3 +338,4 @@ async def test_tracking_and_report_endpoints(tmp_path, monkeypatch) -> None:
         report = await client.get(f"/api/v1/runs/{run['id']}/report")
         assert report.status_code == 200
         assert "CapexGraph" in report.text
+        assert "bundled_fixture" in report.text
