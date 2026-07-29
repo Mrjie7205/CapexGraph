@@ -5,6 +5,7 @@ from collections.abc import Sequence
 
 import httpx
 
+from capexgraph.config import load_project_env
 from capexgraph.domain import (
     EvidenceKind,
     ResearchRun,
@@ -30,7 +31,7 @@ class SecEdgarSourceProvider:
     """Discover recent official SEC filing documents through EDGAR submissions."""
 
     provider_name = "sec-edgar-submissions"
-    provider_version = "1"
+    provider_version = "2"
 
     def __init__(
         self,
@@ -38,6 +39,7 @@ class SecEdgarSourceProvider:
         client: httpx.Client | None = None,
         user_agent: str | None = None,
     ) -> None:
+        load_project_env()
         self.client = client or httpx.Client(timeout=30)
         self.user_agent = (
             user_agent or os.getenv("CAPEXGRAPH_SEC_USER_AGENT") or DEFAULT_SEC_USER_AGENT
@@ -52,7 +54,7 @@ class SecEdgarSourceProvider:
                 "Accept": "application/json",
             },
         )
-        response.raise_for_status()
+        raise_for_sec_status(response)
         payload = response.json()
         if not isinstance(payload, dict):
             raise ValueError("SEC returned an unexpected JSON payload")
@@ -104,6 +106,11 @@ class SecEdgarSourceProvider:
         filing_dates = recent.get("filingDate", [])
         report_dates = recent.get("reportDate", [])
         primary_documents = recent.get("primaryDocument", [])
+        acceptance_datetimes = recent.get("acceptanceDateTime", [])
+        items = recent.get("items", [])
+        is_xbrl = recent.get("isXBRL", [])
+        is_inline_xbrl = recent.get("isInlineXBRL", [])
+        primary_descriptions = recent.get("primaryDocDescription", [])
         count = min(
             len(accessions),
             len(form_values),
@@ -147,11 +154,34 @@ class SecEdgarSourceProvider:
                     "form": form,
                     "filing_date": filing_date,
                     "report_date": str(report_dates[index]),
+                    "acceptance_datetime": _sequence_value(acceptance_datetimes, index),
                     "accession": accession,
                     "primary_document": primary_document,
+                    "primary_document_description": _sequence_value(
+                        primary_descriptions,
+                        index,
+                    ),
+                    "items": _sequence_value(items, index),
+                    "is_xbrl": _sequence_value(is_xbrl, index),
+                    "is_inline_xbrl": _sequence_value(is_inline_xbrl, index),
                 },
             )
             suggestions.append(suggestion)
             if len(suggestions) >= max(1, min(limit, 100)):
                 break
         return suggestions
+
+
+def _sequence_value(values, index: int):
+    if not isinstance(values, list) or index >= len(values):
+        return None
+    return values[index]
+
+
+def raise_for_sec_status(response: httpx.Response) -> None:
+    if response.status_code == 403:
+        raise RuntimeError(
+            "SEC returned HTTP 403. Set CAPEXGRAPH_SEC_USER_AGENT in .env to identify "
+            "the application and include a real contact address."
+        )
+    response.raise_for_status()

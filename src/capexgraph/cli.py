@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import date
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Annotated
 
@@ -12,7 +12,17 @@ from rich.panel import Panel
 from rich.table import Table
 
 from capexgraph import __version__
-from capexgraph.domain import EvidenceKind, EvidenceMode, ResearchRun, RunMode, RunStatus
+from capexgraph.domain import (
+    CorporateEventStatus,
+    CorporateEventType,
+    CorporateEventVersion,
+    EvidenceKind,
+    EvidenceMode,
+    ResearchRun,
+    RunMode,
+    RunStatus,
+)
+from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
 from capexgraph.market import (
     MarketDataService,
@@ -55,6 +65,7 @@ evidence_app = typer.Typer(help="Capture and review research evidence.", no_args
 ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
 market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
+events_app = typer.Typer(help="Discover and inspect corporate events.", no_args_is_help=True)
 tracking_app = typer.Typer(
     help="Track candidates and evaluate forward evidence.", no_args_is_help=True
 )
@@ -71,6 +82,7 @@ app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
 app.add_typer(financials_app, name="financials")
+app.add_typer(events_app, name="events")
 app.add_typer(tracking_app, name="tracking")
 app.add_typer(report_app, name="report")
 app.add_typer(sources_app, name="sources")
@@ -402,6 +414,45 @@ def _show_source_suggestions(items) -> None:
     console.print(table)
 
 
+def _show_events(items: list[CorporateEventVersion]) -> None:
+    table = Table(title="CapexGraph corporate event calendar")
+    table.add_column("Date")
+    table.add_column("Ticker")
+    table.add_column("Type")
+    table.add_column("State")
+    table.add_column("Version")
+    table.add_column("Title")
+    table.add_column("Evidence")
+    for item in items:
+        event_date = (
+            item.effective_date
+            or item.expected_date
+            or item.occurred_date
+            or item.announced_date
+        )
+        table.add_row(
+            event_date.isoformat() if event_date else "unknown",
+            item.ticker or item.entity_id,
+            item.event_type.value,
+            item.status.value,
+            str(item.version),
+            item.title,
+            item.evidence_id or "suggestion",
+        )
+    console.print(table)
+
+
+def _event_as_of(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    if len(value) == 10:
+        return datetime.combine(date.fromisoformat(value), time.max, UTC)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("--as-of must include a timezone")
+    return parsed
+
+
 @sources_app.command("discover")
 def sources_discover(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
@@ -427,6 +478,87 @@ def sources_discover(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_source_suggestions(items)
+
+
+@events_app.command("sync")
+def events_sync(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    identifier: Annotated[
+        str | None,
+        typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
+    ] = None,
+    form: Annotated[
+        list[str] | None,
+        typer.Option("--form", help="SEC form to include; repeat for multiple forms"),
+    ] = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
+) -> None:
+    """Discover official SEC filings and append event-calendar versions."""
+    try:
+        items = EventCalendarService().discover_sec_filings(
+            run_id,
+            identifier=identifier,
+            forms=form or (),
+            limit=limit,
+        )
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_events(items)
+
+
+@events_app.command("refresh")
+def events_refresh(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+) -> None:
+    """Rebuild event versions from the run's durable source queue."""
+    try:
+        items = EventCalendarService().refresh_from_sources(run_id)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_events(items)
+
+
+@events_app.command("list")
+def events_list(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    history: Annotated[
+        bool,
+        typer.Option("--history", help="Show every immutable version"),
+    ] = False,
+    as_of: Annotated[
+        str | None,
+        typer.Option("--as-of", help="System-observed cutoff date or ISO datetime"),
+    ] = None,
+    ticker: Annotated[str | None, typer.Option("--ticker")] = None,
+    event_type: Annotated[
+        CorporateEventType | None,
+        typer.Option("--type"),
+    ] = None,
+    status: Annotated[
+        CorporateEventStatus | None,
+        typer.Option("--status"),
+    ] = None,
+    date_from: Annotated[str | None, typer.Option("--from")] = None,
+    date_to: Annotated[str | None, typer.Option("--to")] = None,
+) -> None:
+    """Inspect latest events or the append-only version history."""
+    try:
+        items = EventCalendarService().list(
+            run_id,
+            as_of=_event_as_of(as_of),
+            latest_only=not history,
+            ticker=ticker.upper() if ticker else None,
+            event_type=event_type,
+            status=status,
+            date_from=date.fromisoformat(date_from) if date_from else None,
+            date_to=date.fromisoformat(date_to) if date_to else None,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_events(items)
 
 
 @sources_app.command("add")

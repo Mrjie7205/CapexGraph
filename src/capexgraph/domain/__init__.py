@@ -3,6 +3,9 @@
 from capexgraph.domain.models import (
     Candidate,
     Confidence,
+    CorporateEventStatus,
+    CorporateEventType,
+    CorporateEventVersion,
     CoverageLevel,
     DataQualityIssue,
     DataQualityResult,
@@ -41,6 +44,9 @@ from capexgraph.domain.models import (
 __all__ = [
     "Candidate",
     "Confidence",
+    "CorporateEventStatus",
+    "CorporateEventType",
+    "CorporateEventVersion",
     "CoverageLevel",
     "DataQualityIssue",
     "DataQualityResult",

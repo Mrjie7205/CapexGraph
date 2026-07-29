@@ -6,6 +6,7 @@ import re
 from importlib.resources import files
 from pathlib import Path
 
+from capexgraph.config import load_project_env
 from capexgraph.domain import TickerIdentity
 
 
@@ -54,6 +55,7 @@ class TickerResolver:
     """Resolve canonical ticker identities without letting a model invent company names."""
 
     def __init__(self, extra_registry: Path | None = None) -> None:
+        load_project_env()
         bundled = files("capexgraph.fixtures").joinpath("ticker_registry.csv")
         identities = _read_registry(Path(str(bundled)))
         configured = extra_registry or (

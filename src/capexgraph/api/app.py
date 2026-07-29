@@ -1,5 +1,5 @@
 import json
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated
 
 import httpx
@@ -10,6 +10,9 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
 from capexgraph.domain import (
+    CorporateEventStatus,
+    CorporateEventType,
+    CorporateEventVersion,
     Evidence,
     EvidenceKind,
     EvidenceMode,
@@ -26,6 +29,7 @@ from capexgraph.domain import (
     StepCheckpoint,
     TickerIdentity,
 )
+from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
 from capexgraph.market import (
     MarketDataService,
@@ -346,6 +350,73 @@ def discover_run_sources(
             identifier=request.identifier,
             forms=request.forms,
             limit=request.limit,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/events/discover",
+    response_model=list[CorporateEventVersion],
+)
+def discover_run_events(
+    run_id: str,
+    request: SourceDiscoverRequest,
+) -> list[CorporateEventVersion]:
+    try:
+        return EventCalendarService().discover_sec_filings(
+            run_id,
+            identifier=request.identifier,
+            forms=request.forms,
+            limit=request.limit,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError, httpx.HTTPError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/events/refresh",
+    response_model=list[CorporateEventVersion],
+)
+def refresh_run_events(run_id: str) -> list[CorporateEventVersion]:
+    try:
+        return EventCalendarService().refresh_from_sources(run_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/runs/{run_id}/events",
+    response_model=list[CorporateEventVersion],
+)
+def list_run_events(
+    run_id: str,
+    history: Annotated[bool, Query()] = False,
+    as_of: Annotated[datetime | None, Query()] = None,
+    ticker: Annotated[str | None, Query()] = None,
+    event_type: Annotated[CorporateEventType | None, Query(alias="type")] = None,
+    status: Annotated[CorporateEventStatus | None, Query()] = None,
+    date_from: Annotated[date | None, Query(alias="from")] = None,
+    date_to: Annotated[date | None, Query(alias="to")] = None,
+) -> list[CorporateEventVersion]:
+    try:
+        if as_of is not None and as_of.tzinfo is None:
+            raise ValueError("as_of must include a timezone")
+        return EventCalendarService().list(
+            run_id,
+            as_of=as_of,
+            latest_only=not history,
+            ticker=ticker.upper() if ticker else None,
+            event_type=event_type,
+            status=status,
+            date_from=date_from,
+            date_to=date_to,
         )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error

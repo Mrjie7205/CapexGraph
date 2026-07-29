@@ -239,6 +239,51 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=5,
+        name="versioned_corporate_event_calendar",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS corporate_event_versions (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                event_key TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                version_hash TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                ticker TEXT,
+                market TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                announced_date TEXT,
+                expected_date TEXT,
+                effective_date TEXT,
+                known_at TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                source_suggestion_id TEXT,
+                evidence_id TEXT,
+                payload TEXT NOT NULL,
+                UNIQUE (run_id, event_key, version),
+                UNIQUE (run_id, event_key, version_hash),
+                FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_corporate_events_run_known
+            ON corporate_event_versions(run_id, known_at, observed_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_corporate_events_ticker_effective
+            ON corporate_event_versions(ticker, effective_date DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_corporate_events_type_status
+            ON corporate_event_versions(event_type, status)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

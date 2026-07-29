@@ -4,6 +4,19 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
+  source-public/system-observed timestamps, effective/expected dates, and canonical entities;
+- added append-only migration 5, semantic idempotency, immutable event versions, current/history
+  views, and point-in-time queries;
+- upgraded SEC submission discovery with acceptance timestamps, item metadata, and XBRL flags;
+- mapped SEC periodic reports conservatively into financial-report events and other forms into
+  regulatory-filing events without inferring document contents;
+- linked successful guarded source capture by appending a new evidence-backed event version, and
+  exposed the calendar through CLI, API, run manifests, and portable `events.json`;
+- kept successful evidence capture authoritative if the downstream event projection fails, while
+  recording a durable event-calendar error for explicit refresh;
+- centralized repository `.env` loading across SEC, market, model, and ticker adapters, and made
+  SEC 403 failures explain the required real-contact User-Agent configuration;
 - started the v0.4 market-data foundation with provider-neutral bar, capability, quality, and sync
   contracts;
 - added a credential-safe EODHD daily-history adapter for US, Shanghai, Shenzhen, KRX, and KOSDAQ,

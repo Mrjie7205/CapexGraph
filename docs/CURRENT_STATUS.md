@@ -2,11 +2,48 @@
 
 - Last verified: 2026-07-29
 - Release: `v0.3.0` — Trustworthy live research
-- Next target: `v0.4` — cross-market data foundation and mainline monitoring
-- Active development branch: `codex/v0-4-data-foundation`
+- Active target: `v0.5` — official disclosure events, by explicit user priority
+- Incomplete dependency: `v0.4` — cross-market data foundation and mainline monitoring; the market
+  slice exists, while theme/mainline automation remains open
+- Active development branch: `codex/v0-5-official-events`
 
 This is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
+
+## Implemented on the v0.5 development branch
+
+- typed `CorporateEventVersion`, event taxonomy, lifecycle state, canonical entity, official source,
+  effective/expected dates, `known_at`, and `observed_at`;
+- append-only migration 5 and an idempotent event store with current, full-history, filter, and
+  system point-in-time queries;
+- SEC Submissions metadata upgraded with acceptance timestamp, item, and XBRL fields;
+- conservative SEC mapping: periodic reports become `financial_report`; other forms remain
+  `regulatory_filing` without guessing their business meaning;
+- durable SourceSuggestion-to-event mapping, followed by a new evidence-linked event version when
+  guarded source capture succeeds; a projection failure cannot erase a successful capture and is
+  recorded for `events refresh` recovery;
+- `events.json`, run-manifest coverage, and CLI/API discover, refresh, current, history, and
+  `as_of` paths; and
+- one shared project `.env` loader for market, SEC, model, and ticker configuration, with an
+  actionable SEC 403 error that asks for a real contact address rather than bypassing access rules.
+
+This is the first US official-source vertical, not a v0.5 release. CNINFO/SSE/SZSE/BSE, OpenDART,
+KIND/KRX, issuer calendars, cross-market fact taxonomy, event-triggered re-evaluation, and the
+Cockpit event view remain open. The detailed boundary is in `docs/V0_5_PLAN.md`.
+
+## Verified for the current v0.5 slice
+
+- 78 Python tests pass and Ruff passes;
+- the React/Vite production build passes;
+- a clean isolated wheel build succeeds and contains `capexgraph.events` plus the shared
+  configuration loader;
+- fresh and legacy migration tests reach schema version 5 without rewriting prior run, checkpoint,
+  source, financial-fact, market, or tracking records;
+- frozen SEC tests cover acceptance timestamps, conservative form classification, idempotent
+  discovery, capture-to-Evidence versioning, point-in-time history, CLI, API, and artifacts; and
+- the official SEC schema was probed successfully with an identifying test User-Agent. A real
+  project event sync is intentionally left blocked until the operator supplies
+  `CAPEXGRAPH_SEC_USER_AGENT` with a real contact address; the repository does not invent one.
 
 ## Implemented on the v0.4 development branch
 
@@ -27,7 +64,7 @@ This is an M0/M1 vertical slice, not a v0.4 release. Frozen cross-provider compa
 exchange-calendar/corporate-action checks, an A-share specialist validation adapter, M2 historical
 theme membership, M3 mainline policy, M4 scheduling, and M5 Cockpit work remain open.
 
-## Verified for the current v0.4 slice
+## Verified for the v0.4 foundation commit
 
 - 69 Python tests pass and Ruff passes;
 - the React/Vite production build passes;
@@ -116,6 +153,8 @@ Future code or documentation changes must pass the same remote release gate agai
 - ETF/index/vendor membership is planned as market-recognition evidence, not proof of industrial
   exposure or supplier/customer relationships.
 - Monitoring remains manually invoked. Scheduling and automatic re-evaluation belong to v0.4.
+- SEC filing metadata can now populate an event calendar, but content-level event extraction,
+  issuer calendars, and CN/KR official sources are not implemented.
 - The application is local-first and single-user. Cloud authentication and team permissions are not
   implemented.
 - A running model call is not cancelled mid-stage. The Cockpit can execute one stage and pause at
@@ -123,14 +162,19 @@ Future code or documentation changes must pass the same remote release gate agai
 
 ## Start here next
 
-Continue v0.4 from [the execution plan](V0_4_PLAN.md), in this order:
+Continue v0.5 from [the execution plan](V0_5_PLAN.md):
 
-1. finish M1 frozen US/CN/KR/KOSDAQ comparisons, calendar/corporate-action checks, and one A-share
-   enhancement/validation path;
-2. add point-in-time theme definitions, memberships, and CN/US/KR historical imports;
-3. implement deterministic theme metrics and an explicitly approved, versioned mainline policy;
-4. add scheduled jobs, durable state changes, and linked re-evaluation; and
-5. expose the completed path in the Cockpit and perform v0.4 release validation.
+1. configure a real SEC contact User-Agent for optional live smoke, then add historical submission
+   files and backfill;
+2. add CNINFO plus Shanghai/Shenzhen/Beijing official announcement discovery;
+3. add OpenDART and KIND/KRX official disclosure paths;
+4. normalize cross-market filing facts and evidence-linked event extraction; and
+5. connect events to monitoring proposals and the Cockpit without fabricating the unfinished v0.4
+   mainline policy.
 
-Cross-market official disclosures/events are v0.5, consensus revisions are v0.6, and Catalyst Scan
-is now v0.7. Do not begin them merely because an enum, data vendor, or endpoint exists.
+The remaining v0.4 work stays recorded in [its execution plan](V0_4_PLAN.md) and must be resumed
+before CapexGraph can claim automated daily mainline monitoring.
+
+Cross-market official disclosures/events are the explicit active v0.5 target. Consensus revisions
+remain v0.6 and Catalyst Scan remains v0.7; do not start those later milestones merely because an
+enum, data vendor, or endpoint exists.

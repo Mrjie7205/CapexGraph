@@ -72,6 +72,29 @@ class DataQualityStatus(StrEnum):
     FAIL = "fail"
 
 
+class CorporateEventType(StrEnum):
+    REGULATORY_FILING = "regulatory_filing"
+    FINANCIAL_REPORT = "financial_report"
+    EARNINGS = "earnings"
+    GUIDANCE = "guidance"
+    DIVIDEND = "dividend"
+    SPLIT = "split"
+    INDEX_CHANGE = "index_change"
+    LOCKUP_EXPIRY = "lockup_expiry"
+    INVESTOR_DAY = "investor_day"
+    CAPEX_MILESTONE = "capex_milestone"
+    PRODUCTION_MILESTONE = "production_milestone"
+    OTHER = "other"
+
+
+class CorporateEventStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    ANNOUNCED = "announced"
+    REVISED = "revised"
+    OCCURRED = "occurred"
+    CANCELLED = "cancelled"
+
+
 class QualitySeverity(StrEnum):
     WARNING = "warning"
     ERROR = "error"
@@ -228,6 +251,70 @@ class MarketSyncResult(BaseModel):
     quality: DataQualityResult
     persisted_bars: int = Field(ge=0)
     raw_path: str | None = None
+
+
+class CorporateEventVersion(BaseModel):
+    id: str = Field(min_length=1)
+    event_key: str = Field(min_length=1)
+    version: int = Field(ge=1)
+    version_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    run_id: str = Field(min_length=1)
+    entity_id: str = Field(min_length=1)
+    ticker: str | None = None
+    entity_name: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    event_type: CorporateEventType
+    status: CorporateEventStatus
+    title: str = Field(min_length=1)
+    description: str = ""
+    announced_date: date | None = None
+    expected_date: date | None = None
+    effective_date: date | None = None
+    occurred_date: date | None = None
+    cancelled_date: date | None = None
+    known_at: datetime
+    observed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    source_suggestion_id: str | None = None
+    evidence_id: str | None = None
+    source_url: HttpUrl
+    source_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    external_id: str = Field(min_length=1)
+    revision_reason: str = Field(min_length=1)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_event_timeline(self) -> CorporateEventVersion:
+        if self.known_at.tzinfo is None or self.observed_at.tzinfo is None:
+            raise ValueError("event known_at and observed_at must be timezone-aware")
+        self.known_at = self.known_at.astimezone(UTC)
+        self.observed_at = self.observed_at.astimezone(UTC)
+        if self.known_at > self.observed_at:
+            raise ValueError("event cannot be observed before its source was public")
+        if not any(
+            (
+                self.announced_date,
+                self.expected_date,
+                self.effective_date,
+                self.occurred_date,
+                self.cancelled_date,
+            )
+        ):
+            raise ValueError("event requires an announced, expected, effective, or occurred date")
+        if not self.source_suggestion_id and not self.evidence_id:
+            raise ValueError("event requires a source suggestion or captured evidence")
+        if self.status == CorporateEventStatus.SCHEDULED and self.expected_date is None:
+            raise ValueError("scheduled events require expected_date")
+        if (
+            self.status == CorporateEventStatus.OCCURRED
+            and self.occurred_date is None
+            and self.effective_date is None
+        ):
+            raise ValueError("occurred events require occurred_date or effective_date")
+        if self.status == CorporateEventStatus.CANCELLED and self.cancelled_date is None:
+            raise ValueError("cancelled events require cancelled_date")
+        return self
 
 
 class MarketSnapshot(BaseModel):

@@ -117,10 +117,50 @@ Automatic extraction currently supports SEC Company Facts only. A-share exchange
 non-US taxonomies require a future provider adapter.
 
 SEC asks automated clients to send an identifying User-Agent. Configure
-`CAPEXGRAPH_SEC_USER_AGENT` with your application/name and a real contact address. A 403 or network
-block is persisted as a provider failure and shown in the Cockpit; CapexGraph does not bypass the
-regulator's access controls. Exact CIK input bypasses only the separate remote ticker-registry
-lookup, not the Company Facts endpoint itself.
+`CAPEXGRAPH_SEC_USER_AGENT` in the repository-local `.env` with your application/name and a real
+contact address; the SEC adapters load it automatically. A 403 or network block is persisted as a
+provider failure and shown in the Cockpit; CapexGraph does not bypass the regulator's access
+controls. Exact CIK input bypasses only the separate remote ticker-registry lookup, not the Company
+Facts endpoint itself.
+
+## Official filing event calendar
+
+The v0.5 development path can turn SEC filing metadata into an append-only calendar without
+pretending the filing title proves a specific business event:
+
+```powershell
+capexgraph events sync <run-id> --identifier GOOGL --form 10-Q --form 8-K
+capexgraph events list <run-id>
+```
+
+The sync writes the same official documents into the source-suggestion queue and maps periodic
+reports to `financial_report`; other forms remain `regulatory_filing`. At this point the event
+references a suggestion, not captured Evidence.
+
+Capture the source through the existing guarded path:
+
+```powershell
+capexgraph sources capture <run-id> <suggestion-id>
+capexgraph events list <run-id> --history
+```
+
+Successful capture appends a second event version with `evidence_id` and source hash. The original
+discovery version remains queryable. Current and historical views are available through:
+
+```powershell
+capexgraph events list <run-id>
+capexgraph events list <run-id> --history
+capexgraph events list <run-id> --as-of 2026-07-23
+capexgraph events list <run-id> --type financial_report
+```
+
+`known_at` is the SEC acceptance timestamp when available. `observed_at` is when CapexGraph found or
+captured the record. `--as-of` applies the system-observed cutoff so a later backfill cannot alter
+what an earlier run knew.
+
+SEC discovery currently covers recent compact submission history only. Older submission files,
+issuer calendars, content-level event extraction, China official announcements, and Korean
+OpenDART/KIND sources remain v0.5 work.
 
 ## Evidence modes and execution
 

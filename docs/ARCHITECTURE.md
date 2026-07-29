@@ -58,6 +58,24 @@ capture creates `Evidence(status=captured)`; explicit human approval is still re
 same queue and are labeled issuer/regulator only when their domains match deterministic policy.
 Canonical URLs and content hashes are deduplicated independently.
 
+### Corporate event calendar
+
+`CorporateEventVersion` is the durable v0.5 event contract. It separates the source-public
+`known_at` timestamp from CapexGraph's `observed_at` timestamp and preserves announced, expected,
+effective, occurred, and cancelled dates independently. All datetimes are timezone-aware UTC.
+
+Event versions are append-only in SQLite migration 5. A semantic hash makes identical discovery
+idempotent; a source revision, lifecycle change, or new Evidence link appends a version under the
+same stable `event_key`. Current views select the latest version available by the requested system
+observation cutoff. A document backfilled today therefore cannot appear in what an earlier run
+actually knew.
+
+The first mapper consumes SEC source suggestions. Periodic-report forms are labeled
+`financial_report`; other forms stay `regulatory_filing` until captured content supports a more
+specific event. Discovery remains separate from Evidence. When guarded capture succeeds, the event
+calendar appends an evidence-linked version rather than upgrading the discovery row in place.
+`events.json` is the portable current/history projection; the database remains authoritative.
+
 Before live research, a deterministic context builder measures evidence coverage, verifies captured
 hashes, loads bounded extracted source text, and loads bounded financial facts. The same context is
 added to every Theme and Anchor prompt. Partial mode allows explicit gaps and downgrades unsupported
@@ -106,9 +124,13 @@ The in-development schema version 4 adds normalized cross-market daily bars and 
 idempotent quality reports. It does not rewrite v0.3 run, checkpoint, tracking, source, or financial-fact
 records.
 
+Schema version 5 adds append-only corporate event versions. It is additive and does not rewrite
+market bars, financial facts, source suggestions, tracking history, or run payloads.
+
 ### Applications
 
-- FastAPI exposes runs, evidence review, artifacts, market sync/status, tracking, and HTML reports.
+- FastAPI exposes runs, evidence review, official events, artifacts, market sync/status, tracking,
+  and HTML reports.
 - React/Vite provides the live Research Cockpit and stage board.
 - CLI supports local, batch, tracking, and portable-report workflows.
 

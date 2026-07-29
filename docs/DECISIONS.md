@@ -169,3 +169,20 @@ The approved release order is:
 Scheduling an unvalidated Yahoo-only, present-day-universe workflow is not treated as progress.
 Mainline taxonomy and thresholds require a separate explicit product decision before they become
 the default policy.
+
+## D016 — v0.5 starts as an isolated official-event foundation
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+The user explicitly advanced development to v0.5 while v0.4 point-in-time theme membership,
+mainline policy, scheduling, and Cockpit work remain incomplete. v0.5 may therefore implement
+official-disclosure and event-calendar contracts, persistence, and standalone user paths in
+parallel, but it cannot claim the missing v0.4 monitoring loop or silently couple events to an
+unapproved mainline policy.
+
+Corporate event history is append-only. `known_at` records when the official source made information
+public; `observed_at` records when CapexGraph actually ingested it. Historical system queries use
+`observed_at`, so a document backfilled today cannot appear in what an earlier run knew. Discovery
+metadata remains a `SourceSuggestion`; only guarded capture creates Evidence, and linking that
+Evidence appends a new event version instead of rewriting the discovery version.

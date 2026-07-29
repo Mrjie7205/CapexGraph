@@ -13,6 +13,7 @@ def test_cross_session_handoff_files_exist() -> None:
     required = [
         "AGENTS.md",
         "ROADMAP.md",
+        "docs/V0_5_PLAN.md",
         "docs/V0_4_PLAN.md",
         "docs/V0_3_PLAN.md",
         "docs/PROJECT_CONTEXT.md",
@@ -38,6 +39,7 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     theme_doc = (ROOT / "docs/THEME_SCAN.md").read_text(encoding="utf-8")
     v03_plan = (ROOT / "docs/V0_3_PLAN.md").read_text(encoding="utf-8")
     v04_plan = (ROOT / "docs/V0_4_PLAN.md").read_text(encoding="utf-8")
+    v05_plan = (ROOT / "docs/V0_5_PLAN.md").read_text(encoding="utf-8")
     market_data = (ROOT / "docs/MARKET_DATA.md").read_text(encoding="utf-8")
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8")
 
@@ -51,6 +53,17 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     assert all(term in v04_plan for term in ("EODHD", "recognition_score", "exposure_score"))
     assert "Catalyst Scan" in v04_plan and "v0.7" in v04_plan
     assert "cross-market data foundation and mainline monitoring" in status
+    assert all(
+        term in v05_plan
+        for term in (
+            "CorporateEventVersion",
+            "known_at",
+            "observed_at",
+            "CNINFO",
+            "OpenDART",
+        )
+    )
+    assert "v0.5" in status and "official disclosure events" in status
     assert all(
         term in market_data
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")

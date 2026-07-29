@@ -49,6 +49,24 @@ CapexGraph `0.3.0` is an **alpha research workspace** with:
 It produces research priorities for human review. It does not produce autonomous investment
 recommendations or execute trades.
 
+## v0.5 development preview
+
+The active v0.5 branch adds the first official-disclosure event-calendar vertical:
+
+- immutable `CorporateEventVersion` records with canonical entity, event type, lifecycle state,
+  official/public time, system-observed time, effective/expected dates, and source lineage;
+- SEC EDGAR filing discovery mapped conservatively into financial-report or regulatory-filing
+  events;
+- idempotent discovery plus a new version when guarded capture links the filing to Evidence;
+- current, full-history, date/type/state, and point-in-time event queries;
+- migration 5, `events.json`, run-manifest summaries, CLI, and API paths; and
+- repository-local `.env` loading across SEC, market, model, and ticker adapters, with
+  credential-safe configuration errors.
+
+This is a US-first foundation. It does not yet include CNINFO/SSE/SZSE/BSE, OpenDART/KIND, issuer
+calendars, filing-content event extraction, or event-triggered automated re-evaluation. See
+[the v0.5 execution plan](docs/V0_5_PLAN.md).
+
 ## v0.4 development preview
 
 The active v0.4 branch now contains the first market-data foundation slice:
@@ -100,6 +118,20 @@ explicitly reviewed. The model cannot promote an unreviewed claim by wording it 
 Use `--evidence-mode strict` to block execution until a reviewed, unchanged capture exists; the
 default `partial` mode may continue but preserves unsupported relationships at low confidence.
 
+### SEC disclosure access (no API key)
+
+SEC EDGAR metadata and Company Facts do not require an API key, but SEC requires automated clients
+to identify the application and provide a real contact address. Put that identity in the
+repository-local `.env`:
+
+```dotenv
+CAPEXGRAPH_SEC_USER_AGENT=CapexGraph research Your Name your-real-email@example.com
+```
+
+CapexGraph loads this file automatically for event discovery and filing facts. If SEC returns 403,
+the command stops with a configuration instruction; it does not bypass the regulator's access
+controls. Frozen demos and tests remain available without network access or credentials.
+
 ### Optional EODHD market provider
 
 Keep the token only in the repository-local `.env` file:
@@ -148,6 +180,7 @@ financials.json     source-linked comparison for Anchor Scan
 financials/facts.json versioned filing-derived facts and source locators
 financials/summary.json latest available facts and explicit missing metrics
 market/<ticker>.json normalized bars, quality result, and snapshot
+events.json         current corporate events and immutable version history
 candidates.json     verdicts, risks, invalidation, triggers
 decision.json       final structured decision
 report.html         self-contained portable research report
@@ -198,6 +231,13 @@ capexgraph market providers
 capexgraph market sync 688019.SH AAPL 000660.KO --days 730
 capexgraph market snapshot <run-id> 603986 --provider eodhd
 
+# Official disclosure events
+capexgraph events sync <run-id> --identifier GOOGL --form 10-Q --form 8-K
+capexgraph events list <run-id>
+capexgraph sources capture <run-id> <suggestion-id>
+capexgraph events list <run-id> --history
+capexgraph events list <run-id> --as-of 2026-07-23
+
 # Forward tracking and reports
 capexgraph tracking add <run-id> <node-id> --market-provider eodhd
 capexgraph tracking snapshot <tracked-id> --live --market-provider eodhd
@@ -231,6 +271,9 @@ GET  /api/v1/runs/{id}/sources
 POST /api/v1/runs/{id}/sources/{suggestion-id}/capture
 POST /api/v1/runs/{id}/financials/extract
 GET  /api/v1/runs/{id}/financials
+POST /api/v1/runs/{id}/events/discover
+POST /api/v1/runs/{id}/events/refresh
+GET  /api/v1/runs/{id}/events
 GET  /api/v1/market/providers
 POST /api/v1/market/sync
 POST /api/v1/runs/{id}/market

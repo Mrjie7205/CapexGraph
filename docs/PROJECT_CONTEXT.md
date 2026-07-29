@@ -51,6 +51,8 @@ The same durable run is available through:
 - **Candidate** — thesis, risks, invalidation, triggers, verdict, confidence.
 - **MarketBarSet / quality result** — provider-specific daily history with explicit price semantics,
   provenance, and deterministic acceptance state.
+- **CorporateEventVersion** — immutable official-event observation with lifecycle, point-in-time
+  availability, canonical entity, and source/Evidence lineage.
 - **Tracking record** — original call and benchmark baseline, later snapshots, alpha, events, stage.
 
 Runs are inspectable assets, not disposable prompt transcripts. JSON artifacts provide portability;

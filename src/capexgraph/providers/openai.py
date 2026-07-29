@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from capexgraph.config import load_project_env
 from capexgraph.providers.base import EvidencePolicy, StructuredOutput
 
 
@@ -20,6 +21,7 @@ class OpenAIResearchModel:
         api_key: str | None = None,
         client: Any | None = None,
     ) -> None:
+        load_project_env()
         self.model_name = (model or os.getenv("CAPEXGRAPH_MODEL", "")).strip()
         if not self.model_name:
             raise ValueError("Set CAPEXGRAPH_MODEL when using the OpenAI provider")

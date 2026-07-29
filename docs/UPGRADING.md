@@ -33,6 +33,15 @@ rewriting v0.3 run, checkpoint, tracking, source-suggestion, or financial-fact r
 provider responses remain files under the ignored runtime directory; they are not embedded into the
 portable database migration.
 
+The v0.5 event foundation adds version 5:
+
+5. append-only `corporate_event_versions` with stable event keys, semantic version hashes,
+   source/system timestamps, lifecycle state, and source/Evidence references.
+
+Version 5 is additive and safe for startup. It does not rewrite earlier event knowledge because no
+event table existed before it, and it does not modify runs, source suggestions, financial facts,
+market bars, or tracking history.
+
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
 to run `capexgraph db upgrade`.

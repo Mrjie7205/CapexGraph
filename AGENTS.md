@@ -17,13 +17,14 @@ Read these files in order:
 
 1. `docs/CURRENT_STATUS.md` — what is actually shipped and what is not;
 2. `ROADMAP.md` — the next approved priorities and acceptance criteria;
-3. `docs/V0_4_PLAN.md` — active execution order, provider boundaries, and acceptance matrix;
-4. `docs/V0_3_PLAN.md` — completed v0.3 execution record;
-5. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
-6. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
-7. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
-8. the workflow-specific document under `docs/`; and
-9. `CONTRIBUTING.md` — validation and documentation contract.
+3. `docs/V0_5_PLAN.md` — active official-disclosure and event-calendar execution order;
+4. `docs/V0_4_PLAN.md` — incomplete market/theme/mainline dependency plan;
+5. `docs/V0_3_PLAN.md` — completed v0.3 execution record;
+6. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
+7. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
+8. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
+9. the workflow-specific document under `docs/`; and
+10. `CONTRIBUTING.md` — validation and documentation contract.
 
 When documentation and code disagree, verify the implementation and tests, fix the documentation
 in the same change, and record material design changes in `docs/DECISIONS.md`.
@@ -61,6 +62,7 @@ src/capexgraph/research/     Theme and Anchor agent workflows
 src/capexgraph/providers/    fixture and optional model adapters
 src/capexgraph/financials/   immutable filing facts and persistence
 src/capexgraph/market/       daily providers, quality gates, sync, persistence
+src/capexgraph/events/       official event mapping, versions, point-in-time calendar
 src/capexgraph/tools/        evidence, identity, market, financial tools
 src/capexgraph/tracking/     snapshots, triggers, scorecards, stages
 src/capexgraph/api/          FastAPI application
@@ -74,9 +76,9 @@ advertise it as shipped until its roadmap acceptance criteria and tests are comp
 
 ## Working method
 
-1. Start from an active item in `ROADMAP.md` or a scoped user request. v0.3 is complete; the next
-   approved product target is v0.4 cross-market data foundations and mainline monitoring. Follow
-   the M0→M5 order in `docs/V0_4_PLAN.md`.
+1. Start from an active item in `ROADMAP.md` or a scoped user request. The user explicitly advanced
+   active development to the isolated v0.5 event foundation. Follow `docs/V0_5_PLAN.md` without
+   claiming the paused v0.4 theme/mainline work is complete.
 2. Inspect the actual code path and tests before proposing architecture.
 3. State any assumption that changes evidence semantics, provider trust, or repository boundaries.
 4. Implement the smallest end-to-end vertical slice with durable artifacts and failure states.

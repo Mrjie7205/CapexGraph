@@ -240,6 +240,23 @@ class SourceDiscoveryService:
             suggestion.error = ""
             saved = self.store.save(suggestion)
             self._write_queue_artifact(run_id)
+            from capexgraph.events import EventCalendarService
+
+            try:
+                EventCalendarService(source_store=self.store).ingest_suggestions(
+                    run_id,
+                    [saved],
+                )
+            except Exception as event_error:
+                refreshed_run = self._run(run_id)
+                refreshed_run.manifest.setdefault("event_calendar_errors", []).append(
+                    {
+                        "suggestion_id": saved.id,
+                        "error": f"{type(event_error).__name__}: {event_error}",
+                        "observed_at": _now().isoformat(),
+                    }
+                )
+                save_run(refreshed_run)
             return saved
         except Exception as error:
             suggestion.status = SourceSuggestionStatus.CAPTURE_FAILED

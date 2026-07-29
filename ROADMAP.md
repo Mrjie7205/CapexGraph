@@ -16,9 +16,10 @@ which must also update `docs/DECISIONS.md` and `docs/CURRENT_STATUS.md`.
   Cockpit path; and
 - preserved no-key fixtures, resumable runs, tracking, scorecards, and reports.
 
-The immediate priority is v0.4 cross-market data foundations, point-in-time theme universes, and
-mainline monitoring. Reliable scheduled re-evaluation depends on those inputs; it is not useful to
-schedule the current Yahoo-only, present-day-universe path more often. The approved sequence is:
+The user has explicitly advanced active development to the isolated v0.5 official-event foundation
+after the first v0.4 market-data slice. Point-in-time theme universes and mainline monitoring remain
+incomplete dependencies; starting event contracts does not waive them or make automatic
+re-evaluation production-ready. The product sequence remains:
 
 1. market history and historical theme membership;
 2. official disclosures, filing facts, and event calendars;
@@ -102,6 +103,9 @@ Detailed execution order, provider boundaries, data contracts, tests, and Defini
   observations, and why a theme changed state.
 
 ## v0.5 — Cross-market disclosures, filing facts, and event calendar
+
+Detailed implementation order and the current SEC-first boundary are in
+[`docs/V0_5_PLAN.md`](docs/V0_5_PLAN.md).
 
 ### Goals
 
@@ -212,9 +216,13 @@ execution queue.
 2. Completed in v0.3 — [#5 official-source discovery and evidence review queue](https://github.com/Mrjie7205/CapexGraph/issues/5)
 3. Completed in v0.3 — [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6)
 4. Completed in v0.3 — [#7 filing-derived financial facts with evidence lineage](https://github.com/Mrjie7205/CapexGraph/issues/7)
-5. In progress P0 — v0.4 M0/M1: the first EODHD/quality/persistence vertical slice is implemented;
+5. Completed slice — v0.4 M0/M1: the first EODHD/quality/persistence vertical slice is implemented;
    frozen comparisons, exchange/corporate-action checks, and an A-share validation adapter remain.
-6. Next P0 — v0.4 M2: point-in-time theme registry and historical membership ingestion.
-7. Pending P1 — v0.4 M3: deterministic theme metrics and versioned mainline policy.
-8. Pending P1 — v0.4 M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
-9. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).
+6. Completed first slice — v0.5 M0 and the initial M1 SEC vertical: append-only event contracts,
+   official filing discovery, Evidence-linked versions, point-in-time queries, CLI/API, and
+   artifacts pass the local release gate; SEC history backfill and a contact-identified live smoke
+   remain.
+7. Paused dependency P0 — v0.4 M2: point-in-time theme registry and historical membership.
+8. Paused dependency P1 — v0.4 M3/M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
+9. Next v0.5 P0 — CNINFO/SSE/SZSE/BSE, then OpenDART/KIND official disclosure adapters.
+10. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).

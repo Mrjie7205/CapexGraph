@@ -47,6 +47,10 @@ def _sec_transport(*, filings: bool = True) -> httpx.MockTransport:
                     "form": ["10-Q", "8-K"],
                     "filingDate": ["2026-07-23", "2026-07-22"],
                     "reportDate": ["2026-06-30", "2026-06-30"],
+                    "acceptanceDateTime": [
+                        "2026-07-23T20:01:02.000Z",
+                        "2026-07-22T20:03:04.000Z",
+                    ],
                     "primaryDocument": ["goog-20260630.htm", "goog-20260722.htm"],
                 }
                 if filings
@@ -55,6 +59,7 @@ def _sec_transport(*, filings: bool = True) -> httpx.MockTransport:
                     "form": [],
                     "filingDate": [],
                     "reportDate": [],
+                    "acceptanceDateTime": [],
                     "primaryDocument": [],
                 }
             )
@@ -87,12 +92,13 @@ def test_sec_discovery_creates_suggestions_not_evidence(tmp_path, monkeypatch) -
     ]
     assert all(item.authority == SourceAuthority.REGULATOR for item in items)
     assert items[0].metadata["form"] == "10-Q"
+    assert items[0].metadata["acceptance_datetime"] == "2026-07-23T20:01:02.000Z"
     assert "/Archives/edgar/data/1652044/" in str(items[0].url)
     refreshed = load_run(run.id)
     assert refreshed is not None
     assert refreshed.evidence == []
     assert refreshed.manifest["source_discovery_providers"] == [
-        {"name": "sec-edgar-submissions", "version": "1"}
+        {"name": "sec-edgar-submissions", "version": "2"}
     ]
     assert (tmp_path / run.id / "sources.json").is_file()
 
@@ -122,6 +128,51 @@ def test_sec_discovery_empty_and_provider_failure(tmp_path, monkeypatch) -> None
     assert refreshed.manifest["source_discovery_errors"][-1]["provider"] == (
         "sec-edgar-submissions"
     )
+
+
+def test_sec_provider_loads_project_env_without_overriding_process_env(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "CAPEXGRAPH_SEC_USER_AGENT=CapexGraph env env@example.com\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CAPEXGRAPH_ENV_FILE", str(env_path))
+    monkeypatch.delenv("CAPEXGRAPH_SEC_USER_AGENT", raising=False)
+
+    loaded = SecEdgarSourceProvider(client=httpx.Client())
+    assert loaded.user_agent == "CapexGraph env env@example.com"
+
+    monkeypatch.setenv(
+        "CAPEXGRAPH_SEC_USER_AGENT",
+        "CapexGraph process process@example.com",
+    )
+    preserved = SecEdgarSourceProvider(client=httpx.Client())
+    assert preserved.user_agent == "CapexGraph process process@example.com"
+
+
+def test_sec_403_explains_required_user_agent_configuration(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    provider = SecEdgarSourceProvider(
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(403, request=request)
+            )
+        ),
+        user_agent="CapexGraph incomplete",
+    )
+    run = create_run(RunMode.THEME, "Alphabet", "US")
+
+    with pytest.raises(
+        RuntimeError,
+        match=r"CAPEXGRAPH_SEC_USER_AGENT.*real contact address",
+    ):
+        provider.discover(run, identifier="1652044")
 
 
 def test_manual_url_classification_and_canonical_deduplication(tmp_path, monkeypatch) -> None:
