@@ -120,3 +120,52 @@ system of record. Every `FinancialFact` preserves period, unit, concept, filing 
 ID, and source locator. Restatements append a new value instead of overwriting history; missing is
 null rather than zero; derived values declare formula and input fact IDs. Deterministic code, not an
 agent, owns these validations.
+
+## D013 — Market providers are complementary and quality-gated
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+EODHD is the optional cross-market daily provider for US, Shanghai/Shenzhen, KRX, and
+KOSDAQ. It does not automatically replace a China-specialist provider: Tushare or another licensed
+A-share adapter may remain primary or act as the semantic/quality reference for adjusted prices,
+suspensions, limits, and local fields. Yahoo remains an explicit no-key fallback and demo path,
+not a silent production default. Provider selection is configuration-driven; a missing EODHD token
+is an explicit error rather than permission to change sources.
+
+Raw OHLC, adjusted return price, volume adjustment, corporate actions, exchange, currency, source
+version, and retrieval time must remain distinguishable. Every market default is gated by a frozen
+independent comparison suite. Provider keys stay local, and licensed raw data is never committed
+or redistributed through the public repository.
+
+## D014 — Theme recognition and industrial exposure are separate axes
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+An index constituent, ETF holding, ETF creation basket, or vendor concept member is evidence of
+market classification/recognition. It is not by itself evidence that the company has material
+industrial exposure, nor that a supplier/customer relationship exists. Evidence-reviewed filings
+and supply-chain relationships populate industrial exposure separately.
+
+Theme membership is point-in-time and preserves both when a membership was effective and when the
+system could have known it. CapexGraph must be able to surface high-exposure/low-recognition
+companies; absence from an ETF cannot exclude a bottleneck lead.
+
+## D015 — Data foundations precede broader automation
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+The approved release order is:
+
+1. v0.4 cross-market daily history, point-in-time theme universes, deterministic theme metrics,
+   versioned mainline policy, scheduling, and linked re-evaluation;
+2. v0.5 official CN/US/KR disclosures, filing facts, and event calendars;
+3. v0.6 point-in-time consensus revisions and expectation-aware regime analysis;
+4. v0.7 Catalyst Scan and cross-run graph memory; and
+5. v0.8 Cockpit productization.
+
+Scheduling an unvalidated Yahoo-only, present-day-universe workflow is not treated as progress.
+Mainline taxonomy and thresholds require a separate explicit product decision before they become
+the default policy.

@@ -58,6 +58,25 @@ class EvidenceMode(StrEnum):
     STRICT = "strict"
 
 
+class CoverageLevel(StrEnum):
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    FORWARD_ONLY = "forward_only"
+    BLOCKED = "blocked"
+    UNSUPPORTED = "unsupported"
+
+
+class DataQualityStatus(StrEnum):
+    PASS = "pass"
+    WARN = "warn"
+    FAIL = "fail"
+
+
+class QualitySeverity(StrEnum):
+    WARNING = "warning"
+    ERROR = "error"
+
+
 class SourceSuggestionStatus(StrEnum):
     SUGGESTED = "suggested"
     SELECTED = "selected"
@@ -146,7 +165,69 @@ class MarketBar(BaseModel):
     high: float
     low: float
     close: float
+    adjusted_close: float | None = None
     volume: float | None = None
+
+    @property
+    def return_close(self) -> float:
+        """Price series used for total-return comparisons."""
+
+        return self.adjusted_close if self.adjusted_close is not None else self.close
+
+
+class ProviderCapability(BaseModel):
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    markets: list[str] = Field(default_factory=list)
+    exchanges: list[str] = Field(default_factory=list)
+    history: CoverageLevel
+    adjusted_close: bool
+    corporate_actions: CoverageLevel
+    delisted_securities: CoverageLevel
+    rate_limit: str = ""
+    license: str = Field(min_length=1)
+    notes: list[str] = Field(default_factory=list)
+
+
+class DataQualityIssue(BaseModel):
+    code: str = Field(min_length=1)
+    severity: QualitySeverity
+    message: str = Field(min_length=1)
+    dates: list[date] = Field(default_factory=list)
+
+
+class DataQualityResult(BaseModel):
+    status: DataQualityStatus
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    bar_count: int = Field(ge=0)
+    first_date: date | None = None
+    latest_date: date | None = None
+    issues: list[DataQualityIssue] = Field(default_factory=list)
+
+    @property
+    def blocks_persistence(self) -> bool:
+        return self.status == DataQualityStatus.FAIL
+
+
+class MarketBarSet(BaseModel):
+    ticker: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    exchange: str = Field(min_length=2)
+    currency: str = Field(min_length=3, max_length=3)
+    timezone: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    fetched_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    source_url: HttpUrl | None = None
+    raw_hash: str = Field(min_length=64, max_length=64)
+    bars: list[MarketBar]
+
+
+class MarketSyncResult(BaseModel):
+    bar_set: MarketBarSet
+    quality: DataQualityResult
+    persisted_bars: int = Field(ge=0)
+    raw_path: str | None = None
 
 
 class MarketSnapshot(BaseModel):
@@ -161,6 +242,8 @@ class MarketSnapshot(BaseModel):
     pct_off_6mo_high: float | None = None
     above_sma50: bool | None = None
     stage: str = "unknown"
+    price_basis: str = "raw_close"
+    return_basis: str = "adjusted_close_with_raw_fallback"
     source_url: HttpUrl | None = None
 
 

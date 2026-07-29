@@ -24,6 +24,15 @@ The v0.3.0 schema reaches version 3:
 All three are additive and safe for startup. The legacy-upgrade test verifies that the original
 run, checkpoint, tracked candidate, snapshot, and trigger-event counts remain unchanged.
 
+The in-development v0.4 schema adds version 4:
+
+4. normalized daily `market_bars` and hashed `market_quality_reports`.
+
+It is also additive and safe for startup. Upgrading creates the two tables and indexes without
+rewriting v0.3 run, checkpoint, tracking, source-suggestion, or financial-fact records. Licensed raw
+provider responses remain files under the ignored runtime directory; they are not embedded into the
+portable database migration.
+
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
 to run `capexgraph db upgrade`.

@@ -189,6 +189,56 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=4,
+        name="cross_market_daily_history",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS market_bars (
+                ticker TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                trade_date TEXT NOT NULL,
+                market TEXT NOT NULL,
+                exchange TEXT NOT NULL,
+                currency TEXT NOT NULL,
+                timezone TEXT NOT NULL,
+                open REAL NOT NULL,
+                high REAL NOT NULL,
+                low REAL NOT NULL,
+                close REAL NOT NULL,
+                adjusted_close REAL,
+                volume REAL,
+                raw_hash TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                PRIMARY KEY (ticker, provider, trade_date)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_market_bars_ticker_date
+            ON market_bars(ticker, trade_date DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS market_quality_reports (
+                ticker TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                raw_hash TEXT NOT NULL,
+                checked_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                first_date TEXT,
+                latest_date TEXT,
+                bar_count INTEGER NOT NULL,
+                source_url TEXT,
+                provider_version TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                PRIMARY KEY (ticker, provider, raw_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_market_quality_ticker_checked
+            ON market_quality_reports(ticker, checked_at DESC)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

@@ -49,6 +49,24 @@ CapexGraph `0.3.0` is an **alpha research workspace** with:
 It produces research priorities for human review. It does not produce autonomous investment
 recommendations or execute trades.
 
+## v0.4 development preview
+
+The active v0.4 branch now contains the first market-data foundation slice:
+
+- provider-neutral daily-history contracts with explicit exchange, currency, timezone, raw close,
+  adjusted close, provider version, retrieval time, and source hash;
+- optional EODHD history for US, Shanghai, Shenzhen, KRX, and KOSDAQ, with Beijing Stock Exchange
+  reported as unsupported rather than returning an empty success;
+- the existing Yahoo adapter as an explicit no-key fallback;
+- deterministic checks for ordering, duplicates, OHLC validity, negative volume, adjusted-close
+  validity, future dates, and staleness;
+- idempotent SQLite bar storage and quality reports through schema migration 4; and
+- CLI, API, run-snapshot, and forward-tracking integration.
+
+Point-in-time theme membership, theme metrics, mainline policy, scheduling, and Cockpit views are
+still pending. See [the v0.4 execution plan](docs/V0_4_PLAN.md) and
+[market-data guide](docs/MARKET_DATA.md).
+
 ## Quick start
 
 ```powershell
@@ -82,6 +100,27 @@ explicitly reviewed. The model cannot promote an unreviewed claim by wording it 
 Use `--evidence-mode strict` to block execution until a reviewed, unchanged capture exists; the
 default `partial` mode may continue but preserves unsupported relationships at low confidence.
 
+### Optional EODHD market provider
+
+Keep the token only in the repository-local `.env` file:
+
+```dotenv
+EODHD_API_TOKEN=your-token
+CAPEXGRAPH_MARKET_PROVIDER=eodhd
+```
+
+Then inspect public provider status and synchronize daily history:
+
+```powershell
+capexgraph market providers
+capexgraph market sync 688019.SH AAPL 000660.KO --days 730
+capexgraph market snapshot <run-id> 688019.SH
+```
+
+The token is read only by the Python backend. It is not returned by the API, written to manifests,
+or embedded in source URLs. To use the no-key path explicitly, pass `--provider yahoo`; selecting
+EODHD without a token fails clearly instead of silently changing providers.
+
 ### Web Cockpit
 
 ```powershell
@@ -108,6 +147,7 @@ sources.json        persistent discovery/capture queue
 financials.json     source-linked comparison for Anchor Scan
 financials/facts.json versioned filing-derived facts and source locators
 financials/summary.json latest available facts and explicit missing metrics
+market/<ticker>.json normalized bars, quality result, and snapshot
 candidates.json     verdicts, risks, invalidation, triggers
 decision.json       final structured decision
 report.html         self-contained portable research report
@@ -154,11 +194,13 @@ capexgraph evidence collect <run-id> <url> --id filing-1 --title "Filing"
 capexgraph evidence review <run-id> filing-1
 capexgraph financials extract <run-id> --identifier GOOGL
 capexgraph financials list <run-id>
-capexgraph market snapshot <run-id> 603986
+capexgraph market providers
+capexgraph market sync 688019.SH AAPL 000660.KO --days 730
+capexgraph market snapshot <run-id> 603986 --provider eodhd
 
 # Forward tracking and reports
-capexgraph tracking add <run-id> <node-id>
-capexgraph tracking snapshot <tracked-id> --live
+capexgraph tracking add <run-id> <node-id> --market-provider eodhd
+capexgraph tracking snapshot <tracked-id> --live --market-provider eodhd
 capexgraph tracking list
 capexgraph report render <run-id>
 
@@ -189,6 +231,9 @@ GET  /api/v1/runs/{id}/sources
 POST /api/v1/runs/{id}/sources/{suggestion-id}/capture
 POST /api/v1/runs/{id}/financials/extract
 GET  /api/v1/runs/{id}/financials
+GET  /api/v1/market/providers
+POST /api/v1/market/sync
+POST /api/v1/runs/{id}/market
 POST /api/v1/runs/{id}/tracking
 GET  /api/v1/tracking
 POST /api/v1/tracking/{id}/snapshots
@@ -219,6 +264,7 @@ New contributors and coding agents should start with [AGENTS.md](AGENTS.md),
 [current status](docs/CURRENT_STATUS.md), and the [roadmap](ROADMAP.md).
 
 See [project context](docs/PROJECT_CONTEXT.md), [accepted decisions](docs/DECISIONS.md),
+[v0.4 execution plan](docs/V0_4_PLAN.md),
 [Theme Scan](docs/THEME_SCAN.md), [Anchor Scan](docs/ANCHOR_SCAN.md),
 [live research tools](docs/LIVE_RESEARCH.md), [forward tracking](docs/MONITORING.md),
 [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).

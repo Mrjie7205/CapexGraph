@@ -14,6 +14,12 @@ from rich.table import Table
 from capexgraph import __version__
 from capexgraph.domain import EvidenceKind, EvidenceMode, ResearchRun, RunMode, RunStatus
 from capexgraph.financials import FinancialFactService
+from capexgraph.market import (
+    MarketDataService,
+    MarketSettings,
+    build_market_provider,
+    provider_capabilities,
+)
 from capexgraph.providers import ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
@@ -521,14 +527,58 @@ def ticker_resolve(query: Annotated[str, typer.Argument(help="Ticker, name, or a
 def market_snapshot(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
     ticker: Annotated[str, typer.Argument(help="Ticker or registered company name")],
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
+    days: Annotated[int, typer.Option("--days", min=1, max=20000)] = 400,
 ) -> None:
-    """Fetch adjusted daily history and attach a market snapshot to a run."""
+    """Fetch quality-checked daily history and attach a snapshot to a run."""
     try:
-        snapshot = capture_market_snapshot(run_id, ticker)
+        snapshot = capture_market_snapshot(
+            run_id,
+            ticker,
+            provider=build_market_provider(provider),
+            days=days,
+        )
     except (KeyError, ValueError, RuntimeError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print_json(data=snapshot.model_dump(mode="json"))
+
+
+@market_app.command("sync")
+def market_sync(
+    tickers: Annotated[list[str], typer.Argument(help="One or more canonical tickers")],
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
+    days: Annotated[int, typer.Option("--days", min=1, max=20000)] = 400,
+) -> None:
+    """Incrementally sync normalized bars and persist their quality report."""
+    try:
+        service = MarketDataService(provider=build_market_provider(provider))
+        results = service.sync_many(tickers, days=days)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=[item.model_dump(mode="json") for item in results])
+
+
+@market_app.command("providers")
+def market_providers() -> None:
+    """Show provider coverage and credential presence without revealing secrets."""
+    settings = MarketSettings.from_environment()
+    console.print_json(
+        data={
+            "configuration": settings.public_status(),
+            "capabilities": [
+                capability.model_dump(mode="json")
+                for capability in provider_capabilities()
+            ],
+        }
+    )
 
 
 @financials_app.command("import")
@@ -601,6 +651,10 @@ def tracking_add(
     ] = None,
     as_of: Annotated[str | None, typer.Option("--as-of")] = None,
     no_live: Annotated[bool, typer.Option("--no-live")] = False,
+    market_provider: Annotated[
+        str | None,
+        typer.Option("--market-provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
 ) -> None:
     """Add one run candidate to forward tracking."""
     try:
@@ -611,6 +665,7 @@ def tracking_add(
             call_date=date.fromisoformat(as_of) if as_of else None,
             call_price=price,
             call_benchmark_price=benchmark_price,
+            provider=build_market_provider(market_provider) if not no_live else None,
             capture_live=not no_live,
         )
     except (KeyError, ValueError, RuntimeError) as error:
@@ -628,12 +683,19 @@ def tracking_snapshot(
     ] = None,
     as_of: Annotated[str | None, typer.Option("--as-of")] = None,
     live: Annotated[bool, typer.Option("--live")] = False,
+    market_provider: Annotated[
+        str | None,
+        typer.Option("--market-provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
 ) -> None:
     """Capture a live or manual candidate/benchmark price pair."""
     service = TrackingService()
     try:
         if live:
-            snapshot = service.capture_live_snapshot(tracked_id)
+            snapshot = service.capture_live_snapshot(
+                tracked_id,
+                provider=build_market_provider(market_provider),
+            )
         else:
             if price is None or benchmark_price is None:
                 raise ValueError("Manual snapshot requires --price and --benchmark-price")

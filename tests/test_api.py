@@ -21,6 +21,26 @@ async def test_health() -> None:
 
 
 @pytest.mark.anyio
+async def test_market_provider_status_redacts_credentials(monkeypatch) -> None:
+    token = "api-test-token-that-must-not-be-returned"
+    monkeypatch.setenv("CAPEXGRAPH_MARKET_PROVIDER", "eodhd")
+    monkeypatch.setenv("EODHD_API_TOKEN", token)
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        response = await client.get("/api/v1/market/providers")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["configuration"] == {
+        "configured_provider": "eodhd",
+        "eodhd_token_configured": True,
+    }
+    assert token not in response.text
+
+
+@pytest.mark.anyio
 async def test_create_theme_run(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
     async with AsyncClient(

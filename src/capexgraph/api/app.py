@@ -16,6 +16,8 @@ from capexgraph.domain import (
     FinancialFact,
     FinancialMetric,
     MarketSnapshot,
+    MarketSyncResult,
+    ProviderCapability,
     ResearchRun,
     RunMode,
     RunStatus,
@@ -25,6 +27,12 @@ from capexgraph.domain import (
     TickerIdentity,
 )
 from capexgraph.financials import FinancialFactService
+from capexgraph.market import (
+    MarketDataService,
+    MarketSettings,
+    build_market_provider,
+    provider_capabilities,
+)
 from capexgraph.providers import ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
@@ -118,6 +126,14 @@ class SourceSuggestRequest(BaseModel):
 
 class MarketCaptureRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=80)
+    provider: str | None = Field(default=None, pattern=r"^(eodhd|yahoo|yahoo-chart)$")
+    days: int = Field(default=400, ge=1, le=20000)
+
+
+class MarketSyncRequest(BaseModel):
+    tickers: list[str] = Field(min_length=1, max_length=500)
+    provider: str | None = Field(default=None, pattern=r"^(eodhd|yahoo|yahoo-chart)$")
+    days: int = Field(default=400, ge=1, le=20000)
 
 
 class FinancialMetricsRequest(BaseModel):
@@ -135,6 +151,10 @@ class TrackCandidateRequest(BaseModel):
     call_price: float | None = Field(default=None, gt=0)
     call_benchmark_price: float | None = Field(default=None, gt=0)
     capture_live: bool = True
+    market_provider: str | None = Field(
+        default=None,
+        pattern=r"^(eodhd|yahoo|yahoo-chart)$",
+    )
 
 
 class TrackingSnapshotRequest(BaseModel):
@@ -142,6 +162,10 @@ class TrackingSnapshotRequest(BaseModel):
     price: float | None = Field(default=None, gt=0)
     benchmark_price: float | None = Field(default=None, gt=0)
     capture_live: bool = False
+    market_provider: str | None = Field(
+        default=None,
+        pattern=r"^(eodhd|yahoo|yahoo-chart)$",
+    )
 
 
 class TrackingStageRequest(BaseModel):
@@ -404,7 +428,35 @@ def dismiss_run_source(run_id: str, suggestion_id: str) -> SourceSuggestion:
 @app.post("/api/v1/runs/{run_id}/market", response_model=MarketSnapshot)
 def capture_run_market(run_id: str, request: MarketCaptureRequest) -> MarketSnapshot:
     try:
-        return capture_market_snapshot(run_id, request.ticker)
+        return capture_market_snapshot(
+            run_id,
+            request.ticker,
+            provider=build_market_provider(request.provider),
+            days=request.days,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/market/providers")
+def market_provider_status() -> dict[str, object]:
+    settings = MarketSettings.from_environment()
+    capabilities: list[ProviderCapability] = provider_capabilities()
+    return {
+        "configuration": settings.public_status(),
+        "capabilities": [
+            capability.model_dump(mode="json") for capability in capabilities
+        ],
+    }
+
+
+@app.post("/api/v1/market/sync", response_model=list[MarketSyncResult])
+def sync_market_history(request: MarketSyncRequest) -> list[MarketSyncResult]:
+    try:
+        service = MarketDataService(provider=build_market_provider(request.provider))
+        return service.sync_many(request.tickers, days=request.days)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (ValueError, RuntimeError) as error:
@@ -463,6 +515,11 @@ def track_run_candidate(run_id: str, request: TrackCandidateRequest) -> TrackedC
             call_date=request.call_date,
             call_price=request.call_price,
             call_benchmark_price=request.call_benchmark_price,
+            provider=(
+                build_market_provider(request.market_provider)
+                if request.capture_live
+                else None
+            ),
             capture_live=request.capture_live,
         )
     except KeyError as error:
@@ -497,7 +554,10 @@ def add_tracking_snapshot(
     service = TrackingService()
     try:
         if request.capture_live:
-            return service.capture_live_snapshot(tracked_id)
+            return service.capture_live_snapshot(
+                tracked_id,
+                provider=build_market_provider(request.market_provider),
+            )
         if request.price is None or request.benchmark_price is None:
             raise ValueError("Manual snapshots require price and benchmark_price")
         return service.add_snapshot(

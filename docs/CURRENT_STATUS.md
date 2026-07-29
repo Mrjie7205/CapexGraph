@@ -1,11 +1,44 @@
 # Current status
 
-- Last verified: 2026-07-27
+- Last verified: 2026-07-29
 - Release: `v0.3.0` — Trustworthy live research
-- Next target: `v0.4` — continuous monitoring and re-evaluation
+- Next target: `v0.4` — cross-market data foundation and mainline monitoring
+- Active development branch: `codex/v0-4-data-foundation`
 
 This is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
+
+## Implemented on the v0.4 development branch
+
+- provider-neutral `MarketBarSet`, capability, quality-result, and sync-result contracts;
+- separate raw OHLC and adjusted close semantics, with raw prices used for displayed price/SMA/range
+  and adjusted close used for returns;
+- explicit EODHD mappings for US, Shanghai, Shenzhen, KRX, and KOSDAQ plus a clear unsupported
+  Beijing Stock Exchange result;
+- credential-safe EODHD retries/errors/source URLs and an explicit Yahoo no-key fallback;
+- deterministic ordering, duplicate-date, OHLC, volume, adjusted-close, future-date, and staleness
+  checks that block structurally failed data;
+- migration 4 with idempotent normalized bars and hashed quality reports;
+- ignored local raw-response retention, overlapping incremental updates, CLI/API sync, run snapshot,
+  and forward-tracking integration; and
+- public provider status that reveals only credential presence, never the token.
+
+This is an M0/M1 vertical slice, not a v0.4 release. Frozen cross-provider comparison fixtures,
+exchange-calendar/corporate-action checks, an A-share specialist validation adapter, M2 historical
+theme membership, M3 mainline policy, M4 scheduling, and M5 Cockpit work remain open.
+
+## Verified for the current v0.4 slice
+
+- 69 Python tests pass and Ruff passes;
+- the React/Vite production build passes;
+- the local wheel builds and contains the complete `capexgraph.market` package;
+- fresh and legacy databases reach schema version 4 without changing the legacy run, checkpoint,
+  candidate, snapshot, or trigger-event counts;
+- synthetic tests cover EODHD parsing, credential-safe failures, US/CN/KR/KOSDAQ mapping, explicit
+  BSE rejection, quality blocking, idempotent storage, `.env` redaction, API status, and run
+  snapshot integration; and
+- an optional live EODHD smoke synchronized representative US, Shanghai, and KRX securities through
+  the real service with `pass` quality through 2026-07-28 and credential-free source URLs.
 
 ## Shipped in v0.3.0
 
@@ -73,7 +106,15 @@ Future code or documentation changes must pass the same remote release gate agai
   status proves every interpretation in a report.
 - Partial mode may produce a low-confidence `needs_review` report with explicit gaps. Strict mode
   requires at least one reviewed, hash-valid source and blocks unsupported medium/high claims.
-- Yahoo Chart is an unofficial, best-effort no-key market adapter, not a licensed production feed.
+- Yahoo Chart remains an unofficial, best-effort no-key market adapter, not a licensed production
+  feed.
+- EODHD daily history is implemented on the v0.4 development branch, but its independent frozen
+  comparison suite and A-share semantic validation are not complete. Tushare, JQData, SEC N-PORT
+  theme holdings, and KRX constituent adapters are still roadmap targets.
+- CapexGraph has no point-in-time theme registry today. It cannot yet reconstruct which companies
+  belonged to a theme using only information available on a historical date.
+- ETF/index/vendor membership is planned as market-recognition evidence, not proof of industrial
+  exposure or supplier/customer relationships.
 - Monitoring remains manually invoked. Scheduling and automatic re-evaluation belong to v0.4.
 - The application is local-first and single-user. Cloud authentication and team permissions are not
   implemented.
@@ -82,11 +123,14 @@ Future code or documentation changes must pass the same remote release gate agai
 
 ## Start here next
 
-Begin v0.4 from [ROADMAP.md](../ROADMAP.md):
+Continue v0.4 from [the execution plan](V0_4_PLAN.md), in this order:
 
-1. scheduled or externally triggered market snapshots;
-2. financial/operating trigger evaluation from new evidence-linked facts;
-3. source update → trigger → acknowledgement → linked re-evaluation history; and
-4. scorecard comparison across runs and cohorts.
+1. finish M1 frozen US/CN/KR/KOSDAQ comparisons, calendar/corporate-action checks, and one A-share
+   enhancement/validation path;
+2. add point-in-time theme definitions, memberships, and CN/US/KR historical imports;
+3. implement deterministic theme metrics and an explicitly approved, versioned mainline policy;
+4. add scheduled jobs, durable state changes, and linked re-evaluation; and
+5. expose the completed path in the Cockpit and perform v0.4 release validation.
 
-Do not begin Catalyst Scan merely because the enum exists; it remains a v0.5 target.
+Cross-market official disclosures/events are v0.5, consensus revisions are v0.6, and Catalyst Scan
+is now v0.7. Do not begin them merely because an enum, data vendor, or endpoint exists.

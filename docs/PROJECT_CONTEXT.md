@@ -49,6 +49,8 @@ The same durable run is available through:
 - **Evidence** — source identity, retrieval/hash state, excerpt, local artifact, review state.
 - **SupplyChainNode / Edge** — canonical entities and evidence-linked relationships.
 - **Candidate** — thesis, risks, invalidation, triggers, verdict, confidence.
+- **MarketBarSet / quality result** — provider-specific daily history with explicit price semantics,
+  provenance, and deterministic acceptance state.
 - **Tracking record** — original call and benchmark baseline, later snapshots, alpha, events, stage.
 
 Runs are inspectable assets, not disposable prompt transcripts. JSON artifacts provide portability;

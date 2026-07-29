@@ -5,22 +5,28 @@ candidate price and benchmark price on the same market date, then calculates sub
 benchmark return, and alpha from paired snapshots.
 
 ```powershell
-# Establish a live no-key baseline against CSI 300
-capexgraph tracking add <run-id> <node-id>
+# Establish a live baseline with the configured market provider
+capexgraph tracking add <run-id> <node-id> --market-provider eodhd
 
 # Or use explicit, auditable manual prices
 capexgraph tracking add <run-id> <node-id> --price 100 --benchmark-price 100 --as-of 2026-07-17 --no-live
 
 # Capture a later market snapshot
-capexgraph tracking snapshot <tracked-id> --live
+capexgraph tracking snapshot <tracked-id> --live --market-provider eodhd
 
 # Inspect scorecards and move research stages
 capexgraph tracking list
 capexgraph tracking stage <tracked-id> validated
 ```
 
-The default benchmark is `000300.SH`, converted to Yahoo's CSI 300 symbol only inside the no-key
-market adapter. A snapshot is accepted only when the candidate and benchmark share a market date.
+The default benchmark is `000300.SH`. Each adapter performs its own canonical provider mapping:
+EODHD receives `000300.SHG`, while the no-key Yahoo fallback receives the Yahoo symbol. A snapshot
+is accepted only when the candidate and benchmark share a market date. Both histories pass the
+same quality gate and enter the idempotent daily-bar store before pairing.
+
+`CAPEXGRAPH_MARKET_PROVIDER` selects the default. `--market-provider` overrides it for one command.
+Selecting EODHD without a local `EODHD_API_TOKEN` fails explicitly; it never falls back silently.
+See [`MARKET_DATA.md`](MARKET_DATA.md).
 
 Structured candidate triggers are evaluated only when their metric is deterministic and present in
 the snapshot: `price`, `return_pct`, `benchmark_return_pct`, or `alpha_pct`. Financial triggers stay

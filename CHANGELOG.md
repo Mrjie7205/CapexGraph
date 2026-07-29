@@ -4,6 +4,25 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- started the v0.4 market-data foundation with provider-neutral bar, capability, quality, and sync
+  contracts;
+- added a credential-safe EODHD daily-history adapter for US, Shanghai, Shenzhen, KRX, and KOSDAQ,
+  while preserving Yahoo as an explicit no-key fallback and reporting Beijing Stock Exchange as
+  unsupported;
+- preserved raw OHLC separately from adjusted close, added deterministic structural/staleness
+  checks, and blocked failed data before normalized persistence;
+- added schema migration 4, idempotent daily bars, hashed quality reports, ignored local raw
+  responses, and overlapping incremental sync;
+- connected provider selection and quality-checked history to CLI, API, run market snapshots, and
+  forward tracking without exposing tokens; and
+- approved and documented the v0.4 execution plan for EODHD-backed US/CN/KR daily history,
+  market-specific quality gates, point-in-time theme membership, deterministic theme metrics,
+  versioned mainline policy, scheduled monitoring, and linked re-evaluation;
+- separated ETF/index/vendor recognition from evidence-backed industrial exposure and required
+  effective/known time boundaries for historical theme universes; and
+- reordered future milestones so cross-market official disclosures/events precede point-in-time
+  consensus revisions, with Catalyst and Cockpit productization following afterward.
+
 ## 0.3.0 — 2026-07-27
 
 - added a repository-owned cross-session handoff contract: agent guide, forward roadmap, project

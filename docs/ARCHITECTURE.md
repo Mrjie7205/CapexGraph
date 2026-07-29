@@ -37,9 +37,19 @@ to runtime-only scaffold handlers and be presented as completed research.
 
 Provider interfaces prevent the workflow from depending on one model vendor. The built-in fixture provider loads a curated evidence pack and needs no key. The optional OpenAI provider uses structured Responses API output and is loaded only when selected.
 
-Tools own ticker identity, adjusted prices, financial facts/imports, SSRF-safe public source
-retrieval, content hashing, and report rendering. The built-in market adapter is no-key and
-best-effort; production deployments can replace it behind the same interface.
+Tools own ticker identity, market prices, financial facts/imports, SSRF-safe public source
+retrieval, content hashing, and report rendering. The market-data boundary has two current
+adapters: optional licensed EODHD for normalized US/CN/KR daily history and Yahoo as an explicit
+no-key fallback. Both return one `MarketBarSet`; raw OHLC remains separate from adjusted close.
+Provider capability declarations expose coverage and license boundaries without exposing
+credentials.
+
+`MarketDataService` writes the raw response to the ignored local runtime, runs deterministic
+quality checks, blocks structurally invalid data, and idempotently upserts accepted bars and
+quality reports into SQLite. Run snapshots consume this same path instead of bypassing the gate.
+Forward tracking also uses it before pairing candidate and benchmark dates. See
+[`MARKET_DATA.md`](MARKET_DATA.md) for ticker mappings, adjustment semantics, and remaining M1
+limits.
 
 Source discovery has its own trust boundary. `SourceSuggestion` records a provider result, official
 domain classification, reason, and queue state. It is not Evidence. Only a successful guarded
@@ -92,9 +102,13 @@ Only migrations marked safe for startup may run automatically; explicit upgrade,
 and verified restore are available through the CLI. A failed migration rolls back only its own
 transaction and never stamps a version that did not complete.
 
+The in-development schema version 4 adds normalized cross-market daily bars and hashed,
+idempotent quality reports. It does not rewrite v0.3 run, checkpoint, tracking, source, or financial-fact
+records.
+
 ### Applications
 
-- FastAPI exposes runs, evidence review, artifacts, tracking, and HTML reports.
+- FastAPI exposes runs, evidence review, artifacts, market sync/status, tracking, and HTML reports.
 - React/Vite provides the live Research Cockpit and stage board.
 - CLI supports local, batch, tracking, and portable-report workflows.
 
