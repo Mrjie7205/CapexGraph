@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time as time_module
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Annotated
@@ -26,8 +27,11 @@ from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
 from capexgraph.live import (
     FrozenClock,
+    LiveGatewayRuntime,
     LiveSignalService,
     LiveSignalStore,
+    calculate_live_coverage,
+    get_live_runtime,
     load_frozen_dual_channel_feeds,
 )
 from capexgraph.market import (
@@ -835,8 +839,112 @@ def live_status(
             "dead_letters": [
                 item.model_dump(mode="json") for item in store.list_dead_letters()
             ],
+            "coverage": calculate_live_coverage(
+                store.list_signals(),
+                store.list_observations(limit=5000),
+            ).model_dump(mode="json"),
+            "alerts": [
+                item.model_dump(mode="json") for item in store.list_alerts(limit=200)
+            ],
         }
     )
+
+
+@live_app.command("providers")
+def live_providers() -> None:
+    """Show both live channels without revealing provider credentials."""
+
+    console.print_json(data=get_live_runtime().status())
+
+
+@live_app.command("poll")
+def live_poll(
+    stream: Annotated[
+        str,
+        typer.Option("--stream", help="MCP stream: flash or calendar"),
+    ] = "flash",
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run one real MCP head poll and persist normalized signals."""
+
+    try:
+        result = LiveGatewayRuntime(path).poll_once(stream)
+    except (ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(
+        data={
+            "stream": stream,
+            "observations": len(result.batch.observations),
+            "created_versions": result.created_versions,
+            "duplicates": result.duplicate_observations,
+            "checkpoint": result.batch.checkpoint.model_dump(mode="json"),
+        }
+    )
+
+
+@live_app.command("monitor")
+def live_monitor(
+    cycles: Annotated[
+        int,
+        typer.Option(
+            "--cycles",
+            min=0,
+            help="0 keeps the gateway running until interrupted; positive values run test cycles.",
+        ),
+    ] = 0,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", min=0, max=3600),
+    ] = 1,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run equal-priority MCP/WebSocket monitoring with independent health."""
+
+    runtime = LiveGatewayRuntime(path)
+    if cycles:
+        snapshots: list[dict[str, object]] = []
+        for index in range(cycles):
+            for stream in ("flash", "calendar"):
+                try:
+                    result = runtime.poll_once(stream)
+                    snapshots.append(
+                        {
+                            "cycle": index + 1,
+                            "channel": "mcp",
+                            "stream": stream,
+                            "health": result.batch.checkpoint.health.value,
+                            "observations": len(result.batch.observations),
+                        }
+                    )
+                except RuntimeError as error:
+                    snapshots.append(
+                        {
+                            "cycle": index + 1,
+                            "channel": "mcp",
+                            "stream": stream,
+                            "health": "degraded",
+                            "error": f"{type(error).__name__}: poll failed",
+                        }
+                    )
+            if interval and index + 1 < cycles:
+                time_module.sleep(interval)
+        console.print_json(data={"cycles": cycles, "results": snapshots})
+        return
+    runtime.start()
+    console.print("Live gateway started. Press Ctrl+C to stop.")
+    try:
+        while runtime.running:
+            time_module.sleep(1)
+    except KeyboardInterrupt:
+        runtime.stop()
+        console.print("Live gateway stopped.")
 
 
 @financials_app.command("import")

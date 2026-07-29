@@ -4,9 +4,9 @@
 - Release: `v0.3.0` — Trustworthy live research
 - Active target: `v0.5` — official disclosure events, by explicit user priority
 - Active extension: `v0.5.1` — provider-neutral live-event gateway with equal-priority Jin10 MCP
-  and Open Platform WebSocket channels; M0 contracts/persistence and the M1 frozen no-key
-  dual-channel replay are implemented, while both real adapters, AI analysis, SSE, and Live Desk
-  remain open
+  and Open Platform WebSocket channels; M0 through M6 are implemented, including real MCP
+  polling, the WebSocket protocol/worker, reconciliation/rules, optional AI analysis, API/SSE, and
+  the Cockpit Live Desk. M7 release hardening and the event-to-research closed loop remain open
 - Incomplete dependency: `v0.4` — cross-market data foundation and mainline monitoring; the market
   slice exists, while theme/mainline automation remains open
 - Active development branch: `codex/v0-5-1-live-event-gateway`
@@ -14,7 +14,7 @@
 This is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
 
-## Implemented on the v0.5.1 development branch
+## Implemented on the v0.5.1 development branch (M0-M6)
 
 - typed `SignalObservation`, append-only `LiveSignalVersion`, channel/match/retention/verification
   states, independent `LiveProviderCheckpoint`, redacted dead letters, and human-gated
@@ -27,11 +27,32 @@ substantial change, and update it in the same pull request whenever shipped capa
 - a frozen synthetic Jin10-shaped MCP/WebSocket fixture with a controllable clock, independent
   cursors, identical and divergent cross-channel examples, and deterministic replay; and
 - no-key `capexgraph live demo` and `capexgraph live status` commands for replaying and inspecting
-  the persisted foundation without presenting fixture events as current market information.
+  the persisted foundation without presenting fixture events as current market information;
+- a strict Jin10 Streamable HTTP MCP client using `initialize` → initialized notification →
+  tools/resources discovery → tool calls, with `structuredContent` as the only machine-data
+  source, latest-page polling, cursor metadata, Beijing-day budget reset, and 30/120/300-second
+  adaptive cadence;
+- a Jin10 Open Platform WebSocket adapter for flash, calendar, and optional quotes, including the
+  official connected/auth/subscribe envelopes, ping/pong heartbeat, jittered reconnect, independent
+  health/checkpoint state, and a visible no-key `NOT_CONFIGURED` state;
+- additive migration 7 for deterministic rule assessments, typed analysis lineage, single-alert
+  delivery state, Live Desk settings, and auditable user actions;
+- deterministic relevance, urgency, importance, novelty, injection, entity/theme, cooldown, and
+  single-alert rules, plus overlap, channel-only, divergent, P50, and P95 coverage metrics;
+- a rules-only no-key impact-analysis baseline and an explicitly selected/cost-gated model path
+  with typed output, prompt hash, provider/model/call lineage, and visible failure state without
+  silent model fallback;
+- `live providers|poll|monitor` CLI paths and `/api/v1/live` status, polling, monitor, event,
+  coverage, settings, action, analysis, and reconnectable SSE endpoints; and
+- a responsive Live Desk with independent channel chips, filters, lineage/detail, coverage audit,
+  settings, explicit browser notifications, rules/model analysis selection, and human
+  Watch/Verify/Dismiss/Mute actions. Attach and linked re-evaluation remain intentionally blocked
+  until M7.
 
-This completes the scoped M0/M1 foundation, not the v0.5.1 product. The repository still has no
-real Jin10 MCP or WebSocket adapter, polling scheduler, live credentials, AI event-analysis
-runtime, frontend API/SSE stream, browser notification path, or Live Desk.
+This completes M0 through M6, not the v0.5.1 release. The current checkout has no Jin10 WebSocket
+Secret-Key, so the WebSocket transport is protocol/mock verified and visibly reports `WAIT KEY`;
+it is not claimed as live-connected. M7 still owns release packaging, operating runbooks, longer
+soak/chaos checks, official-source task creation, Evidence attachment, and linked re-evaluation.
 
 ## Implemented on the v0.5 development branch
 
@@ -61,24 +82,35 @@ KIND/KRX, issuer calendars, cross-market fact taxonomy, event-triggered re-evalu
 Cockpit event view remain open. The detailed boundary is in `docs/V0_5_PLAN.md`.
 
 The approved v0.5.1 design is documented in `docs/V0_5_1_PLAN.html`. MCP polling and WebSocket are
-equal-priority information channels: MCP is the first real-data runtime slice, the WebSocket
-adapter is developed in parallel, and both remain active after the Secret-Key is available. The
-shared gateway contract, storage, and frozen replay now exist; actual Jin10 transport adapters do
-not. A future Jin10 signal remains a secondary discovery input and cannot become Evidence without
-the existing guarded official-source capture and human-review path.
+equal-priority information channels with separate loops, checkpoints, health, and credentials.
+MCP is live-verified; WebSocket becomes live-active when its independent Secret-Key is configured.
+A Jin10 signal remains a secondary discovery input and cannot become Evidence without the existing
+guarded official-source capture and human-review path.
 
 ## Verified for the current development slice
 
-- 97 Python tests pass and Ruff passes;
+- 109 Python tests pass and Ruff passes;
 - the React/Vite production build passes;
-- a clean isolated wheel build succeeds and contains `capexgraph.events`, the complete
-  `capexgraph.live` package, the synthetic dual-channel fixture, and the shared configuration
-  loader;
-- fresh and legacy migration tests reach schema version 6 without rewriting prior run, checkpoint,
+- a fresh wheel build includes `capexgraph.events`, the complete
+  `capexgraph.live` package, both adapters, the synthetic dual-channel fixture, and shared
+  configuration loaders;
+- fresh and legacy migration tests reach schema version 7 without rewriting prior run, checkpoint,
   source, financial-fact, market, official-event, or tracking records;
 - frozen live-gateway tests cover timezone enforcement, retention, independent checkpoints and
   failure health, idempotency, matched/divergent/single-channel versions, redacted dead letters,
   human-gated actions, and the no-key CLI path;
+- Jin10 frozen transport tests cover standard MCP negotiation, structuredContent precedence,
+  historical cursor semantics, daily budget exhaustion, all official WebSocket envelopes,
+  authentication/subscription, calendar/quote normalization, reconnect health, HTML sanitization,
+  and licensed-picture omission;
+- rule/analysis/API tests cover single alerts, cross-channel coverage and delay, rules-only and
+  typed model paths, visible model failure, settings, SSE resume IDs, user actions, and the
+  deliberate M7 action boundary;
+- a real MCP smoke on 2026-07-29 negotiated all eight documented tools and `quote://codes`, then
+  normalized 20 latest flash observations and 269 calendar observations with both streams active;
+- desktop and 390-pixel browser QA verified the no-key replay, SSE connection, matched/divergent
+  display, rules analysis, backend-only credential boundary, responsive settings, and no
+  horizontal overflow or console errors;
 - frozen SEC tests cover acceptance timestamps, conservative form classification, idempotent
   discovery, capture-to-Evidence versioning, point-in-time history, CLI, API, and artifacts; and
 - the official SEC schema was probed successfully with an identifying test User-Agent. A real
@@ -196,10 +228,14 @@ Future code or documentation changes must pass the same remote release gate agai
   belonged to a theme using only information available on a historical date.
 - ETF/index/vendor membership is planned as market-recognition evidence, not proof of industrial
   exposure or supplier/customer relationships.
-- Monitoring remains manually invoked. Scheduling and automatic re-evaluation belong to v0.4.
-- The v0.5.1 live-event path currently replays an explicitly synthetic fixture. It does not poll
-  Jin10, open a WebSocket, receive current events, run continuously, call a model, or expose a
-  Live Desk yet.
+- Mainline/theme monitoring remains manually invoked. Its scheduling and automatic re-evaluation
+  belong to v0.4 and are not made complete by the separate live-event supervisor.
+- The v0.5.1 gateway can continuously poll Jin10 MCP and run an independent WebSocket worker,
+  persist/reconcile events, serve SSE, and expose the Live Desk. MCP needs its Bearer token;
+  WebSocket needs a separate Secret-Key. Rules-only analysis and frozen replay need neither.
+- The current checkout has no WebSocket Secret-Key, so only its frozen protocol and reconnect
+  tests are verified. Browser notifications require explicit user opt-in, and licensed raw
+  provider bodies/pictures are not archived or exported.
 - SEC filing metadata can now populate an event calendar, but content-level event extraction,
   issuer calendars, and CN/KR official sources are not implemented.
 - The application is local-first and single-user. Cloud authentication and team permissions are not
@@ -209,11 +245,11 @@ Future code or documentation changes must pass the same remote release gate agai
 
 ## Start here next
 
-Continue v0.5 from [the execution plan](V0_5_PLAN.md):
+Continue v0.5/v0.5.1 from [the execution plan](V0_5_PLAN.md):
 
-1. implement the MCP first-live M2 and WebSocket M3 adapters against the completed M0/M1 contract;
-   the Secret-Key gates only WebSocket live smoke, and the complete HTML plan is
-   [here](V0_5_1_PLAN.html);
+1. complete v0.5.1 M7: obtain a WebSocket trial Secret-Key for live smoke/soak, add the operational
+   runbook and release packaging, and implement explicit official-source task, Evidence attach,
+   and linked re-evaluation actions without bypassing human review;
 2. configure a real SEC contact User-Agent for optional live smoke, then add historical submission
    files and backfill;
 3. add CNINFO plus Shanghai/Shenzhen/Beijing official announcement discovery;

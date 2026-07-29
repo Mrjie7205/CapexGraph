@@ -399,6 +399,92 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=7,
+        name="live_desk_rules_analysis_and_alerts",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS live_rule_assessments (
+                id TEXT PRIMARY KEY,
+                signal_version_id TEXT NOT NULL UNIQUE,
+                signal_key TEXT NOT NULL,
+                ruleset_version TEXT NOT NULL,
+                total_score REAL NOT NULL,
+                should_alert INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_assessments_score
+            ON live_rule_assessments(should_alert, total_score DESC, created_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_analyses (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                signal_version_id TEXT NOT NULL,
+                analysis_version INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                proposal_id TEXT,
+                model_provider TEXT,
+                model TEXT,
+                prompt_hash TEXT,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (signal_key, analysis_version),
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE,
+                FOREIGN KEY (proposal_id)
+                    REFERENCES research_action_proposals(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_analyses_signal_created
+            ON live_signal_analyses(signal_key, created_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_alert_deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                signal_key TEXT NOT NULL UNIQUE,
+                signal_version_id TEXT NOT NULL,
+                state TEXT NOT NULL,
+                score REAL NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_alerts_state_id
+            ON live_alert_deliveries(state, id DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_settings (
+                id TEXT PRIMARY KEY,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_user_actions (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                action TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_actions_signal_created
+            ON live_user_actions(signal_key, created_at DESC)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

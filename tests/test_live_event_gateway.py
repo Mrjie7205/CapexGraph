@@ -89,6 +89,11 @@ def test_live_store_migration_and_metadata_retention(tmp_path) -> None:
         "live_provider_checkpoints",
         "live_dead_letters",
         "research_action_proposals",
+        "live_rule_assessments",
+        "live_signal_analyses",
+        "live_alert_deliveries",
+        "live_settings",
+        "live_user_actions",
     } <= tables
 
 
@@ -244,3 +249,39 @@ def test_live_cli_replays_synthetic_fixture_without_keys(tmp_path) -> None:
     payload = json.loads(status.stdout)
     assert len(payload["checkpoints"]) == 2
     assert len(payload["signals"]) == 3
+
+
+def test_live_cli_provider_poll_and_bounded_monitor_need_no_key(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("JIN10_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("JIN10_WEBSOCKET_SECRET_KEY", raising=False)
+    path = tmp_path / "cli-monitor.db"
+    runner = CliRunner()
+
+    providers = runner.invoke(app, ["live", "providers"])
+    poll = runner.invoke(
+        app,
+        ["live", "poll", "--stream", "flash", "--path", str(path)],
+    )
+    monitor = runner.invoke(
+        app,
+        [
+            "live",
+            "monitor",
+            "--cycles",
+            "1",
+            "--interval",
+            "0",
+            "--path",
+            str(path),
+        ],
+    )
+
+    assert providers.exit_code == 0
+    assert '"configured": false' in providers.stdout
+    assert poll.exit_code == 0
+    assert '"health": "not_configured"' in poll.stdout
+    assert monitor.exit_code == 0
+    assert '"cycles": 1' in monitor.stdout

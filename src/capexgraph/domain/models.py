@@ -139,8 +139,25 @@ class LiveProviderHealth(StrEnum):
     REPLAY = "replay"
 
 
+class LiveAlertState(StrEnum):
+    UNREAD = "unread"
+    READ = "read"
+    DISMISSED = "dismissed"
+    MUTED = "muted"
+
+
+class LiveAnalysisStatus(StrEnum):
+    RULES_ONLY = "rules_only"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+
+
 class ResearchAction(StrEnum):
     IGNORE = "ignore"
+    READ = "read"
+    DISMISS = "dismiss"
+    MUTE = "mute"
     WATCH = "watch"
     VERIFY = "verify"
     ATTACH = "attach"
@@ -396,6 +413,7 @@ class SignalObservation(BaseModel):
     content: str = ""
     source_url: HttpUrl | None = None
     published_at: datetime
+    scheduled_at: datetime | None = None
     observed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     content_hash: str = Field(default="", pattern=r"^[0-9a-f]{64}$")
     retention_class: LiveRetentionClass = LiveRetentionClass.METADATA_ONLY
@@ -439,6 +457,10 @@ class SignalObservation(BaseModel):
             raise ValueError("signal published_at and observed_at must be timezone-aware")
         self.published_at = self.published_at.astimezone(UTC)
         self.observed_at = self.observed_at.astimezone(UTC)
+        if self.scheduled_at is not None:
+            if self.scheduled_at.tzinfo is None:
+                raise ValueError("signal scheduled_at must be timezone-aware")
+            self.scheduled_at = self.scheduled_at.astimezone(UTC)
         if self.published_at > self.observed_at:
             raise ValueError("signal cannot be observed before it was published")
         return self
@@ -530,6 +552,152 @@ class LiveDeadLetter(BaseModel):
             raise ValueError("dead-letter observed_at must be timezone-aware")
         self.observed_at = self.observed_at.astimezone(UTC)
         return self
+
+
+class LiveRuleAssessment(BaseModel):
+    id: str = Field(min_length=1)
+    signal_version_id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    ruleset_version: str = Field(min_length=1)
+    ruleset_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    relevance: float = Field(ge=0, le=100)
+    urgency: float = Field(ge=0, le=100)
+    novelty: float = Field(ge=0, le=1)
+    importance: float = Field(ge=0, le=100)
+    total_score: float = Field(ge=0, le=100)
+    matched_entities: list[str] = Field(default_factory=list)
+    matched_themes: list[str] = Field(default_factory=list)
+    matched_graph_nodes: list[str] = Field(default_factory=list)
+    injection_flags: list[str] = Field(default_factory=list)
+    should_alert: bool = False
+    rationale: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_assessment_time(self) -> LiveRuleAssessment:
+        if self.created_at.tzinfo is None:
+            raise ValueError("assessment created_at must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        self.matched_entities = sorted(set(self.matched_entities))
+        self.matched_themes = sorted(set(self.matched_themes))
+        self.matched_graph_nodes = sorted(set(self.matched_graph_nodes))
+        self.injection_flags = sorted(set(self.injection_flags))
+        return self
+
+
+class LiveSignalAnalysis(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    signal_version_id: str = Field(min_length=1)
+    analysis_version: int = Field(ge=1)
+    status: LiveAnalysisStatus
+    proposal_id: str | None = None
+    model_provider: str | None = None
+    model: str | None = None
+    prompt_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    model_call_count: int = Field(default=0, ge=0)
+    retry_count: int = Field(default=0, ge=0)
+    estimated_cost_usd: float | None = Field(default=None, ge=0)
+    cost_status: str = Field(default="not_applicable", min_length=1)
+    failure: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_analysis(self) -> LiveSignalAnalysis:
+        if self.created_at.tzinfo is None:
+            raise ValueError("analysis created_at must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        if self.model_provider is None and (
+            self.model is not None or self.prompt_hash is not None or self.model_call_count
+        ):
+            raise ValueError("model analysis metadata requires model_provider")
+        if self.status == LiveAnalysisStatus.COMPLETED and self.model_provider is None:
+            raise ValueError("completed model analysis requires model_provider")
+        return self
+
+
+class LiveAlertDelivery(BaseModel):
+    id: int | None = Field(default=None, ge=1)
+    signal_key: str = Field(min_length=1)
+    signal_version_id: str = Field(min_length=1)
+    state: LiveAlertState = LiveAlertState.UNREAD
+    score: float = Field(ge=0, le=100)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_alert_times(self) -> LiveAlertDelivery:
+        if self.created_at.tzinfo is None or self.updated_at.tzinfo is None:
+            raise ValueError("alert timestamps must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        self.updated_at = self.updated_at.astimezone(UTC)
+        return self
+
+
+class LiveDeskSettings(BaseModel):
+    mcp_enabled: bool = True
+    websocket_enabled: bool = True
+    flash_enabled: bool = True
+    calendar_enabled: bool = True
+    quote_enabled: bool = False
+    normal_poll_seconds: int = Field(default=120, ge=15, le=3600)
+    urgent_poll_seconds: int = Field(default=30, ge=15, le=3600)
+    quiet_poll_seconds: int = Field(default=300, ge=30, le=7200)
+    alert_score_threshold: float = Field(default=55, ge=0, le=100)
+    model_score_threshold: float = Field(default=75, ge=0, le=100)
+    cooldown_seconds: int = Field(default=900, ge=0, le=86400)
+    include_keywords: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)
+    entity_aliases: dict[str, list[str]] = Field(default_factory=dict)
+    theme_keywords: dict[str, list[str]] = Field(default_factory=dict)
+    desktop_notifications: bool = False
+    model_provider: str | None = None
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_live_settings(self) -> LiveDeskSettings:
+        if self.updated_at.tzinfo is None:
+            raise ValueError("live settings updated_at must be timezone-aware")
+        self.updated_at = self.updated_at.astimezone(UTC)
+        if self.urgent_poll_seconds > self.normal_poll_seconds:
+            raise ValueError("urgent poll interval cannot exceed normal interval")
+        if self.normal_poll_seconds > self.quiet_poll_seconds:
+            raise ValueError("normal poll interval cannot exceed quiet interval")
+        self.include_keywords = sorted(
+            {item.strip() for item in self.include_keywords if item.strip()}
+        )
+        self.exclude_keywords = sorted(
+            {item.strip() for item in self.exclude_keywords if item.strip()}
+        )
+        return self
+
+
+class LiveUserAction(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    action: ResearchAction
+    note: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_action_time(self) -> LiveUserAction:
+        if self.created_at.tzinfo is None:
+            raise ValueError("user action created_at must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        return self
+
+
+class LiveCoverageMetrics(BaseModel):
+    total_signals: int = Field(ge=0)
+    matched: int = Field(ge=0)
+    divergent: int = Field(ge=0)
+    mcp_only: int = Field(ge=0)
+    websocket_only: int = Field(ge=0)
+    fixture_only: int = Field(ge=0)
+    overlap_ratio: float = Field(ge=0, le=1)
+    delivery_delay_p50_seconds: float | None = Field(default=None, ge=0)
+    delivery_delay_p95_seconds: float | None = Field(default=None, ge=0)
+    freshest_by_channel: dict[str, datetime | None] = Field(default_factory=dict)
 
 
 class ResearchActionProposal(BaseModel):

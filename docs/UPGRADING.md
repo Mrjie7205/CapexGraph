@@ -53,6 +53,16 @@ Evidence, financial facts, market bars, official events, or tracking history. Fi
 may retain their synthetic content; `ephemeral` and `metadata_only` observations persist only
 allowed metadata and the original content hash.
 
+The v0.5.1 M2-M6 implementation adds version 7:
+
+7. immutable rule assessments and typed analysis lineage, one alert-delivery row per canonical
+   signal, persisted non-secret Live Desk settings, and append-only user actions.
+
+Version 7 is additive and safe for startup. It does not rewrite observations or signal versions,
+and it does not modify credentials, Evidence, corporate events, runs, financial/market data, or
+tracking history. Provider credentials remain environment-only; `live_settings` contains cadence,
+filters, thresholds, channel switches, and notification preference only.
+
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
 to run `capexgraph db upgrade`.

@@ -24,6 +24,7 @@ import {
 } from "./api";
 import { ResearchReadiness } from "./ResearchReadiness";
 import { SourceQueue } from "./SourceQueue";
+import { LiveDesk } from "./LiveDesk";
 
 const FINAL_STATUSES = new Set(["needs_review", "completed", "failed", "cancelled"]);
 
@@ -311,7 +312,7 @@ function App() {
           <span className="brand-mark"><i>C</i><i>G</i></span>
           <span>CapexGraph<small>evidence-led research</small></span>
         </a>
-        <nav><a className="active" href="#runs">Runs</a><a href="#sources">Sources</a><a href="#graph">Graph</a><a href="#radar">Radar</a><a href="#ledger">Evidence</a></nav>
+        <nav><a className="active" href="#live">Live Desk</a><a href="#runs">Runs</a><a href="#sources">Sources</a><a href="#graph">Graph</a><a href="#radar">Candidates</a></nav>
         <div className="system-state"><span /> Local research workspace</div>
       </header>
 
@@ -348,6 +349,8 @@ function App() {
         <article><span>Grounded edges</span><strong>{selected?.edges.length ?? "—"}</strong><small>{selected ? `${selected.evidence.length} evidence items` : "select a run"}</small></article>
         <article><span>Research queue</span><strong>{selected?.candidates.length ?? "—"}</strong><small>candidates, not buy calls</small></article>
       </section>
+
+      <LiveDesk />
 
       <section className="workbench" id="runs">
         <article className="pipeline panel">

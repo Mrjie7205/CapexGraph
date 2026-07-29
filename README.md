@@ -69,15 +69,23 @@ calendars, filing-content event extraction, or event-triggered automated re-eval
 [the v0.5 execution plan](docs/V0_5_PLAN.md).
 
 The [v0.5.1 live-event gateway plan](docs/V0_5_1_PLAN.html) defines Jin10 MCP polling and Open
-Platform WebSocket as two equal-priority live information channels. Its M0/M1 development
-foundation now includes typed signal/retention/action contracts, additive migration 6, independent
-per-channel checkpoints, deterministic cross-channel versions, and a frozen no-key dual-channel
-replay. Run `capexgraph live demo` and then `capexgraph live status` to inspect that synthetic path.
+Platform WebSocket as two equal-priority live information channels. M0-M6 are implemented:
 
-Real Jin10 MCP/WebSocket adapters, continuous polling, optional AI impact analysis, SSE, and the
-Cockpit Live Desk remain planned work. The frozen fixture is not current market data. Future
-aggregator messages remain secondary signals and must pass through official capture and human
-review before becoming Evidence.
+- typed signal/retention/action contracts and additive migrations 6/7;
+- independent channel checkpoints, deterministic versions, single alerts, and frozen no-key replay;
+- strict MCP initialization, structuredContent parsing, latest-page polling, 30/120/300 cadence,
+  and a 1200-call local target below the documented 1500 per-tool daily limit;
+- Open Platform flash/calendar/quote WebSocket auth, heartbeat, reconnect, and normalization;
+- cross-channel overlap/divergence and P50/P95 delay metrics plus entity/theme/injection rules;
+- rules-only and explicitly selected typed model analysis with visible failure/call lineage; and
+- a supervisor, CLI/API/SSE, and responsive Cockpit Live Desk.
+
+Run `capexgraph live demo` and then `capexgraph live status` to inspect the synthetic no-key path.
+The MCP adapter has a real-provider smoke test. WebSocket live smoke still requires its separate
+Secret-Key; without it the UI reports `WAIT KEY` rather than pretending to be connected. Aggregator
+messages remain secondary signals and must pass through official capture and human review before
+becoming Evidence. M7 retains the official-source task, Evidence attach, linked re-evaluation, and
+release-hardening work.
 
 ## v0.4 development preview
 
@@ -218,6 +226,47 @@ their credential-safe readiness state. Codex subscription execution requires the
 OpenAI execution requires its separately billed API key. The Cockpit can run one durable stage at
 a time, run all remaining stages, retry a failed checkpoint, inspect coverage and provider
 failures, render the real graph, open the portable report, and manage forward tracking.
+
+### Live event gateway
+
+The frozen dual-channel replay and rules-only impact path need no provider or model key:
+
+```powershell
+capexgraph live demo
+capexgraph live status
+capexgraph live providers
+```
+
+For real MCP polling, put the Bearer token only in the repository-local `.env`:
+
+```dotenv
+JIN10_MCP_BEARER_TOKEN=your-bearer-token
+CAPEXGRAPH_JIN10_MCP_CALL_BUDGET=1200
+```
+
+Then poll once or run the independent channel supervisor:
+
+```powershell
+capexgraph live poll --stream flash
+capexgraph live poll --stream calendar
+capexgraph live monitor
+```
+
+WebSocket uses an independent credential and remains equal priority after it is enabled:
+
+```dotenv
+JIN10_WEBSOCKET_SECRET_KEY=your-open-platform-secret-key
+CAPEXGRAPH_JIN10_WS_FLASH_CATEGORIES=1,4
+CAPEXGRAPH_JIN10_WS_CALENDAR_CATEGORIES=cj
+```
+
+The React Cockpit exposes Live Desk as its first navigation item. It shows MCP/WebSocket health
+separately, reconnects its SSE stream, provides event/category/source filters, explains
+matched/divergent lineage and delivery delay, supports no-key rules analysis, and records explicit
+Watch/Verify/Dismiss/Mute actions. Provider credentials are backend-only and never appear in the
+settings API or browser. Browser notifications require a direct user opt-in.
+See [the live event operator guide](docs/LIVE_EVENTS.md) for API contracts, retention, cursor
+semantics, and troubleshooting.
 
 ## Research artifact contract
 

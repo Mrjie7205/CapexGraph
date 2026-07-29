@@ -21,6 +21,7 @@ def test_cross_session_handoff_files_exist() -> None:
         "docs/CURRENT_STATUS.md",
         "docs/DECISIONS.md",
         "docs/ARCHITECTURE.md",
+        "docs/LIVE_EVENTS.md",
         "docs/MARKET_DATA.md",
         "SECURITY.md",
         "CONTRIBUTING.md",
@@ -75,11 +76,12 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
         for term in (
             "D019",
             "SignalObservation",
-            "M0 / M1 complete",
+            "M0–M6 complete",
             "MCP 与 WebSocket 同级",
         )
     )
-    assert "real Jin10 MCP or WebSocket adapter" in status
+    assert "MCP is live-verified" in status
+    assert "M7 still owns release packaging" in status
     assert all(
         term in market_data
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")

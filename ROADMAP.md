@@ -157,13 +157,19 @@ HTML artifact [`docs/V0_5_1_PLAN.html`](docs/V0_5_1_PLAN.html).
 
 Development status:
 
-- M0 complete on the development branch: signal, retention, checkpoint, dead-letter, and
-  human-gated action contracts plus additive schema migration 6;
-- M1 complete on the development branch: common `LiveEventSource`, independent MCP/WebSocket
-  fixture cursors and health, deterministic synthetic replay, cross-channel matched/divergent
-  versions, persistence, and no-key CLI inspection; and
-- M2/M3 next: real Jin10 MCP polling and Open Platform WebSocket adapters. The current commands do
-  not fetch live Jin10 data, and frontend/SSE work remains M6.
+- M0/M1 complete: signal/retention/checkpoint contracts, migration 6, common `LiveEventSource`,
+  independent dual-channel fixtures, deterministic matching, persistence, and no-key replay;
+- M2/M3 complete: strict Jin10 MCP negotiation/structuredContent/head polling/budget control and
+  the co-equal Open Platform WebSocket flash/calendar/quote worker with auth, heartbeat, reconnect,
+  and independent health. MCP is live-smoke verified; WebSocket live smoke still needs its separate
+  Secret-Key;
+- M4/M5 complete: deterministic rules/entity/theme/injection gates, single alerts, cross-channel
+  coverage/delay metrics, rules-only impact analysis, and an explicit typed model path with visible
+  cost/failure lineage;
+- M6 complete: CLI/runtime supervisor, `/api/v1/live` status/events/coverage/settings/actions/SSE,
+  and a responsive Live Desk with no-key replay and backend-only credentials; and
+- M7 next: live WebSocket soak when credentials exist, operational/release hardening, and the
+  explicit official-source task → Evidence attach → linked re-evaluation closed loop.
 
 Goals:
 
@@ -301,9 +307,10 @@ execution queue.
    remain.
 7. Paused dependency P0 — v0.4 M2: point-in-time theme registry and historical membership.
 8. Paused dependency P1 — v0.4 M3/M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
-9. Completed v0.5.1 M0/M1 foundation — typed live-signal contracts, migration 6, independent
-   channel checkpoints, frozen dual-channel replay, canonical matching, and no-key CLI inspection.
-10. Next v0.5.1 P0 — real MCP M2 and WebSocket M3 adapters against the same contract; missing
-    WebSocket credentials block only live smoke.
+9. Completed v0.5.1 M0-M6 — typed contracts, migrations 6/7, independent fixtures and real
+   adapters, rules/reconciliation, optional AI analysis, supervisor/API/SSE, and responsive
+   Live Desk. MCP live smoke passes; missing WebSocket credentials block only its live smoke.
+10. Next v0.5.1 P0 — M7 operational/release hardening and the human-gated
+    official-source/Evidence/linked-re-evaluation closed loop.
 11. Next v0.5 P0 — CNINFO/SSE/SZSE/BSE, then OpenDART/KIND official disclosure adapters.
 12. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).

@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
 
 from capexgraph.domain import (
+    LiveAlertDelivery,
     LiveChannel,
     LiveDeadLetter,
     LiveMatchStatus,
@@ -17,7 +18,9 @@ from capexgraph.domain import (
     SignalObservation,
 )
 from capexgraph.live.base import LiveEventBatch, LiveEventSource
+from capexgraph.live.rules import LiveRuleEngine
 from capexgraph.live.store import LiveSignalStore
+from capexgraph.runtime import RunStore
 
 
 class LiveIngestionResult(BaseModel):
@@ -30,6 +33,18 @@ class LiveIngestionResult(BaseModel):
 class LiveSignalService:
     def __init__(self, store: LiveSignalStore | None = None) -> None:
         self.store = store or LiveSignalStore()
+
+    def _graph_node_aliases(self) -> dict[str, list[str]]:
+        aliases: dict[str, list[str]] = {}
+        for run in RunStore(self.store.db_path).list_runs(limit=500):
+            for node in run.nodes:
+                aliases.setdefault(node.id, [])
+                aliases[node.id].extend(
+                    item
+                    for item in (node.label, node.ticker or "")
+                    if item and item not in aliases[node.id]
+                )
+        return aliases
 
     @staticmethod
     def _signal_key(observation: SignalObservation) -> str:
@@ -124,7 +139,51 @@ class LiveSignalService:
                 ),
             },
         )
-        return self.store.save_signal(signal), True
+        persisted_signal = self.store.save_signal(signal)
+        settings = self.store.get_settings()
+        assessment = LiveRuleEngine(
+            settings,
+            graph_nodes=self._graph_node_aliases(),
+        ).assess(
+            persisted_signal,
+            observations,
+        )
+        if assessment.should_alert and settings.cooldown_seconds:
+            cutoff = assessment.created_at - timedelta(
+                seconds=settings.cooldown_seconds
+            )
+            normalized_title = persisted_signal.title.casefold().strip()
+            duplicate_recent = any(
+                alert.signal_key != persisted_signal.signal_key
+                and alert.created_at >= cutoff
+                and (
+                    recent := self.store.latest_signal(alert.signal_key)
+                ) is not None
+                and recent.title.casefold().strip() == normalized_title
+                for alert in self.store.list_alerts(limit=200)
+            )
+            if duplicate_recent:
+                assessment = assessment.model_copy(
+                    update={
+                        "should_alert": False,
+                        "rationale": [
+                            *assessment.rationale,
+                            "suppressed_by_title_cooldown",
+                        ],
+                    }
+                )
+        self.store.save_assessment(assessment)
+        if assessment.should_alert:
+            self.store.create_alert(
+                LiveAlertDelivery(
+                    signal_key=persisted_signal.signal_key,
+                    signal_version_id=persisted_signal.id,
+                    score=assessment.total_score,
+                    created_at=assessment.created_at,
+                    updated_at=assessment.created_at,
+                )
+            )
+        return persisted_signal, True
 
     def ingest_payload(
         self,

@@ -22,6 +22,25 @@ All notable changes to CapexGraph are documented here.
 - added a common live-source protocol, deterministic service/store, frozen synthetic MCP/WebSocket
   feeds with independent cursors and health, matched/divergent examples, and no-key `live demo` /
   `live status` CLI paths without claiming a real Jin10 connection;
+- completed v0.5.1 M2 with a strict Streamable HTTP MCP client, standard negotiation, tool/resource
+  discovery, structuredContent-only parsing, latest-page flash polling, calendar normalization,
+  Beijing-day call budgets, 30/120/300 adaptive cadence, and credential-safe status;
+- completed M3 with official Jin10 flash/calendar/quote WebSocket envelopes, Secret-Key auth,
+  subscription, heartbeat, jittered reconnect, HTML sanitization, licensed-picture omission, and
+  health/checkpoints independent from MCP; live smoke remains explicitly gated by the missing
+  Secret-Key;
+- completed M4 with deterministic relevance/urgency/importance/novelty and injection rules,
+  editable entity/theme mappings, single canonical alerts, and overlap/channel-only/divergence plus
+  P50/P95 delivery metrics;
+- completed M5 with a no-key rules baseline and an explicit selective typed-model path that
+  persists provider/model/prompt/call/failure lineage without silently presenting a failed model
+  call as model output;
+- added schema migration 7 for rule assessments, analysis records, alert delivery states,
+  backend-owned Live Desk settings, and auditable user actions;
+- completed M6 with the live supervisor, `live providers|poll|monitor`, the `/api/v1/live`
+  status/events/coverage/settings/actions/SSE surface, and a responsive Live Desk with independent
+  channel chips, no-key replay, filters, lineage, impact analysis, coverage audit, explicit browser
+  notifications, and Watch/Verify/Dismiss/Mute actions;
 - started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
   source-public/system-observed timestamps, effective/expected dates, and canonical entities;
 - added append-only migration 5, semantic idempotency, immutable event versions, current/history

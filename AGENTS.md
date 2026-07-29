@@ -28,6 +28,8 @@ Read these files in order:
 10. the workflow-specific document under `docs/`; and
 11. `CONTRIBUTING.md` — validation and documentation contract.
 
+For live-gateway work, the workflow-specific document is `docs/LIVE_EVENTS.md`.
+
 When documentation and code disagree, verify the implementation and tests, fix the documentation
 in the same change, and record material design changes in `docs/DECISIONS.md`.
 
@@ -80,8 +82,9 @@ advertise it as shipped until its roadmap acceptance criteria and tests are comp
 ## Working method
 
 1. Start from an active item in `ROADMAP.md` or a scoped user request. The user explicitly advanced
-   active development to the isolated v0.5 event foundation. Follow `docs/V0_5_PLAN.md` without
-   claiming the paused v0.4 theme/mainline work is complete.
+   active development to the isolated v0.5 event foundation and completed v0.5.1 M0-M6. Follow
+   `docs/V0_5_PLAN.md` and `docs/V0_5_1_PLAN.html`; treat M7 as next and do not claim the paused
+   v0.4 theme/mainline work is complete.
 2. Inspect the actual code path and tests before proposing architecture.
 3. State any assumption that changes evidence semantics, provider trust, or repository boundaries.
 4. Implement the smallest end-to-end vertical slice with durable artifacts and failure states.

@@ -196,7 +196,7 @@
       </section>
 
       <section class="meta" aria-label="计划元信息">
-        <article><span>开发状态</span><strong>M0 / M1 complete</strong><small>M2 / M3 next</small></article>
+        <article><span>开发状态</span><strong>M0–M6 complete</strong><small>M7 next · WS live smoke waits key</small></article>
         <article><span>开发基线</span><strong>v0.5 branch</strong><small>SEC 事件底座已存在</small></article>
         <article><span>运行策略</span><strong>MCP + WebSocket</strong><small>同级 · 独立健康度</small></article>
         <article><span>安全底线</span><strong>Human confirm</strong><small>建议不等于订单</small></article>
@@ -372,9 +372,9 @@ human_status</code></pre></article>
             <li><span class="method">GET</span><span>/status — 每条通道的连接、新鲜度、调用预算</span></li><li><span class="method">GET</span><span>/stream — 浏览器 SSE 合流提醒</span></li>
             <li><span class="method">GET</span><span>/events — 筛选、观察来源、分页、已读状态</span></li><li><span class="method">GET</span><span>/coverage — 重合率、P50/P95 延迟、缺失与修订差异</span></li>
             <li><span class="method">PATCH</span><span>/settings — 两路独立开关、类别、关键词、阈值、通知</span></li>
-            <li><span class="method">POST</span><span>/events/{id}/analyze — 按需或重试分析</span></li><li><span class="method">POST</span><span>/events/{id}/verify — 建立官方补证任务</span></li>
+            <li><span class="method">POST</span><span>/events/{id}/analyze — 按需或重试分析</span></li><li><span class="method">POST</span><span>/events/{id}/verify — M7：建立官方补证任务</span></li>
           </ul></article>
-          <article class="contract"><div class="contract-head"><span>Run integration</span><b>Immutable links</b></div><ul class="endpoints">
+          <article class="contract"><div class="contract-head"><span>Run integration</span><b>M7 · Immutable links</b></div><ul class="endpoints">
             <li><span class="method">POST</span><span>/events/{id}/runs — 创建链接 Theme/Anchor Run</span></li><li><span class="method">POST</span><span>/runs/{id}/live-context — 选择性加入上下文</span></li>
             <li><span class="method">POST</span><span>/events/{id}/dismiss — 忽略并记录原因</span></li><li><span class="method">POST</span><span>/events/{id}/mute — 主题/实体冷却</span></li>
             <li><span class="method">GET</span><span>/events/{id}/audit — 版本、分析、交付与动作</span></li><li><span class="method">GET</span><span>/settings/schema — 前端动态能力说明</span></li>
@@ -396,11 +396,11 @@ human_status</code></pre></article>
         <div class="milestones">
           <article class="milestone"><span class="mid">M0</span><span class="priority">COMPLETE · foundation</span><h3>决策、许可与契约</h3><p>冻结观察、信号、分析、保留和动作语义，确认双通道同级及聚合资讯与 Evidence 分层。</p><ul><li>SignalObservation</li><li>LiveSignalVersion</li><li>RetentionPolicy</li><li>D017 / D019</li></ul><span class="exit">Exit · schema、同级通道与信任边界测试通过</span></article>
           <article class="milestone"><span class="mid">M1</span><span class="priority">COMPLETE · no-key</span><h3>双通道接口与冻结流</h3><p>建立共同连接接口、每路独立 checkpoint、模拟时钟和可重放双源事件序列。</p><ul><li>LiveEventSource protocol</li><li>per-channel health</li><li>FrozenEventFeed</li><li>matched / divergent fixture</li></ul><span class="exit">Exit · 无 Key 双源合流演示可运行</span></article>
-          <article class="milestone"><span class="mid">M2</span><span class="priority">P0 · first live</span><h3>MCP 正式轮询通道</h3><p>首个真实运行切片：实现初始化、structuredContent、游标、自适应频率和本地调用预算。</p><ul><li>list_flash / calendar</li><li>30s / 120s / 300s schedule</li><li>1200 target / 1500 hard guard</li><li>credential-safe status</li></ul><span class="exit">Exit · MCP-only Live Desk 可持续运行且预算可控</span></article>
-          <article class="milestone"><span class="mid">M3</span><span class="priority">P0 · co-develop</span><h3>WebSocket 同级通道</h3><p>与 M2 共用契约并行实现 flash、calendar、quotes、认证、心跳、退避和订阅。</p><ul><li>Secret-Key auth</li><li>frozen protocol tests</li><li>jittered reconnect</li><li>independent checkpoint</li></ul><span class="exit">Exit · 无 Key 合约测试通过；有 Key live smoke 通过</span></article>
-          <article class="milestone"><span class="mid">M4</span><span class="priority">P0 · reconcile</span><h3>双通道合流与确定性规则</h3><p>匹配两路 observation，同时完成版本、去重、覆盖指标、重要度、冷却、实体别名和现有图匹配。</p><ul><li>match / divergence state</li><li>coverage / P50 / P95</li><li>ruleset / novelty</li><li>entity / theme mapping</li></ul><span class="exit">Exit · 单次提醒、双路谱系、低价值事件零模型费用</span></article>
-          <article class="milestone"><span class="mid">M5</span><span class="priority">P1 · optional AI</span><h3>AI 影响分析器</h3><p>高优先事件输出结构化影响路径、条件、证伪、缺口和成本谱系。</p><ul><li>rules-only baseline</li><li>selective model gate</li><li>typed output</li><li>failure / retry / cost</li></ul><span class="exit">Exit · 无模型与有模型路径均诚实</span></article>
-          <article class="milestone"><span class="mid">M6</span><span class="priority">P0 · Cockpit</span><h3>Live Desk 前端</h3><p>实现双通道状态、覆盖差异、实时流、事件详情、影响分析、筛选、通知和用户动作。</p><ul><li>independent channel chips</li><li>coverage / source filter</li><li>SSE reconnect</li><li>responsive settings</li></ul><span class="exit">Exit · MCP 首发与双通道桌面/窄屏路径通过</span></article>
+          <article class="milestone"><span class="mid">M2</span><span class="priority">COMPLETE · first live</span><h3>MCP 正式轮询通道</h3><p>首个真实运行切片：实现初始化、structuredContent、游标、自适应频率和本地调用预算。</p><ul><li>list_flash / calendar</li><li>30s / 120s / 300s schedule</li><li>1200 target / 1500 hard guard</li><li>credential-safe status</li></ul><span class="exit">Exit · 真实 MCP smoke、预算与 Live Desk 路径通过</span></article>
+          <article class="milestone"><span class="mid">M3</span><span class="priority">COMPLETE · contract</span><h3>WebSocket 同级通道</h3><p>与 M2 共用契约并行实现 flash、calendar、quotes、认证、心跳、退避和订阅。</p><ul><li>Secret-Key auth</li><li>frozen protocol tests</li><li>jittered reconnect</li><li>independent checkpoint</li></ul><span class="exit">Exit · 完整合约/工作器测试通过；live smoke 明确等待 Secret-Key</span></article>
+          <article class="milestone"><span class="mid">M4</span><span class="priority">COMPLETE · reconcile</span><h3>双通道合流与确定性规则</h3><p>匹配两路 observation，同时完成版本、去重、覆盖指标、重要度、冷却、实体别名和现有图匹配。</p><ul><li>match / divergence state</li><li>coverage / P50 / P95</li><li>ruleset / novelty</li><li>entity / theme mapping</li></ul><span class="exit">Exit · 单次提醒、双路谱系、低价值事件零模型费用</span></article>
+          <article class="milestone"><span class="mid">M5</span><span class="priority">COMPLETE · optional AI</span><h3>AI 影响分析器</h3><p>高优先事件输出结构化影响路径、条件、证伪、缺口和成本谱系。</p><ul><li>rules-only baseline</li><li>selective model gate</li><li>typed output</li><li>failure / retry / cost</li></ul><span class="exit">Exit · 无模型、有模型和模型失败路径均诚实</span></article>
+          <article class="milestone"><span class="mid">M6</span><span class="priority">COMPLETE · Cockpit</span><h3>Live Desk 前端</h3><p>实现双通道状态、覆盖差异、实时流、事件详情、影响分析、筛选、通知和用户动作。</p><ul><li>independent channel chips</li><li>coverage / source filter</li><li>SSE reconnect</li><li>responsive settings</li></ul><span class="exit">Exit · MCP 首发与双通道桌面/390px 窄屏路径通过</span></article>
           <article class="milestone"><span class="mid">M7</span><span class="priority">P0 · release</span><h3>补证、链接重评与发布</h3><p>把高价值信号连接到官方源队列、不可变 Run、审计、迁移与发布验证。</p><ul><li>official-source task</li><li>linked run</li><li>audit timeline</li><li>CI / wheel / Web / docs</li></ul><span class="exit">Exit · Definition of Done 全部满足</span></article>
         </div>
         <div class="path"><span>M0 契约</span><i>→</i><span>M1 双源冻结流</span><i>→</i><span>M2 MCP 首发 ∥ M3 WS 并行</span><i>→</i><span>M4 合流规则</span><i>→</i><span>M5 AI</span><i>→</i><span>M6 前端</span><i>→</i><span>M7 发布</span></div>
@@ -459,7 +459,7 @@ human_status</code></pre></article>
       </section>
 
       <section class="handoff">
-        <div><h2>下一步：M2 首发、M3 并行。</h2><p>M0 / M1 已完成双通道契约、迁移 6、独立 checkpoint、双源冻结流和无 Key CLI 演示；接下来让 MCP 进入真实持续运行，同时用 mock server 完成 WebSocket 适配器。拿到 Secret-Key 后只补 live smoke，稳定形态是两路同级常开。</p></div>
+        <div><h2>下一步：M7 补证闭环与发布。</h2><p>M0–M6 已完成双通道契约、迁移 6/7、真实 MCP、完整 WebSocket 工作器、确定性合流规则、可选 AI、API/SSE 与响应式 Live Desk。当前没有 Secret-Key，因此 WebSocket 只诚实声明合约测试完成、live smoke 待凭证；M7 继续官方补证任务、Evidence 附着、链接重评、运行手册和发布门禁。</p></div>
         <div class="links"><a href="../ROADMAP.md">Roadmap</a><a href="V0_5_PLAN.md">v0.5 Plan</a><a href="V0_4_PLAN.md">v0.4 Dependencies</a><a href="DECISIONS.md">Decisions</a><button class="print" type="button" onclick="window.print()">打印 / 导出 PDF</button></div>
       </section>
     </main>

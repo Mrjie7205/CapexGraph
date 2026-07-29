@@ -184,6 +184,176 @@ export interface Scorecard {
   days_tracked: number;
 }
 
+export type LiveChannel = "mcp" | "websocket" | "fixture";
+export type LiveHealth = "not_configured" | "active" | "degraded" | "off" | "exhausted" | "replay";
+export type LiveAlertState = "unread" | "read" | "dismissed" | "muted";
+
+export interface LiveCheckpoint {
+  provider: string;
+  channel: LiveChannel;
+  stream: string;
+  cursor: string;
+  last_external_id?: string;
+  last_published_at?: string;
+  last_observed_at?: string;
+  health: LiveHealth;
+  calls_used: number;
+  call_budget?: number;
+  updated_at: string;
+  error: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface LiveSignal {
+  id: string;
+  signal_key: string;
+  version: number;
+  category: "flash" | "calendar" | "quote" | "news" | "other";
+  title: string;
+  published_at: string;
+  first_observed_at: string;
+  last_observed_at: string;
+  observation_ids: string[];
+  channels: LiveChannel[];
+  match_status: "single_channel" | "matched" | "divergent";
+  verification_state: "signal_only" | "official_source_pending" | "evidence_linked";
+  revision_reason: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface LiveObservation {
+  id: string;
+  provider: string;
+  provider_version: string;
+  channel: LiveChannel;
+  stream: string;
+  external_id: string;
+  category: string;
+  title: string;
+  published_at: string;
+  scheduled_at?: string;
+  observed_at: string;
+  retention_class: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface LiveAssessment {
+  signal_version_id: string;
+  ruleset_version: string;
+  relevance: number;
+  urgency: number;
+  novelty: number;
+  importance: number;
+  total_score: number;
+  matched_entities: string[];
+  matched_themes: string[];
+  matched_graph_nodes: string[];
+  injection_flags: string[];
+  should_alert: boolean;
+  rationale: string[];
+}
+
+export interface LiveProposal {
+  id: string;
+  model_provider?: string;
+  model?: string;
+  themes: string[];
+  entities: string[];
+  direction: string;
+  horizon: string;
+  impact_score: number;
+  confidence: number;
+  transmission_path: string[];
+  price_confirmation: string;
+  evidence_gaps: string[];
+  recommended_action: string;
+  trigger_conditions: string[];
+  invalidations: string[];
+}
+
+export interface LiveAnalysis {
+  id: string;
+  status: "rules_only" | "completed" | "failed" | "skipped";
+  model_provider?: string;
+  model?: string;
+  model_call_count: number;
+  retry_count: number;
+  estimated_cost_usd?: number;
+  cost_status: string;
+  failure: string;
+  created_at: string;
+}
+
+export interface LiveAlert {
+  id?: number;
+  signal_key: string;
+  state: LiveAlertState;
+  score: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LiveEventRecord {
+  signal: LiveSignal;
+  observations: LiveObservation[];
+  assessment?: LiveAssessment;
+  proposal?: LiveProposal;
+  analysis?: LiveAnalysis;
+  alert?: LiveAlert;
+  actions: Array<{ id: string; action: string; note: string; created_at: string }>;
+  trust_notice: string;
+}
+
+export interface LiveCoverage {
+  total_signals: number;
+  matched: number;
+  divergent: number;
+  mcp_only: number;
+  websocket_only: number;
+  fixture_only: number;
+  overlap_ratio: number;
+  delivery_delay_p50_seconds?: number;
+  delivery_delay_p95_seconds?: number;
+  freshest_by_channel: Record<string, string | undefined>;
+}
+
+export interface LiveSettings {
+  mcp_enabled: boolean;
+  websocket_enabled: boolean;
+  flash_enabled: boolean;
+  calendar_enabled: boolean;
+  quote_enabled: boolean;
+  normal_poll_seconds: number;
+  urgent_poll_seconds: number;
+  quiet_poll_seconds: number;
+  alert_score_threshold: number;
+  model_score_threshold: number;
+  cooldown_seconds: number;
+  include_keywords: string[];
+  exclude_keywords: string[];
+  entity_aliases: Record<string, string[]>;
+  theme_keywords: Record<string, string[]>;
+  desktop_notifications: boolean;
+  model_provider?: Provider;
+  updated_at: string;
+}
+
+export interface LiveStatus {
+  running: boolean;
+  started_at?: string;
+  database: string;
+  configuration: {
+    provider: string;
+    mcp: { enabled: boolean; configured: boolean; call_budget: number; hard_limit: number; missing: string[] };
+    websocket: { enabled: boolean; configured: boolean; streams: Record<string, unknown[]>; missing: string[] };
+    errors: string[];
+  };
+  settings: LiveSettings;
+  checkpoints: LiveCheckpoint[];
+  unread_alerts: number;
+  coverage: LiveCoverage;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);
   if (!response.ok) {
@@ -366,4 +536,75 @@ export function setTrackingStage(trackedId: string, stage: TrackingStage): Promi
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ stage }),
   });
+}
+
+export function getLiveStatus(): Promise<LiveStatus> {
+  return request("/api/v1/live/status");
+}
+
+export function listLiveEvents(params: Record<string, string> = {}): Promise<LiveEventRecord[]> {
+  const query = new URLSearchParams(params).toString();
+  return request(`/api/v1/live/events${query ? `?${query}` : ""}`);
+}
+
+export function getLiveCoverage(): Promise<LiveCoverage> {
+  return request("/api/v1/live/coverage");
+}
+
+export function pollLiveStream(stream: "flash" | "calendar"): Promise<unknown> {
+  return request("/api/v1/live/poll", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ stream }),
+  });
+}
+
+export function replayLiveDemo(): Promise<unknown> {
+  return request("/api/v1/live/demo", { method: "POST" });
+}
+
+export function setLiveMonitor(running: boolean): Promise<LiveStatus> {
+  return request(`/api/v1/live/monitor/${running ? "start" : "stop"}`, {
+    method: "POST",
+  });
+}
+
+export function getLiveSettings(): Promise<LiveSettings> {
+  return request("/api/v1/live/settings");
+}
+
+export function patchLiveSettings(settings: Partial<LiveSettings>): Promise<LiveSettings> {
+  return request("/api/v1/live/settings", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(settings),
+  });
+}
+
+export function analyzeLiveEvent(
+  signalId: string,
+  provider?: Provider,
+  forceModel = false,
+): Promise<{ proposal: LiveProposal; analysis: LiveAnalysis }> {
+  return request(`/api/v1/live/events/${encodeURIComponent(signalId)}/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, force_model: forceModel }),
+  });
+}
+
+export function actOnLiveEvent(
+  signalId: string,
+  action: "read" | "dismiss" | "mute" | "watch" | "verify" | "ignore",
+  note = "",
+): Promise<unknown> {
+  return request(`/api/v1/live/events/${encodeURIComponent(signalId)}/actions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, note }),
+  });
+}
+
+export function liveStreamUrl(): string {
+  return "/api/v1/live/stream";
 }

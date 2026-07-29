@@ -1,11 +1,18 @@
+import asyncio
+import hashlib
 import json
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Annotated
 
 import httpx
-from fastapi import BackgroundTasks, FastAPI, HTTPException, Query
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    PlainTextResponse,
+    StreamingResponse,
+)
 from pydantic import BaseModel, Field, HttpUrl
 
 from capexgraph import __version__
@@ -18,9 +25,16 @@ from capexgraph.domain import (
     EvidenceMode,
     FinancialFact,
     FinancialMetric,
+    LiveAlertState,
+    LiveChannel,
+    LiveDeskSettings,
+    LiveMatchStatus,
+    LiveSignalCategory,
+    LiveUserAction,
     MarketSnapshot,
     MarketSyncResult,
     ProviderCapability,
+    ResearchAction,
     ResearchRun,
     RunMode,
     RunStatus,
@@ -31,13 +45,25 @@ from capexgraph.domain import (
 )
 from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
+from capexgraph.live import (
+    LiveImpactAnalyzer,
+    LiveSignalStore,
+    calculate_live_coverage,
+    get_live_runtime,
+    load_frozen_dual_channel_feeds,
+)
 from capexgraph.market import (
     MarketDataService,
     MarketSettings,
     build_market_provider,
     provider_capabilities,
 )
-from capexgraph.providers import ModelSettings, ProviderName, redact_provider_secrets
+from capexgraph.providers import (
+    ModelSettings,
+    ProviderName,
+    create_research_model,
+    redact_provider_secrets,
+)
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.research.context import EvidenceCoverage, refresh_evidence_coverage
@@ -73,7 +99,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["*"],
 )
 
@@ -175,6 +201,40 @@ class TrackingSnapshotRequest(BaseModel):
 
 class TrackingStageRequest(BaseModel):
     stage: TrackingStage
+
+
+class LivePollRequest(BaseModel):
+    stream: str = Field(default="flash", pattern=r"^(flash|calendar)$")
+
+
+class LiveAnalyzeRequest(BaseModel):
+    provider: ProviderName | None = None
+    force_model: bool = False
+
+
+class LiveActionRequest(BaseModel):
+    action: ResearchAction
+    note: str = Field(default="", max_length=500)
+
+
+class LiveSettingsPatch(BaseModel):
+    mcp_enabled: bool | None = None
+    websocket_enabled: bool | None = None
+    flash_enabled: bool | None = None
+    calendar_enabled: bool | None = None
+    quote_enabled: bool | None = None
+    normal_poll_seconds: int | None = Field(default=None, ge=15, le=3600)
+    urgent_poll_seconds: int | None = Field(default=None, ge=15, le=3600)
+    quiet_poll_seconds: int | None = Field(default=None, ge=30, le=7200)
+    alert_score_threshold: float | None = Field(default=None, ge=0, le=100)
+    model_score_threshold: float | None = Field(default=None, ge=0, le=100)
+    cooldown_seconds: int | None = Field(default=None, ge=0, le=86400)
+    include_keywords: list[str] | None = Field(default=None, max_length=100)
+    exclude_keywords: list[str] | None = Field(default=None, max_length=100)
+    entity_aliases: dict[str, list[str]] | None = None
+    theme_keywords: dict[str, list[str]] | None = None
+    desktop_notifications: bool | None = None
+    model_provider: ProviderName | None = None
 
 
 @app.get("/api/health")
@@ -788,3 +848,315 @@ def resume_run(
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (ValueError, RuntimeError) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
+    observations = store.observations_by_ids(signal.observation_ids)
+    assessment = store.get_assessment(signal.id)
+    proposals = store.list_proposals(signal_key=signal.signal_key)
+    analyses = store.list_analyses(signal_key=signal.signal_key)
+    alert = store.get_alert(signal.signal_key)
+    actions = store.list_user_actions(signal.signal_key)
+    return {
+        "signal": signal.model_dump(mode="json"),
+        "observations": [item.model_dump(mode="json") for item in observations],
+        "assessment": (
+            assessment.model_dump(mode="json") if assessment is not None else None
+        ),
+        "proposal": proposals[0].model_dump(mode="json") if proposals else None,
+        "analysis": analyses[0].model_dump(mode="json") if analyses else None,
+        "alert": alert.model_dump(mode="json") if alert is not None else None,
+        "actions": [item.model_dump(mode="json") for item in actions],
+        "trust_notice": (
+            "Aggregator signal only. It is not Evidence and cannot raise graph confidence "
+            "without guarded official-source capture and human review."
+        ),
+    }
+
+
+@app.get("/api/v1/live/status")
+def live_gateway_status() -> dict[str, object]:
+    runtime = get_live_runtime()
+    status = runtime.status()
+    alerts = runtime.store.list_alerts(
+        states=[LiveAlertState.UNREAD],
+        limit=1000,
+    )
+    coverage = calculate_live_coverage(
+        runtime.store.list_signals(),
+        runtime.store.list_observations(limit=5000),
+    )
+    return {
+        **status,
+        "unread_alerts": len(alerts),
+        "coverage": coverage.model_dump(mode="json"),
+    }
+
+
+@app.post("/api/v1/live/poll")
+def poll_live_gateway(request: LivePollRequest) -> dict[str, object]:
+    try:
+        result = get_live_runtime().poll_once(request.stream)
+    except (ValueError, RuntimeError, httpx.HTTPError) as error:
+        raise HTTPException(
+            status_code=502,
+            detail=redact_provider_secrets(error),
+        ) from error
+    return {
+        "stream": request.stream,
+        "observations": len(result.batch.observations),
+        "created_versions": result.created_versions,
+        "duplicates": result.duplicate_observations,
+        "checkpoint": result.batch.checkpoint.model_dump(mode="json"),
+    }
+
+
+@app.post("/api/v1/live/demo")
+def replay_live_demo() -> dict[str, object]:
+    runtime = get_live_runtime()
+    results = [
+        runtime.service.poll_source(feed)
+        for feed in load_frozen_dual_channel_feeds()
+    ]
+    return {
+        "fixture": "jin10-dual-channel-synthetic-v1",
+        "notice": "Synthetic replay only; not current market data.",
+        "channels": [
+            {
+                "channel": result.batch.descriptor.channel.value,
+                "observations": len(result.batch.observations),
+                "created_versions": result.created_versions,
+            }
+            for result in results
+        ],
+    }
+
+
+@app.post("/api/v1/live/monitor/start")
+def start_live_gateway() -> dict[str, object]:
+    return get_live_runtime().start()
+
+
+@app.post("/api/v1/live/monitor/stop")
+def stop_live_gateway() -> dict[str, object]:
+    return get_live_runtime().stop()
+
+
+@app.get("/api/v1/live/events")
+def list_live_events(
+    channel: LiveChannel | None = None,
+    category: LiveSignalCategory | None = None,
+    match_status: LiveMatchStatus | None = None,
+    state: LiveAlertState | None = None,
+    q: Annotated[str | None, Query(max_length=120)] = None,
+    limit: Annotated[int, Query(ge=1, le=500)] = 100,
+) -> list[dict[str, object]]:
+    store = get_live_runtime().store
+    records: list[dict[str, object]] = []
+    for signal in store.list_signals():
+        if channel is not None and channel not in signal.channels:
+            continue
+        if category is not None and signal.category != category:
+            continue
+        if match_status is not None and signal.match_status != match_status:
+            continue
+        if q and q.casefold() not in signal.title.casefold():
+            continue
+        alert = store.get_alert(signal.signal_key)
+        if state is not None and (alert is None or alert.state != state):
+            continue
+        records.append(_live_event_record(store, signal))
+        if len(records) >= limit:
+            break
+    return records
+
+
+@app.get("/api/v1/live/events/{signal_reference}")
+def get_live_event(signal_reference: str) -> dict[str, object]:
+    store = get_live_runtime().store
+    signal = store.get_signal(signal_reference) or store.latest_signal(signal_reference)
+    if signal is None:
+        raise HTTPException(status_code=404, detail="Live signal not found.")
+    return _live_event_record(store, signal)
+
+
+@app.get("/api/v1/live/coverage")
+def get_live_coverage() -> dict[str, object]:
+    store = get_live_runtime().store
+    return calculate_live_coverage(
+        store.list_signals(),
+        store.list_observations(limit=5000),
+    ).model_dump(mode="json")
+
+
+@app.get("/api/v1/live/settings", response_model=LiveDeskSettings)
+def get_live_settings() -> LiveDeskSettings:
+    return get_live_runtime().store.get_settings()
+
+
+@app.get("/api/v1/live/settings/schema")
+def get_live_settings_schema() -> dict[str, object]:
+    schema = LiveDeskSettings.model_json_schema()
+    schema["credential_notice"] = (
+        "Provider credentials are backend-only environment variables and are never "
+        "accepted or returned by this endpoint."
+    )
+    return schema
+
+
+@app.patch("/api/v1/live/settings", response_model=LiveDeskSettings)
+def patch_live_settings(request: LiveSettingsPatch) -> LiveDeskSettings:
+    runtime = get_live_runtime()
+    current = runtime.store.get_settings()
+    updates = request.model_dump(exclude_none=True, mode="json")
+    updates["updated_at"] = datetime.now(UTC)
+    try:
+        updated = LiveDeskSettings.model_validate(
+            {**current.model_dump(mode="json"), **updates}
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    was_running = runtime.running
+    if was_running:
+        runtime.stop()
+    runtime.store.save_settings(updated)
+    if was_running:
+        runtime.start()
+    return updated
+
+
+@app.post("/api/v1/live/events/{signal_reference}/analyze")
+def analyze_live_event(
+    signal_reference: str,
+    request: LiveAnalyzeRequest,
+) -> dict[str, object]:
+    store = get_live_runtime().store
+    signal = store.get_signal(signal_reference) or store.latest_signal(signal_reference)
+    if signal is None:
+        raise HTTPException(status_code=404, detail="Live signal not found.")
+    model = None
+    if request.provider not in {None, ProviderName.FIXTURE}:
+        try:
+            model = create_research_model(
+                request.provider,
+                subject=signal.title,
+                mode="catalyst",
+            )
+        except (ValueError, RuntimeError) as error:
+            raise HTTPException(
+                status_code=409,
+                detail=redact_provider_secrets(error),
+            ) from error
+    try:
+        proposal, analysis = LiveImpactAnalyzer(store).analyze(
+            signal.signal_key,
+            model=model,
+            force_model=request.force_model,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail=redact_provider_secrets(error),
+        ) from error
+    return {
+        "proposal": proposal.model_dump(mode="json"),
+        "analysis": analysis.model_dump(mode="json"),
+    }
+
+
+@app.post("/api/v1/live/events/{signal_reference}/actions")
+def act_on_live_event(
+    signal_reference: str,
+    request: LiveActionRequest,
+) -> dict[str, object]:
+    store = get_live_runtime().store
+    signal = store.get_signal(signal_reference) or store.latest_signal(signal_reference)
+    if signal is None:
+        raise HTTPException(status_code=404, detail="Live signal not found.")
+    if request.action in {
+        ResearchAction.ATTACH,
+        ResearchAction.LINKED_REEVALUATION,
+    }:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Attaching Evidence or launching a linked re-evaluation belongs to M7. "
+                "M6 records watch, verify, read, dismiss, mute, and ignore decisions only."
+            ),
+        )
+    now = datetime.now(UTC)
+    action_id = hashlib.sha256(
+        f"{signal.signal_key}:{request.action.value}:{now.isoformat()}".encode()
+    ).hexdigest()[:24]
+    action = store.save_user_action(
+        LiveUserAction(
+            id=f"live-action-{action_id}",
+            signal_key=signal.signal_key,
+            action=request.action,
+            note=request.note,
+            created_at=now,
+        )
+    )
+    alert = store.get_alert(signal.signal_key)
+    if alert is not None:
+        state = {
+            ResearchAction.DISMISS: LiveAlertState.DISMISSED,
+            ResearchAction.IGNORE: LiveAlertState.DISMISSED,
+            ResearchAction.MUTE: LiveAlertState.MUTED,
+            ResearchAction.READ: LiveAlertState.READ,
+            ResearchAction.WATCH: LiveAlertState.READ,
+            ResearchAction.VERIFY: LiveAlertState.READ,
+        }.get(request.action)
+        if state is not None:
+            alert = store.update_alert_state(signal.signal_key, state)
+    return {
+        "action": action.model_dump(mode="json"),
+        "alert": alert.model_dump(mode="json") if alert is not None else None,
+    }
+
+
+@app.get("/api/v1/live/stream")
+async def stream_live_events(
+    request: Request,
+    after: Annotated[int, Query(ge=0)] = 0,
+    once: bool = False,
+) -> StreamingResponse:
+    header = request.headers.get("last-event-id", "").strip()
+    if header.isdigit():
+        after = max(after, int(header))
+    store = get_live_runtime().store
+
+    async def generate():
+        cursor = after
+        heartbeat = 0
+        while True:
+            alerts = store.list_alerts(after_id=cursor, limit=100)
+            for alert in alerts:
+                cursor = alert.id or cursor
+                signal = store.latest_signal(alert.signal_key)
+                if signal is None:
+                    continue
+                payload = json.dumps(
+                    _live_event_record(store, signal),
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                )
+                yield f"id: {cursor}\nevent: live.signal\ndata: {payload}\n\n"
+            if once:
+                break
+            if await request.is_disconnected():
+                break
+            heartbeat += 1
+            if heartbeat >= 15:
+                heartbeat = 0
+                yield ": heartbeat\n\n"
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

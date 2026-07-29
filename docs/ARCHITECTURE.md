@@ -94,11 +94,27 @@ independent. A failed source can degrade only its own checkpoint. Raw validation
 metadata-only dead-letter record containing a hash and safe schema errors, not the unlicensed or
 potentially sensitive payload.
 
-M0/M1 currently provide only a synthetic, controllable-clock dual-channel feed and the
-`capexgraph live demo` / `live status` inspection path. Real Jin10 transports, scheduling,
-cross-event fuzzy matching, model analysis, SSE, notifications, and the Live Desk are later
-milestones. A `signal_only` record cannot become Evidence or an official corporate event without
-the existing guarded capture and human-review boundary.
+M0-M6 now provide three executable paths. The frozen, controllable-clock feed preserves a no-key
+replay. `Jin10McpClient` performs strict Streamable HTTP negotiation and consumes only
+`structuredContent`; flash uses repeated latest-page reads with local idempotency because the
+provider cursor pages backward through history. A Beijing-day call target and adaptive cadence
+protect quota. `Jin10WebSocketWorker` independently authenticates/subscribes to flash, calendar,
+and optional quote streams, uses protocol heartbeat plus jittered reconnect, and never changes MCP
+health or cadence.
+
+Every new signal version receives an immutable rules assessment. The L0 gate maps configured
+entities/themes, scores relevance/urgency/importance/novelty, flags prompt-injection patterns, and
+creates at most one alert per signal key. Coverage is calculated from preserved observations,
+including channel-only counts, matched/divergent state, and P50/P95 delivery delay. Optional model
+analysis is a separately selected L1 path; typed outputs, model/provider, prompt hash, call count,
+and failures are persisted. A model failure leaves a visible failed analysis and a rules baseline,
+not a falsely model-authored proposal.
+
+`LiveGatewayRuntime` supervises independent MCP and WebSocket loops. The API exposes state,
+poll/start/stop, events, coverage, settings, analysis, actions, and reconnectable SSE. Live Desk
+consumes that surface, while provider credentials remain environment-only. A `signal_only` record
+still cannot become Evidence or an official corporate event without guarded capture and human
+review. M7 owns that explicit attach/linked-run bridge.
 
 ### Corporate event calendar
 
@@ -173,12 +189,17 @@ Schema version 6 adds live observations, append-only canonical signal versions a
 independent provider/channel checkpoints, redacted dead letters, and human-gated action proposals.
 It is additive and does not modify prior research, market, official-event, or tracking history.
 
+Schema version 7 adds immutable rules assessments and analysis lineage, one canonical alert-delivery
+record per signal key, persisted Live Desk settings, and append-only user actions. It is additive
+and does not reinterpret prior observations, signals, Evidence, events, runs, or tracking history.
+
 ### Applications
 
 - FastAPI exposes runs, evidence review, official events, artifacts, market sync/status, tracking,
-  and HTML reports.
-- React/Vite provides the live Research Cockpit and stage board.
-- CLI supports local, batch, tracking, portable-report, and synthetic live-signal replay workflows.
+  HTML reports, and the live gateway/SSE surface.
+- React/Vite provides the Research Cockpit, responsive Live Desk, and stage board.
+- CLI supports local, batch, tracking, portable-report, synthetic replay, real MCP polling, and
+  the equal-priority live supervisor.
 
 ## Runtime lifecycle
 

@@ -25,5 +25,17 @@ from consuming personal subscription capacity.
 The v0.5.1 live-signal contract keeps provider content retention explicit. `ephemeral` and
 `metadata_only` observations persist allowed metadata and a content hash, not the raw body;
 validation dead letters persist only a payload hash and safe schema errors. The bundled
-dual-channel feed is synthetic. Future Jin10 credentials must remain backend-only and must never
-enter checkpoints, API responses, portable artifacts, logs, or committed fixtures.
+dual-channel feed is synthetic.
+
+Jin10 MCP Bearer and Open Platform WebSocket Secret-Key are independent backend environment
+variables. They must never enter Live Desk settings, checkpoints, API/SSE responses, portable
+artifacts, logs, or committed fixtures. Public status exposes only configured/missing booleans.
+Provider errors are sanitized before persistence, common Authorization/API/Secret-Key patterns are
+redacted, HTML-ish provider content is reduced to bounded plain text, and provider picture URLs are
+deliberately omitted because licensed images must not be hotlinked or redistributed.
+
+Live provider content is untrusted input. Deterministic rules run before optional model analysis;
+injection-like strings are flagged and model prompts isolate provider text inside an explicit
+untrusted-data boundary. A Jin10 signal cannot become Evidence, change an official event, or raise
+relationship confidence. Browser notifications are disabled by default and require the operator's
+explicit permission; the browser receives no provider credential.

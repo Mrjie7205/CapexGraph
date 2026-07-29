@@ -257,3 +257,26 @@ cannot disable or demote WebSocket; WebSocket disconnects may trigger its own re
 state but cannot change MCP cadence or role. Cross-channel data can corroborate delivery and improve
 coverage, but two aggregator observations still remain secondary signals. They do not satisfy the
 official-source capture and human-review gate established by D017.
+
+## D020 — Live polling is head-refresh, analysis is rules-first, and M6 stops before research mutation
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+Jin10 `list_flash` cursors page toward older history; they are not forward incremental cursors.
+Continuous MCP operation therefore calls the un-cursored latest page on each cycle, relies on
+stable external identities plus content hashes for local idempotency/revisions, and records the
+returned `next_cursor` only for explicit historical backfill. Calendar observations separate the
+scheduled publication time from when CapexGraph observed the current calendar row.
+
+Every new signal version runs through a deterministic rules layer before an optional model. The
+ruleset owns relevance, urgency, importance, novelty, entity/theme mapping, exclusions, injection
+flags, and the single-alert decision. Model execution is explicit, threshold/cost gated, typed, and
+audited; model failure is visible and cannot be labeled as model-generated output. Licensed
+provider bodies default to metadata-only retention, HTML is sanitized, and picture URLs are not
+hotlinked or persisted.
+
+M6 may record reversible read/watch/verify/dismiss/mute/ignore actions and expose browser
+notifications after explicit permission. It may not attach a signal as Evidence or create a linked
+research run. Those state-changing bridges remain M7 and must pass through official-source capture,
+human review, and explicit confirmation.
