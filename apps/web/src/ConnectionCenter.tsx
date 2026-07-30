@@ -10,6 +10,7 @@ import {
   startCodexLogin,
   type ConnectionStatus,
 } from "./api";
+import { BilingualText, humanizeUiValue } from "./UiText";
 
 interface ConnectionCenterProps {
   open: boolean;
@@ -137,7 +138,7 @@ export function ConnectionCenter({
   }
 
   async function removeMcp() {
-    if (!window.confirm("断开金十 MCP，并从本机配置中删除 Token？")) return;
+    if (!window.confirm("断开金十 MCP，并从本机配置中删除访问令牌？")) return;
     setBusy("mcp");
     setError("");
     try {
@@ -162,7 +163,7 @@ export function ConnectionCenter({
       setWebsocketKey("");
       await refresh();
       announceChange();
-      setNotice("WebSocket Secret-Key 已保存；启动 Monitor 后完成真实流验证。");
+      setNotice("WebSocket 密钥已保存；启动实时监控后完成真实流验证。");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "WebSocket 配置失败");
     } finally {
@@ -171,7 +172,7 @@ export function ConnectionCenter({
   }
 
   async function removeWebSocket() {
-    if (!window.confirm("断开金十 WebSocket，并从本机配置中删除 Secret-Key？")) return;
+    if (!window.confirm("断开金十 WebSocket，并从本机配置中删除推送密钥？")) return;
     setBusy("websocket");
     setError("");
     try {
@@ -243,18 +244,18 @@ export function ConnectionCenter({
       >
         <header className="connection-head">
           <div>
-            <span>Local integration desk / 本机连接</span>
-            <h2 id="connection-title">Connection Center</h2>
+            <BilingualText zh="本机集成台" en="Local integration desk" />
+            <h2 id="connection-title">连接中心<small>Connection Center</small></h2>
             <p>凭据只进入本机后端；浏览器不会读取、回显或同步它们。</p>
           </div>
           <div className="connection-score">
             <strong>{connectedCount}<small>/ 3</small></strong>
-            <span>channels ready</span>
+            <span>条通道就绪<small>channels ready</small></span>
           </div>
           <button className="connection-close" onClick={onClose} aria-label="关闭连接中心">×</button>
         </header>
 
-        {error && <div className="connection-message error">{error}</div>}
+        {error && <div className="connection-message error"><strong>连接操作未完成</strong><small>{error}</small></div>}
         {notice && <div className="connection-message success">{notice}</div>}
 
         {!status ? (
@@ -268,27 +269,28 @@ export function ConnectionCenter({
           <article className="connection-card">
             <div className="connection-card-head">
               <div className={`connection-orb ${connectionTone(mcp?.reachability ?? "not_checked")}`} />
-              <div><span>Market signal · 01</span><h3>金十 MCP</h3></div>
+              <div><BilingualText zh="市场信号 · 01" en="Market signal" compact /><h3>金十 MCP</h3></div>
               <b className={connectionTone(mcp?.reachability ?? "not_checked")}>
                 {connectionLabel(mcp?.reachability ?? "not_checked")}
+                <small>{humanizeUiValue(mcp?.reachability ?? "not_checked")}</small>
               </b>
             </div>
             <p>正式快讯和财经日历轮询。连接时会完成 MCP 握手、工具发现与资源发现。</p>
             {mcp?.configured ? (
               <div className="connection-facts">
-                <span><small>Daily guard</small>{mcp.call_budget} / 1500</span>
-                <span><small>Tools</small>{mcp.tools.length || "待检测"}</span>
-                <span><small>Storage</small>本机 .env</span>
+                <span><small>每日额度<em>Daily guard</em></small>{mcp.call_budget} / 1500</span>
+                <span><small>工具数<em>Tools</em></small>{mcp.tools.length || "待检测"}</span>
+                <span><small>存储位置<em>Storage</em></small>本机 .env</span>
               </div>
             ) : (
               <label className="secret-field">
-                Bearer Token
+                访问令牌<small>Bearer Token</small>
                 <input
                   type="password"
                   autoComplete="new-password"
                   value={mcpToken}
                   onChange={(event) => setMcpToken(event.target.value)}
-                  placeholder="粘贴金十 MCP Token"
+                  placeholder="粘贴金十 MCP 访问令牌"
                 />
               </label>
             )}
@@ -309,27 +311,28 @@ export function ConnectionCenter({
           <article className="connection-card">
             <div className="connection-card-head">
               <div className={`connection-orb ${connectionTone(websocket?.reachability ?? "not_checked")}`} />
-              <div><span>Market signal · 02</span><h3>金十 WebSocket</h3></div>
+              <div><BilingualText zh="市场信号 · 02" en="Market signal" compact /><h3>金十 WebSocket</h3></div>
               <b className={connectionTone(websocket?.reachability ?? "not_checked")}>
                 {connectionLabel(websocket?.reachability ?? "not_checked")}
+                <small>{humanizeUiValue(websocket?.reachability ?? "not_checked")}</small>
               </b>
             </div>
-            <p>低延迟推送，与 MCP 同级运行。保存密钥后需在 Live Desk 启动 Monitor 完成实流验证。</p>
+            <p>低延迟推送，与 MCP 同级运行。保存密钥后需在实时台启动监控，完成实流验证。</p>
             {websocket?.configured ? (
               <div className="connection-facts">
-                <span><small>Flash</small>1, 4</span>
-                <span><small>Calendar</small>cj</span>
-                <span><small>Next</small>启动 Monitor</span>
+                <span><small>快讯流<em>Flash</em></small>1, 4</span>
+                <span><small>日历流<em>Calendar</em></small>cj</span>
+                <span><small>下一步<em>Next</em></small>启动监控</span>
               </div>
             ) : (
               <label className="secret-field">
-                Secret-Key
+                推送密钥<small>Secret-Key</small>
                 <input
                   type="password"
                   autoComplete="new-password"
                   value={websocketKey}
                   onChange={(event) => setWebsocketKey(event.target.value)}
-                  placeholder="粘贴开放平台 Secret-Key"
+                  placeholder="粘贴开放平台推送密钥"
                 />
               </label>
             )}
@@ -347,9 +350,10 @@ export function ConnectionCenter({
           <article className="connection-card codex-card">
             <div className="connection-card-head">
               <div className={`connection-orb ${connectionTone(codex?.reachability ?? "not_checked")}`} />
-              <div><span>Reasoning · 03</span><h3>Codex Subscription</h3></div>
+              <div><BilingualText zh="推理通道 · 03" en="Reasoning" compact /><h3>Codex 订阅<small>Codex Subscription</small></h3></div>
               <b className={connectionTone(codex?.reachability ?? "not_checked")}>
                 {connectionLabel(codex?.reachability ?? "not_checked")}
+                <small>{humanizeUiValue(codex?.reachability ?? "not_checked")}</small>
               </b>
             </div>
             <p>通过 OpenAI 官方 Codex CLI 使用 ChatGPT 订阅；不需要 OpenAI Platform API Key。</p>
@@ -362,16 +366,16 @@ export function ConnectionCenter({
             ) : codex.authenticated ? (
               <>
                 <div className="connection-facts">
-                  <span><small>Account</small>{codex.account?.email ?? "ChatGPT"}</span>
-                  <span><small>Plan</small>{codex.account?.plan_type ?? "已登录"}</span>
-                  <span><small>CLI</small>{codex.version?.replace("codex-cli ", "v") ?? "ready"}</span>
+                  <span><small>账号<em>Account</em></small>{codex.account?.email ?? "ChatGPT"}</span>
+                  <span><small>套餐<em>Plan</em></small>{codex.account?.plan_type ?? "已登录"}</span>
+                  <span><small>命令行<em>CLI</em></small>{codex.version?.replace("codex-cli ", "v") ?? "就绪"}</span>
                 </div>
                 <label className="model-field">
-                  Research model
+                  研究模型<small>Research model</small>
                   <select value={selectedModel} onChange={(event) => setSelectedModel(event.target.value)}>
                     {codex.models.map((model) => (
                       <option key={model.id} value={model.id}>
-                        {model.display_name}{model.is_default ? " · default" : ""}
+                        {model.display_name}{model.is_default ? " · 默认" : ""}
                       </option>
                     ))}
                   </select>
@@ -402,8 +406,8 @@ export function ConnectionCenter({
         )}
 
         <footer className="connection-foot">
-          <p><b>Local-only boundary</b> Token 写入被 Git 忽略的项目 `.env`；Codex OAuth 由官方 CLI 和系统凭据存储管理。</p>
-          <button onClick={onClose}>完成</button>
+          <p><b>仅限本机<small>Local-only boundary</small></b> 访问令牌写入被 Git 忽略的项目 `.env`；Codex OAuth 由官方 CLI 和系统凭据存储管理。</p>
+          <button onClick={onClose}>完成<small>Done</small></button>
         </footer>
       </aside>
     </div>

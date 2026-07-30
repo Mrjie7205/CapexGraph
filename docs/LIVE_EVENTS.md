@@ -18,8 +18,9 @@ failing never changes the other channel's role.
 
 ## Quick start without keys
 
-Start API and Web with `scripts/dev.ps1`, open `http://127.0.0.1:5173`, and select **Live Desk**.
-Click **Load no-key replay** to create three explicitly synthetic canonical signals:
+Start API and Web with `scripts/dev.ps1`, open `http://127.0.0.1:5173`, and select
+**实时台** (*Live Desk*). Click **加载免密钥回放** (*Load no-key replay*) to create three
+explicitly synthetic canonical signals:
 
 - a cross-channel matched flash;
 - a divergent cross-channel flash; and
@@ -39,7 +40,8 @@ The replay is not current market information. It is intentionally dated and labe
 
 ## Configure real channels
 
-In the Cockpit, choose **Connections** from the top bar or Live Desk. The product setup flow:
+In the Cockpit, choose **连接** (*Connections*) from the top bar or **连接中心** from the
+Live Desk. The product setup flow:
 
 1. accepts the MCP Bearer Token in a password field;
 2. completes the standard MCP handshake and tool/resource discovery before saving it;
@@ -103,7 +105,9 @@ it is never mistaken for a forward stream offset.
 
 ## Live Desk
 
-Live Desk exposes:
+The Cockpit is Chinese-first: every operating label and deterministic machine state is presented
+in Chinese, with compact English sublabels retained for cross-reference and audit vocabulary.
+Native dropdowns use Chinese-first option text. Live Desk exposes:
 
 - a productized Connection Center for Jin10 MCP, Jin10 WebSocket, and official Codex login/model
   selection;

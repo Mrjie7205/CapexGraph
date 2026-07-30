@@ -21,6 +21,33 @@ body { margin: 0; min-width: 320px; min-height: 100vh; }
 button, input, select { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; }
+.bilingual-text {
+  display: inline-flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  line-height: 1.15;
+  text-transform: none;
+}
+.bilingual-text.align-center { align-items: center; text-align: center; }
+.bilingual-text.align-right { align-items: flex-end; text-align: right; }
+.bilingual-text.compact { gap: 1px; }
+.bilingual-primary { display: block; min-width: 0; }
+.bilingual-secondary {
+  display: block;
+  margin: 0;
+  color: inherit;
+  opacity: .56;
+  font: 6.5px/1.15 var(--mono);
+  font-weight: 400;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+button .bilingual-secondary, a .bilingual-secondary { opacity: .62; }
+.panel-title .bilingual-primary, .composer-head .bilingual-primary { letter-spacing: .09em; }
+.panel-title .bilingual-secondary, .composer-head .bilingual-secondary { font-size: 6px; }
 
 body::before {
   content: "";
@@ -48,7 +75,9 @@ main { min-height: 100vh; }
 }
 
 .brand { display: flex; align-items: center; gap: 12px; color: var(--ink); text-decoration: none; font-size: 19px; font-weight: 600; }
-.brand small { display: block; font: 9px var(--mono); letter-spacing: .16em; text-transform: uppercase; color: var(--muted); margin-top: 2px; }
+.brand .bilingual-text { display: flex; margin-top: 3px; }
+.brand .bilingual-primary { color: var(--muted); font: 9px/1.1 var(--mono); letter-spacing: .1em; }
+.brand small { display: block; color: var(--muted); font: 6px/1.1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
 .brand-mark { width: 36px; height: 36px; position: relative; display: grid; place-items: center; border: 1px solid var(--ink); transform: rotate(45deg); }
 .brand-mark i { position: absolute; font: normal 500 12px var(--mono); transform: rotate(-45deg); }
 .brand-mark i:first-child { translate: -6px -4px; color: var(--burgundy); }
@@ -57,8 +86,9 @@ main { min-height: 100vh; }
 nav { display: flex; align-self: stretch; }
 nav a { display: grid; place-items: center; padding: 0 18px; color: var(--muted); text-decoration: none; font: 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; border-bottom: 2px solid transparent; }
 nav a:hover, nav a.active { color: var(--ink); border-bottom-color: var(--burgundy); }
-.system-state { justify-self: end; font: 10px var(--mono); color: var(--muted); text-transform: uppercase; }
-.system-state span { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 8px; box-shadow: 0 0 0 4px rgba(45,104,84,.1); }
+.system-state { justify-self: end; display: flex; align-items: center; white-space: nowrap; font: 10px var(--mono); color: var(--muted); text-transform: uppercase; }
+.system-state > span:first-child { display: inline-block; flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 8px; box-shadow: 0 0 0 4px rgba(45,104,84,.1); }
+.system-state .bilingual-text { flex: 0 0 auto; }
 .topbar-tools { justify-self: end; display: flex; align-items: center; gap: 15px; }
 .connection-trigger { display: flex; align-items: center; gap: 8px; border: 1px solid rgba(111,31,43,.42); background: rgba(111,31,43,.035); color: var(--burgundy); padding: 9px 11px; font: 8px var(--mono); text-transform: uppercase; letter-spacing: .08em; }
 .connection-trigger:hover { color: white; background: var(--burgundy); }
@@ -69,6 +99,7 @@ nav a:hover, nav a.active { color: var(--ink); border-bottom-color: var(--burgun
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(420px, .75fr); gap: 7vw; align-items: end; }
 h1 { font-size: clamp(55px, 6.4vw, 104px); line-height: .86; letter-spacing: -.055em; margin: 0; font-weight: 400; }
 h1 em { color: var(--burgundy); font-weight: 500; }
+.hero h1 > small { display: block; margin-top: 24px; color: var(--muted); font: 11px/1.2 var(--mono); letter-spacing: .11em; text-transform: uppercase; }
 .hero-copy { max-width: 640px; font-size: 20px; line-height: 1.6; color: #554f46; margin: 34px 0 0; }
 
 .run-composer { background: var(--ink); color: var(--paper); padding: 24px; box-shadow: 16px 18px 0 rgba(111,31,43,.12); }
@@ -711,6 +742,127 @@ footer span:last-child { justify-self: end; color: var(--burgundy); }
 .audit-block li small { margin-top: 4px; color: var(--muted); font: 7px var(--mono); overflow-wrap: anywhere; }
 .audit-block li.audit-empty { display: block; color: var(--muted); font: 9px var(--mono); }
 
+/* Chinese is the operating language; English remains a quiet audit aid. */
+section[id] { scroll-margin-top: 88px; }
+.panel-title > b, .live-panel-head > b, .detail-section-title > b {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.panel-title > b > small,
+.live-panel-head > b > small,
+.detail-section-title > b > small {
+  display: block;
+  opacity: .52;
+  font: 5.5px/1 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.stats .bilingual-primary, .live-tape .bilingual-primary {
+  font-size: 8px;
+  color: var(--ink);
+}
+.stats .bilingual-secondary, .live-tape .bilingual-secondary {
+  font-size: 5.5px;
+  opacity: .48;
+}
+.run-strip button > span > small,
+.source-status > small,
+.radar-head small,
+.candidate-row > span > small,
+.graph-key small,
+.review-actions small,
+.suggestion-meta small,
+.facts-table th small,
+.facts-table td small,
+.fact-type small,
+.tracking-grid button small,
+.tracking-grid footer small,
+main > footer small {
+  display: block;
+  margin-top: 2px;
+  opacity: .5;
+  font: 5.5px/1.1 var(--mono);
+  font-style: normal;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.return-strip small > em,
+.connection-facts small > em,
+.impact-axis small > em {
+  display: block;
+  margin-top: 2px;
+  opacity: .52;
+  font: normal 5.5px/1.1 var(--mono);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.signal-stamp small,
+.signal-tags small,
+.detail-overline small,
+.detail-score small,
+.score-ruler span small,
+.channel-mark small,
+.lineage-row > i small,
+.analysis-cost small,
+.impact-axis strong small,
+.coverage-dial small,
+.coverage-list small,
+.official-source-card span small,
+.review-gate span small,
+.evidence-seal span small,
+.audit-block li span small {
+  display: block;
+  margin-top: 2px;
+  opacity: .5;
+  font: 5px/1.05 var(--mono);
+  font-style: normal;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.channel-chip small > em {
+  display: block;
+  margin-top: 2px;
+  opacity: .52;
+  font: normal 5.5px/1 var(--mono);
+  letter-spacing: .08em;
+}
+.trust-notice small {
+  display: block;
+  margin-top: 5px;
+  opacity: .58;
+  font-size: 6px;
+  line-height: 1.4;
+}
+.coverage-ring span small,
+.coverage-orbit h3 small,
+.coverage-orbit p small,
+.facts-head h3 small,
+.connection-head h2 small,
+.connection-score span small,
+.connection-card-head h3 small,
+.connection-card-head b small,
+.secret-field > small,
+.model-field > small,
+.connection-foot b small,
+.research-bridge header h3 small,
+.bridge-run-controls label > small,
+.bridge-new-run label > small,
+.bridge-result span small,
+.live-settings header h3 small,
+.live-settings legend > small,
+.live-settings label > small,
+.live-settings button > small {
+  display: block;
+  margin-top: 2px;
+  opacity: .52;
+  font: 5.5px/1.1 var(--mono);
+  font-style: normal;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
 @media (max-width: 980px) {
   .topbar { grid-template-columns: 1fr auto; }
   nav { display: none; }
@@ -746,7 +898,7 @@ footer span:last-child { justify-self: end; color: var(--burgundy); }
   .connection-trigger { padding: 8px 9px; }
   .hero { padding: 55px 20px; }
   .hero-grid { display: block; }
-  h1 { font-size: 56px; }
+  h1 { font-size: 44px; line-height: .92; }
   .hero-copy { font-size: 17px; margin-bottom: 35px; }
   .stats, .workbench, .lower-grid { padding-left: 14px; padding-right: 14px; }
   .stats { padding: 0; }

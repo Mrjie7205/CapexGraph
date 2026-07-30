@@ -73,6 +73,11 @@ substantial change, and update it in the same pull request whenever shipped capa
   the operations/recovery runbook; and
 - a responsive Research Bridge with four-stage status, official-source capture and human review,
   immutable run operations, explicit confirmations, and audit history.
+- a Chinese-first Cockpit language system across the research composer, workflow, graph, source
+  queue, readiness, Live Desk, Connection Center, settings, and Research Bridge: operating labels
+  and machine states are Chinese, while compact English sublabels preserve product and audit
+  vocabulary; native selectors use Chinese-first option text, and the bridge Market control is
+  bounded to CN/US/KR instead of accepting free text.
 
 This completes M0 through M7 in code and makes the branch release-ready; it does not merge, tag, or
 publish a release. The current checkout has no Jin10 WebSocket
@@ -121,6 +126,9 @@ guarded official-source capture and human-review path.
 - the productized connection flow was browser-verified at desktop and 390px width: Codex account
   and models load, missing Jin10 credentials remain `WAIT KEY`, SSE becomes `CONNECTED`
   immediately, and the Market selector exposes exactly CN/US/KR without horizontal overflow;
+- the Chinese-first interface was browser-verified at desktop and 390px width across the landing
+  composer, Live Desk, connection onboarding, gateway settings, Research Bridge, dynamic run and
+  evidence states, with English retained only as compact secondary vocabulary;
 - 122 Python tests pass locally and Ruff passes;
 - the React/Vite production build passes;
 - a fresh wheel build includes `capexgraph.events`, the complete

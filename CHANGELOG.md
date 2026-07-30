@@ -4,6 +4,11 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- made Chinese the primary Cockpit operating language across navigation, research creation,
+  workflow and evidence states, source/readiness tools, Live Desk, Connection Center, settings,
+  and Research Bridge; retained compact English sublabels for audit vocabulary, localized
+  deterministic signal explanations, improved 390px typography, and changed the bridge Market
+  field to the same bounded CN/US/KR selector used by the main composer;
 - made the official local Codex CLI the default `codex_subscription` transport, with official
   app-server account/login/model discovery, ephemeral read-only schema-bound `codex exec`, and no
   OpenAI Platform API key; recursively normalized Pydantic schemas for strict structured output,
