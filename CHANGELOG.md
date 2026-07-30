@@ -41,6 +41,19 @@ All notable changes to CapexGraph are documented here.
   status/events/coverage/settings/actions/SSE surface, and a responsive Live Desk with independent
   channel chips, no-key replay, filters, lineage, impact analysis, coverage audit, explicit browser
   notifications, and Watch/Verify/Dismiss/Mute actions;
+- completed M7 with confirmed official-source verification tasks, regulator/issuer source gates,
+  guarded capture and retry, human approve/reject, unchanged-hash enforcement, separate reviewed
+  Evidence links, and append-only verification-state signal versions;
+- added immutable live-context snapshots and integrity checks, existing-run attachment,
+  parent-preserving child re-evaluation, dedicated mutation endpoints, and a combined
+  observation/signal/analysis/action/bridge audit timeline;
+- added additive schema migration 8 for verification tasks, live Evidence links, run-context links,
+  audit entries, and soak reports without rewriting existing research history;
+- added isolated duplicate/failure/recovery soak tests, `live soak`, `live doctor`, credential-safe
+  diagnostics, WebSocket/MCP credentialed-gate semantics, and the live operations/recovery runbook;
+- extended Live Desk with the responsive Research Bridge, four-stage evidence firewall, official
+  source capture/review controls, linked-run operations, audit history, release-gate status, and
+  explicit confirmations for every research mutation;
 - started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
   source-public/system-observed timestamps, effective/expected dates, and canonical entities;
 - added append-only migration 5, semantic idempotency, immutable event versions, current/history

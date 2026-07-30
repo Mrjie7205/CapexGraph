@@ -69,23 +69,27 @@ calendars, filing-content event extraction, or event-triggered automated re-eval
 [the v0.5 execution plan](docs/V0_5_PLAN.md).
 
 The [v0.5.1 live-event gateway plan](docs/V0_5_1_PLAN.html) defines Jin10 MCP polling and Open
-Platform WebSocket as two equal-priority live information channels. M0-M6 are implemented:
+Platform WebSocket as two equal-priority live information channels. M0-M7 are implemented:
 
-- typed signal/retention/action contracts and additive migrations 6/7;
+- typed signal/retention/action/bridge contracts and additive migrations 6/7/8;
 - independent channel checkpoints, deterministic versions, single alerts, and frozen no-key replay;
 - strict MCP initialization, structuredContent parsing, latest-page polling, 30/120/300 cadence,
   and a 1200-call local target below the documented 1500 per-tool daily limit;
 - Open Platform flash/calendar/quote WebSocket auth, heartbeat, reconnect, and normalization;
 - cross-channel overlap/divergence and P50/P95 delay metrics plus entity/theme/injection rules;
 - rules-only and explicitly selected typed model analysis with visible failure/call lineage; and
-- a supervisor, CLI/API/SSE, and responsive Cockpit Live Desk.
+- a supervisor, CLI/API/SSE, and responsive Cockpit Live Desk;
+- confirmed official-source tasks, guarded capture, reviewed Evidence links, immutable run context,
+  parent-preserving linked re-evaluations, and an audit timeline; and
+- an isolated no-key chaos soak, read-only diagnostics, release runbook, and Research Bridge UI.
 
 Run `capexgraph live demo` and then `capexgraph live status` to inspect the synthetic no-key path.
 The MCP adapter has a real-provider smoke test. WebSocket live smoke still requires its separate
 Secret-Key; without it the UI reports `WAIT KEY` rather than pretending to be connected. Aggregator
 messages remain secondary signals and must pass through official capture and human review before
-becoming Evidence. M7 retains the official-source task, Evidence attach, linked re-evaluation, and
-release-hardening work.
+creating a separate Evidence link. The credentialed WebSocket live soak remains an external
+acceptance gate until its Secret-Key is available; it is not reported as a passing or fallback
+path.
 
 ## v0.4 development preview
 
@@ -235,6 +239,8 @@ The frozen dual-channel replay and rules-only impact path need no provider or mo
 capexgraph live demo
 capexgraph live status
 capexgraph live providers
+capexgraph live soak --mode fixture --cycles 6 --failure-every 3
+capexgraph live doctor
 ```
 
 For real MCP polling, put the Bearer token only in the repository-local `.env`:
@@ -263,10 +269,14 @@ CAPEXGRAPH_JIN10_WS_CALENDAR_CATEGORIES=cj
 The React Cockpit exposes Live Desk as its first navigation item. It shows MCP/WebSocket health
 separately, reconnects its SSE stream, provides event/category/source filters, explains
 matched/divergent lineage and delivery delay, supports no-key rules analysis, and records explicit
-Watch/Verify/Dismiss/Mute actions. Provider credentials are backend-only and never appear in the
-settings API or browser. Browser notifications require a direct user opt-in.
+Watch/Dismiss/Mute actions. Its Research Bridge creates confirmed official-source tasks, captures
+and reviews official material, links only unchanged reviewed Evidence, attaches immutable context,
+creates parent-preserving child re-evaluations, and exposes the complete audit timeline. Provider
+credentials are backend-only and never appear in the settings API or browser. Browser
+notifications require a direct user opt-in.
 See [the live event operator guide](docs/LIVE_EVENTS.md) for API contracts, retention, cursor
-semantics, and troubleshooting.
+semantics, and troubleshooting, and [the live operations runbook](docs/LIVE_OPERATIONS.md) for
+release gates, restart, recovery, and incident handling.
 
 ## Research artifact contract
 

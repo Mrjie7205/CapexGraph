@@ -94,6 +94,11 @@ def test_live_store_migration_and_metadata_retention(tmp_path) -> None:
         "live_alert_deliveries",
         "live_settings",
         "live_user_actions",
+        "live_verification_tasks",
+        "live_evidence_links",
+        "live_run_context_links",
+        "live_audit_entries",
+        "live_soak_reports",
     } <= tables
 
 

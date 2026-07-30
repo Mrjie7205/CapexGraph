@@ -293,6 +293,100 @@ export interface LiveAlert {
   updated_at: string;
 }
 
+export type LiveVerificationTaskStatus =
+  | "pending"
+  | "source_suggested"
+  | "capture_pending"
+  | "captured"
+  | "evidence_linked"
+  | "rejected"
+  | "failed"
+  | "cancelled";
+
+export interface LiveVerificationTask {
+  id: string;
+  signal_key: string;
+  signal_version_id: string;
+  query: string;
+  status: LiveVerificationTaskStatus;
+  run_id?: string;
+  source_suggestion_id?: string;
+  evidence_id?: string;
+  evidence_link_id?: string;
+  note: string;
+  attempts: number;
+  error: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LiveEvidenceLink {
+  id: string;
+  signal_key: string;
+  signal_version_id: string;
+  verification_task_id: string;
+  run_id: string;
+  evidence_id: string;
+  source_hash: string;
+  link_hash: string;
+  linked_at: string;
+  linked_by: string;
+}
+
+export interface LiveRunContextLink {
+  id: string;
+  signal_key: string;
+  signal_version_id: string;
+  run_id: string;
+  parent_run_id?: string;
+  context_hash: string;
+  context: Record<string, unknown>;
+  note: string;
+  created_at: string;
+  created_by: string;
+}
+
+export interface LiveAuditEntry {
+  id?: number;
+  signal_key: string;
+  event_type: string;
+  object_type: string;
+  object_id: string;
+  actor: string;
+  summary: string;
+  occurred_at: string;
+  details: Record<string, unknown>;
+}
+
+export interface LiveSoakReport {
+  id: string;
+  mode: string;
+  cycles: number;
+  observations: number;
+  created_versions: number;
+  duplicates: number;
+  injected_failures: number;
+  observed_failures: number;
+  checkpoint_isolation_ok: boolean;
+  passed: boolean;
+  started_at: string;
+  completed_at: string;
+  notes: string[];
+}
+
+export interface LiveVerificationTaskRecord {
+  task: LiveVerificationTask;
+  source_suggestion?: SourceSuggestion;
+  evidence?: EvidenceItem;
+  evidence_link?: LiveEvidenceLink;
+  run?: ResearchRun;
+}
+
+export interface LiveLinkedRunResponse {
+  run: ResearchRun;
+  link: LiveRunContextLink;
+}
+
 export interface LiveEventRecord {
   signal: LiveSignal;
   observations: LiveObservation[];
@@ -301,6 +395,9 @@ export interface LiveEventRecord {
   analysis?: LiveAnalysis;
   alert?: LiveAlert;
   actions: Array<{ id: string; action: string; note: string; created_at: string }>;
+  verification_tasks: LiveVerificationTask[];
+  evidence_links: LiveEvidenceLink[];
+  run_links: LiveRunContextLink[];
   trust_notice: string;
 }
 
@@ -352,6 +449,7 @@ export interface LiveStatus {
   checkpoints: LiveCheckpoint[];
   unread_alerts: number;
   coverage: LiveCoverage;
+  latest_soak?: LiveSoakReport;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -547,6 +645,10 @@ export function listLiveEvents(params: Record<string, string> = {}): Promise<Liv
   return request(`/api/v1/live/events${query ? `?${query}` : ""}`);
 }
 
+export function getLiveEvent(signalReference: string): Promise<LiveEventRecord> {
+  return request(`/api/v1/live/events/${encodeURIComponent(signalReference)}`);
+}
+
 export function getLiveCoverage(): Promise<LiveCoverage> {
   return request("/api/v1/live/coverage");
 }
@@ -591,6 +693,109 @@ export function analyzeLiveEvent(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ provider, force_model: forceModel }),
   });
+}
+
+export function openLiveVerificationTask(
+  signalReference: string,
+  runId?: string,
+): Promise<LiveVerificationTaskRecord> {
+  return request(`/api/v1/live/events/${encodeURIComponent(signalReference)}/verify`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      run_id: runId || undefined,
+      confirmed: true,
+      note: "Opened from the Live Desk Research Bridge.",
+    }),
+  });
+}
+
+export function getLiveVerificationTask(taskId: string): Promise<LiveVerificationTaskRecord> {
+  return request(`/api/v1/live/verification-tasks/${encodeURIComponent(taskId)}`);
+}
+
+export function addLiveVerificationSource(
+  taskId: string,
+  input: {
+    run_id?: string;
+    url: string;
+    title: string;
+    publisher?: string;
+    issuer_domains?: string[];
+  },
+): Promise<LiveVerificationTaskRecord> {
+  return request(`/api/v1/live/verification-tasks/${encodeURIComponent(taskId)}/sources`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...input,
+      kind: "company_disclosure",
+      confirmed: true,
+    }),
+  });
+}
+
+export function captureLiveVerificationSource(
+  taskId: string,
+  retry = false,
+): Promise<LiveVerificationTaskRecord> {
+  return request(`/api/v1/live/verification-tasks/${encodeURIComponent(taskId)}/capture`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ retry, confirmed: true }),
+  });
+}
+
+export function reviewLiveVerificationEvidence(
+  taskId: string,
+  approved: boolean,
+): Promise<LiveVerificationTaskRecord> {
+  return request(`/api/v1/live/verification-tasks/${encodeURIComponent(taskId)}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved, confirmed: true }),
+  });
+}
+
+export function attachLiveContextToRun(
+  runId: string,
+  signalReference: string,
+): Promise<LiveRunContextLink> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/live-context`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      signal_reference: signalReference,
+      confirmed: true,
+      note: "Immutable context attached from the Live Desk Research Bridge.",
+    }),
+  });
+}
+
+export function createLiveLinkedRun(
+  signalReference: string,
+  input: {
+    parent_run_id?: string;
+    mode?: RunMode;
+    subject?: string;
+    market?: string;
+    provider?: Provider;
+    note?: string;
+  },
+): Promise<LiveLinkedRunResponse> {
+  const endpoint = input.parent_run_id ? "reevaluate" : "runs";
+  return request(`/api/v1/live/events/${encodeURIComponent(signalReference)}/${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      ...input,
+      confirmed: true,
+    }),
+  });
+}
+
+export function listLiveAudit(signalReference: string): Promise<LiveAuditEntry[]> {
+  return request(`/api/v1/live/events/${encodeURIComponent(signalReference)}/audit`);
 }
 
 export function actOnLiveEvent(

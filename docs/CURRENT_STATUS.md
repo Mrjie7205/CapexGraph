@@ -1,12 +1,14 @@
 # Current status
 
-- Last verified: 2026-07-29
+- Last verified: 2026-07-30
 - Release: `v0.3.0` — Trustworthy live research
 - Active target: `v0.5` — official disclosure events, by explicit user priority
 - Active extension: `v0.5.1` — provider-neutral live-event gateway with equal-priority Jin10 MCP
-  and Open Platform WebSocket channels; M0 through M6 are implemented, including real MCP
-  polling, the WebSocket protocol/worker, reconciliation/rules, optional AI analysis, API/SSE, and
-  the Cockpit Live Desk. M7 release hardening and the event-to-research closed loop remain open
+  and Open Platform WebSocket channels; M0 through M7 are implemented in code, including real MCP
+  polling, the WebSocket protocol/worker, reconciliation/rules, optional AI analysis, API/SSE,
+  Cockpit Live Desk/Research Bridge, official-source/Evidence/run integration, audit, diagnostics,
+  and release gates. The credentialed WebSocket live soak remains an external acceptance gate
+  until a Secret-Key is available
 - Incomplete dependency: `v0.4` — cross-market data foundation and mainline monitoring; the market
   slice exists, while theme/mainline automation remains open
 - Active development branch: `codex/v0-5-1-live-event-gateway`
@@ -14,7 +16,7 @@
 This is the short handoff for a new session. Verify it against code and tests when starting a
 substantial change, and update it in the same pull request whenever shipped capability changes.
 
-## Implemented on the v0.5.1 development branch (M0-M6)
+## Implemented on the v0.5.1 development branch (M0-M7)
 
 - typed `SignalObservation`, append-only `LiveSignalVersion`, channel/match/retention/verification
   states, independent `LiveProviderCheckpoint`, redacted dead letters, and human-gated
@@ -46,13 +48,29 @@ substantial change, and update it in the same pull request whenever shipped capa
   coverage, settings, action, analysis, and reconnectable SSE endpoints; and
 - a responsive Live Desk with independent channel chips, filters, lineage/detail, coverage audit,
   settings, explicit browser notifications, rules/model analysis selection, and human
-  Watch/Verify/Dismiss/Mute actions. Attach and linked re-evaluation remain intentionally blocked
-  until M7.
+  Watch/Dismiss/Mute actions;
+- additive migration 8 plus typed verification tasks, reviewed Evidence links, immutable run
+  context links, durable bridge audit entries, and bounded soak reports;
+- `LiveResearchBridge` with explicit confirmation on every mutation, regulator/issuer source
+  authority checks, guarded capture/retry, captured-versus-reviewed separation, source-hash
+  integrity, approve/reject behavior, and append-only verification-state signal versions;
+- existing-run context attachment and new linked Theme/Anchor runs, including child re-evaluation
+  with `parent_run_id` while preserving the parent run payload;
+- dedicated API endpoints and a synthesized audit timeline across observations, signal versions,
+  analyses, actions, Evidence links, and run links; generic attach/linked actions remain blocked so
+  callers cannot skip the bridge;
+- `live soak` with duplicate replay, alternating one-channel failure, checkpoint-isolation and
+  recovery checks in an isolated temporary database, plus `live doctor`, persisted reports, and
+  the operations/recovery runbook; and
+- a responsive Research Bridge with four-stage status, official-source capture and human review,
+  immutable run operations, explicit confirmations, and audit history.
 
-This completes M0 through M6, not the v0.5.1 release. The current checkout has no Jin10 WebSocket
+This completes M0 through M7 in code and makes the branch release-ready; it does not merge, tag, or
+publish a release. The current checkout has no Jin10 WebSocket
 Secret-Key, so the WebSocket transport is protocol/mock verified and visibly reports `WAIT KEY`;
-it is not claimed as live-connected. M7 still owns release packaging, operating runbooks, longer
-soak/chaos checks, official-source task creation, Evidence attachment, and linked re-evaluation.
+it is not claimed as live-connected. The fixture chaos/soak gate passes; the credentialed
+MCP/WebSocket soak is implemented but correctly refuses to pass until both equal-priority channel
+credentials exist.
 
 ## Implemented on the v0.5 development branch
 
@@ -89,12 +107,12 @@ guarded official-source capture and human-review path.
 
 ## Verified for the current development slice
 
-- 109 Python tests pass and Ruff passes;
+- 116 Python tests pass and Ruff passes;
 - the React/Vite production build passes;
 - a fresh wheel build includes `capexgraph.events`, the complete
   `capexgraph.live` package, both adapters, the synthetic dual-channel fixture, and shared
   configuration loaders;
-- fresh and legacy migration tests reach schema version 7 without rewriting prior run, checkpoint,
+- fresh and legacy migration tests reach schema version 8 without rewriting prior run, checkpoint,
   source, financial-fact, market, official-event, or tracking records;
 - frozen live-gateway tests cover timezone enforcement, retention, independent checkpoints and
   failure health, idempotency, matched/divergent/single-channel versions, redacted dead letters,
@@ -104,13 +122,14 @@ guarded official-source capture and human-review path.
   authentication/subscription, calendar/quote normalization, reconnect health, HTML sanitization,
   and licensed-picture omission;
 - rule/analysis/API tests cover single alerts, cross-channel coverage and delay, rules-only and
-  typed model paths, visible model failure, settings, SSE resume IDs, user actions, and the
-  deliberate M7 action boundary;
+  typed model paths, visible model failure, settings, SSE resume IDs, user actions, verification
+  confirmation, official-source approval/rejection, immutable linked runs, context integrity,
+  audit, fixture chaos/soak, and no-key diagnostics;
 - a real MCP smoke on 2026-07-29 negotiated all eight documented tools and `quote://codes`, then
   normalized 20 latest flash observations and 269 calendar observations with both streams active;
 - desktop and 390-pixel browser QA verified the no-key replay, SSE connection, matched/divergent
-  display, rules analysis, backend-only credential boundary, responsive settings, and no
-  horizontal overflow or console errors;
+  display, rules analysis, backend-only credential boundary, responsive settings/Research Bridge,
+  four-stage workflow, audit timeline, and no horizontal overflow or console errors;
 - frozen SEC tests cover acceptance timestamps, conservative form classification, idempotent
   discovery, capture-to-Evidence versioning, point-in-time history, CLI, API, and artifacts; and
 - the official SEC schema was probed successfully with an identifying test User-Agent. A real
@@ -247,9 +266,8 @@ Future code or documentation changes must pass the same remote release gate agai
 
 Continue v0.5/v0.5.1 from [the execution plan](V0_5_PLAN.md):
 
-1. complete v0.5.1 M7: obtain a WebSocket trial Secret-Key for live smoke/soak, add the operational
-   runbook and release packaging, and implement explicit official-source task, Evidence attach,
-   and linked re-evaluation actions without bypassing human review;
+1. when a WebSocket trial Secret-Key is available, run the implemented credentialed MCP/WebSocket
+   soak and record the result; until then keep `WAIT KEY` and do not call WebSocket live-connected;
 2. configure a real SEC contact User-Agent for optional live smoke, then add historical submission
    files and backfill;
 3. add CNINFO plus Shanghai/Shenzhen/Beijing official announcement discovery;

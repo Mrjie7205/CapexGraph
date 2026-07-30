@@ -22,6 +22,7 @@ def test_cross_session_handoff_files_exist() -> None:
         "docs/DECISIONS.md",
         "docs/ARCHITECTURE.md",
         "docs/LIVE_EVENTS.md",
+        "docs/LIVE_OPERATIONS.md",
         "docs/MARKET_DATA.md",
         "SECURITY.md",
         "CONTRIBUTING.md",
@@ -76,12 +77,12 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
         for term in (
             "D019",
             "SignalObservation",
-            "M0–M6 complete",
+            "M0–M7 complete",
             "MCP 与 WebSocket 同级",
         )
     )
     assert "MCP is live-verified" in status
-    assert "M7 still owns release packaging" in status
+    assert "M0 through M7 are implemented in code" in status
     assert all(
         term in market_data
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")
@@ -91,7 +92,8 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
         term in architecture
         for term in ("fixture", "codex_subscription", "openai", "never falls")
     )
-    assert "D018" in decisions and "billing are separate boundaries" in decisions
+    assert all(term in decisions for term in ("D018", "D021", "parent-preserving"))
+    assert "billing are separate boundaries" in decisions
     assert all(
         term in readme
         for term in (

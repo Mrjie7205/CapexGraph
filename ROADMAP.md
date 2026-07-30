@@ -168,8 +168,11 @@ Development status:
   cost/failure lineage;
 - M6 complete: CLI/runtime supervisor, `/api/v1/live` status/events/coverage/settings/actions/SSE,
   and a responsive Live Desk with no-key replay and backend-only credentials; and
-- M7 next: live WebSocket soak when credentials exist, operational/release hardening, and the
-  explicit official-source task → Evidence attach → linked re-evaluation closed loop.
+- M7 complete in code: explicit official-source task → guarded capture → human-reviewed Evidence
+  link → immutable run context/linked re-evaluation, migration 8, audit timeline, Research Bridge,
+  isolated chaos soak, diagnostics, operating runbook, and release gates. The credentialed
+  WebSocket live soak remains an external acceptance gate until a Secret-Key exists and is not
+  reported as a passing connection.
 
 Goals:
 
@@ -307,10 +310,12 @@ execution queue.
    remain.
 7. Paused dependency P0 — v0.4 M2: point-in-time theme registry and historical membership.
 8. Paused dependency P1 — v0.4 M3/M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
-9. Completed v0.5.1 M0-M6 — typed contracts, migrations 6/7, independent fixtures and real
+9. Completed v0.5.1 M0-M7 — typed contracts, migrations 6/7/8, independent fixtures and real
    adapters, rules/reconciliation, optional AI analysis, supervisor/API/SSE, and responsive
-   Live Desk. MCP live smoke passes; missing WebSocket credentials block only its live smoke.
-10. Next v0.5.1 P0 — M7 operational/release hardening and the human-gated
-    official-source/Evidence/linked-re-evaluation closed loop.
+   Live Desk/Research Bridge. MCP live smoke passes; missing WebSocket credentials block only its
+   credentialed live smoke/soak.
+10. External v0.5.1 acceptance gate — run the credentialed WebSocket/MCP provider soak when a
+    Secret-Key is available; do not block or demote MCP and do not call WebSocket live before it
+    passes.
 11. Next v0.5 P0 — CNINFO/SSE/SZSE/BSE, then OpenDART/KIND official disclosure adapters.
 12. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).

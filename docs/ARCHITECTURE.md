@@ -94,7 +94,7 @@ independent. A failed source can degrade only its own checkpoint. Raw validation
 metadata-only dead-letter record containing a hash and safe schema errors, not the unlicensed or
 potentially sensitive payload.
 
-M0-M6 now provide three executable paths. The frozen, controllable-clock feed preserves a no-key
+M0-M7 now provide three executable paths. The frozen, controllable-clock feed preserves a no-key
 replay. `Jin10McpClient` performs strict Streamable HTTP negotiation and consumes only
 `structuredContent`; flash uses repeated latest-page reads with local idempotency because the
 provider cursor pages backward through history. A Beijing-day call target and adaptive cadence
@@ -114,7 +114,21 @@ not a falsely model-authored proposal.
 poll/start/stop, events, coverage, settings, analysis, actions, and reconnectable SSE. Live Desk
 consumes that surface, while provider credentials remain environment-only. A `signal_only` record
 still cannot become Evidence or an official corporate event without guarded capture and human
-review. M7 owns that explicit attach/linked-run bridge.
+review.
+
+`LiveResearchBridge` implements that explicit M7 boundary. A confirmed verification task moves the
+signal to `official_source_pending` through a new signal version. Regulator or explicitly identified
+issuer URLs enter the existing source queue; guarded capture remains `captured` until a human
+reviews the unchanged hash. Approval creates a separate `LiveEvidenceLink` and a new
+`evidence_linked` signal version. Rejection creates no link.
+
+Run integration uses `LiveRunContextLink`: a bounded immutable snapshot, trust class, content hash,
+and optional reviewed Evidence links. Context loading recomputes the hash and excludes a tampered
+snapshot. A linked re-evaluation creates a new child `ResearchRun` with `parent_run_id`; it does not
+mutate the parent's payload or artifacts. Dedicated audit rows plus synthesized observation,
+signal, analysis, and action entries form the event timeline. `LiveSoakRunner` exercises duplicate
+replay, one-channel failure isolation, and recovery in an isolated temporary database, then
+persists only its bounded report.
 
 ### Corporate event calendar
 
@@ -193,13 +207,18 @@ Schema version 7 adds immutable rules assessments and analysis lineage, one cano
 record per signal key, persisted Live Desk settings, and append-only user actions. It is additive
 and does not reinterpret prior observations, signals, Evidence, events, runs, or tracking history.
 
+Schema version 8 adds official-source verification tasks, reviewed live-to-Evidence links,
+immutable run-context links, bridge audit entries, and soak reports. It is additive and does not
+rewrite prior observations, signals, Evidence, events, runs, financial/market facts, or tracking
+history.
+
 ### Applications
 
 - FastAPI exposes runs, evidence review, official events, artifacts, market sync/status, tracking,
-  HTML reports, and the live gateway/SSE surface.
-- React/Vite provides the Research Cockpit, responsive Live Desk, and stage board.
+  HTML reports, live gateway/SSE, Research Bridge, audit, diagnostics, and soak-report surfaces.
+- React/Vite provides the Research Cockpit, responsive Live Desk/Research Bridge, and stage board.
 - CLI supports local, batch, tracking, portable-report, synthetic replay, real MCP polling, and
-  the equal-priority live supervisor.
+  the equal-priority live supervisor plus deterministic soak and local diagnostics.
 
 ## Runtime lifecycle
 

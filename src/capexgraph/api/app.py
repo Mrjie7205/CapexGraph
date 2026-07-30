@@ -26,11 +26,17 @@ from capexgraph.domain import (
     FinancialFact,
     FinancialMetric,
     LiveAlertState,
+    LiveAuditEntry,
     LiveChannel,
     LiveDeskSettings,
+    LiveEvidenceLink,
     LiveMatchStatus,
+    LiveRunContextLink,
     LiveSignalCategory,
+    LiveSoakReport,
     LiveUserAction,
+    LiveVerificationTask,
+    LiveVerificationTaskStatus,
     MarketSnapshot,
     MarketSyncResult,
     ProviderCapability,
@@ -47,7 +53,9 @@ from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
 from capexgraph.live import (
     LiveImpactAnalyzer,
+    LiveResearchBridge,
     LiveSignalStore,
+    build_live_diagnostics,
     calculate_live_coverage,
     get_live_runtime,
     load_frozen_dual_channel_feeds,
@@ -215,6 +223,73 @@ class LiveAnalyzeRequest(BaseModel):
 class LiveActionRequest(BaseModel):
     action: ResearchAction
     note: str = Field(default="", max_length=500)
+
+
+class LiveVerifyRequest(BaseModel):
+    run_id: str | None = Field(default=None, max_length=160)
+    query: str | None = Field(default=None, max_length=500)
+    note: str = Field(default="", max_length=500)
+    confirmed: bool = False
+
+
+class LiveOfficialSourceRequest(BaseModel):
+    run_id: str | None = Field(default=None, max_length=160)
+    url: HttpUrl
+    title: str = Field(min_length=1, max_length=300)
+    kind: EvidenceKind = EvidenceKind.COMPANY_DISCLOSURE
+    publisher: str | None = Field(default=None, max_length=160)
+    published_at: date | None = None
+    issuer_domains: list[str] = Field(default_factory=list, max_length=20)
+    reason: str | None = Field(default=None, max_length=500)
+    confirmed: bool = False
+
+
+class LiveCaptureTaskRequest(BaseModel):
+    retry: bool = False
+    confirmed: bool = False
+
+
+class LiveConfirmationRequest(BaseModel):
+    confirmed: bool = False
+
+
+class LiveTaskReviewRequest(BaseModel):
+    approved: bool
+    confirmed: bool = False
+
+
+class LiveRunContextRequest(BaseModel):
+    signal_reference: str = Field(min_length=1, max_length=200)
+    include_observations: bool = True
+    include_analysis: bool = True
+    include_proposal: bool = True
+    note: str = Field(default="", max_length=500)
+    confirmed: bool = False
+
+
+class LiveLinkedRunRequest(BaseModel):
+    parent_run_id: str | None = Field(default=None, max_length=160)
+    mode: RunMode | None = None
+    subject: str | None = Field(default=None, min_length=1, max_length=200)
+    market: str | None = Field(default=None, min_length=2, max_length=12)
+    as_of_date: date | None = None
+    evidence_mode: EvidenceMode | None = None
+    provider: ProviderName | None = None
+    note: str = Field(default="", max_length=500)
+    confirmed: bool = False
+
+
+class LiveVerificationTaskRecord(BaseModel):
+    task: LiveVerificationTask
+    source_suggestion: SourceSuggestion | None = None
+    evidence: Evidence | None = None
+    evidence_link: LiveEvidenceLink | None = None
+    run: ResearchRun | None = None
+
+
+class LiveLinkedRunResponse(BaseModel):
+    run: ResearchRun
+    link: LiveRunContextLink
 
 
 class LiveSettingsPatch(BaseModel):
@@ -850,6 +925,39 @@ def resume_run(
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+def _live_bridge() -> LiveResearchBridge:
+    return LiveResearchBridge(get_live_runtime().store)
+
+
+def _live_task_record(
+    bridge: LiveResearchBridge,
+    task: LiveVerificationTask,
+) -> LiveVerificationTaskRecord:
+    suggestion = (
+        bridge.source_service.store.get(task.source_suggestion_id)
+        if task.source_suggestion_id
+        else None
+    )
+    run = load_run(task.run_id) if task.run_id else None
+    evidence = (
+        next((item for item in run.evidence if item.id == task.evidence_id), None)
+        if run is not None and task.evidence_id
+        else None
+    )
+    link = (
+        bridge.store.get_evidence_link(task.evidence_link_id)
+        if task.evidence_link_id
+        else None
+    )
+    return LiveVerificationTaskRecord(
+        task=task,
+        source_suggestion=suggestion,
+        evidence=evidence,
+        evidence_link=link,
+        run=run,
+    )
+
+
 def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
     observations = store.observations_by_ids(signal.observation_ids)
     assessment = store.get_assessment(signal.id)
@@ -857,6 +965,9 @@ def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
     analyses = store.list_analyses(signal_key=signal.signal_key)
     alert = store.get_alert(signal.signal_key)
     actions = store.list_user_actions(signal.signal_key)
+    verification_tasks = store.list_verification_tasks(signal_key=signal.signal_key)
+    evidence_links = store.list_evidence_links(signal_key=signal.signal_key)
+    run_links = store.list_run_context_links(signal_key=signal.signal_key)
     return {
         "signal": signal.model_dump(mode="json"),
         "observations": [item.model_dump(mode="json") for item in observations],
@@ -867,9 +978,15 @@ def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
         "analysis": analyses[0].model_dump(mode="json") if analyses else None,
         "alert": alert.model_dump(mode="json") if alert is not None else None,
         "actions": [item.model_dump(mode="json") for item in actions],
+        "verification_tasks": [
+            item.model_dump(mode="json") for item in verification_tasks
+        ],
+        "evidence_links": [item.model_dump(mode="json") for item in evidence_links],
+        "run_links": [item.model_dump(mode="json") for item in run_links],
         "trust_notice": (
-            "Aggregator signal only. It is not Evidence and cannot raise graph confidence "
-            "without guarded official-source capture and human review."
+            "The aggregator message remains a secondary signal, not Evidence. "
+            "Only separately listed reviewed official Evidence links may support "
+            "factual research claims."
         ),
     }
 
@@ -890,7 +1007,27 @@ def live_gateway_status() -> dict[str, object]:
         **status,
         "unread_alerts": len(alerts),
         "coverage": coverage.model_dump(mode="json"),
+        "latest_soak": (
+            reports[0].model_dump(mode="json")
+            if (reports := runtime.store.list_soak_reports(limit=1))
+            else None
+        ),
     }
+
+
+@app.get("/api/v1/live/doctor")
+def live_gateway_doctor() -> dict[str, object]:
+    return build_live_diagnostics()
+
+
+@app.get(
+    "/api/v1/live/soak-reports",
+    response_model=list[LiveSoakReport],
+)
+def list_live_soak_reports(
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> list[LiveSoakReport]:
+    return get_live_runtime().store.list_soak_reports(limit=limit)
 
 
 @app.post("/api/v1/live/poll")
@@ -1064,6 +1201,245 @@ def analyze_live_event(
     }
 
 
+@app.get(
+    "/api/v1/live/verification-tasks",
+    response_model=list[LiveVerificationTaskRecord],
+)
+def list_live_verification_tasks(
+    signal_key: Annotated[str | None, Query(max_length=200)] = None,
+    run_id: Annotated[str | None, Query(max_length=160)] = None,
+    status: Annotated[LiveVerificationTaskStatus | None, Query()] = None,
+) -> list[LiveVerificationTaskRecord]:
+    bridge = _live_bridge()
+    tasks = bridge.store.list_verification_tasks(
+        signal_key=signal_key,
+        run_id=run_id,
+        statuses=[status] if status else None,
+    )
+    return [_live_task_record(bridge, task) for task in tasks]
+
+
+@app.get(
+    "/api/v1/live/verification-tasks/{task_id}",
+    response_model=LiveVerificationTaskRecord,
+)
+def get_live_verification_task(task_id: str) -> LiveVerificationTaskRecord:
+    bridge = _live_bridge()
+    task = bridge.store.get_verification_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Verification task not found.")
+    return _live_task_record(bridge, task)
+
+
+@app.post(
+    "/api/v1/live/events/{signal_reference}/verify",
+    response_model=LiveVerificationTaskRecord,
+)
+def verify_live_event(
+    signal_reference: str,
+    request: LiveVerifyRequest,
+) -> LiveVerificationTaskRecord:
+    bridge = _live_bridge()
+    try:
+        task = bridge.create_verification_task(
+            signal_reference,
+            run_id=request.run_id,
+            query=request.query,
+            note=request.note,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return _live_task_record(bridge, task)
+
+
+@app.post(
+    "/api/v1/live/verification-tasks/{task_id}/sources",
+    response_model=LiveVerificationTaskRecord,
+)
+def add_live_verification_source(
+    task_id: str,
+    request: LiveOfficialSourceRequest,
+) -> LiveVerificationTaskRecord:
+    bridge = _live_bridge()
+    try:
+        task = bridge.add_official_source(
+            task_id,
+            run_id=request.run_id,
+            url=str(request.url),
+            title=request.title,
+            kind=request.kind,
+            publisher=request.publisher,
+            published_at=request.published_at,
+            issuer_domains=tuple(request.issuer_domains),
+            reason=request.reason,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return _live_task_record(bridge, task)
+
+
+@app.post(
+    "/api/v1/live/verification-tasks/{task_id}/capture",
+    response_model=LiveVerificationTaskRecord,
+)
+def capture_live_verification_source(
+    task_id: str,
+    request: LiveCaptureTaskRequest,
+) -> LiveVerificationTaskRecord:
+    bridge = _live_bridge()
+    try:
+        task = bridge.capture_task_source(
+            task_id,
+            retry=request.retry,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return _live_task_record(bridge, task)
+
+
+@app.post(
+    "/api/v1/live/verification-tasks/{task_id}/review",
+    response_model=LiveVerificationTaskRecord,
+)
+def review_live_verification_evidence(
+    task_id: str,
+    request: LiveTaskReviewRequest,
+) -> LiveVerificationTaskRecord:
+    bridge = _live_bridge()
+    try:
+        task = bridge.review_task_evidence(
+            task_id,
+            approved=request.approved,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return _live_task_record(bridge, task)
+
+
+@app.post(
+    "/api/v1/live/verification-tasks/{task_id}/attach",
+    response_model=LiveVerificationTaskRecord,
+)
+def attach_live_verification_evidence(
+    task_id: str,
+    request: LiveConfirmationRequest,
+) -> LiveVerificationTaskRecord:
+    bridge = _live_bridge()
+    try:
+        task = bridge.attach_reviewed_evidence(
+            task_id,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return _live_task_record(bridge, task)
+
+
+@app.post(
+    "/api/v1/live/events/{signal_reference}/runs",
+    response_model=LiveLinkedRunResponse,
+)
+def create_live_linked_run(
+    signal_reference: str,
+    request: LiveLinkedRunRequest,
+) -> LiveLinkedRunResponse:
+    bridge = _live_bridge()
+    try:
+        run, link = bridge.create_linked_run(
+            signal_reference,
+            parent_run_id=request.parent_run_id,
+            mode=request.mode,
+            subject=request.subject,
+            market=request.market,
+            as_of_date=request.as_of_date,
+            evidence_mode=request.evidence_mode,
+            model_provider=request.provider.value if request.provider else None,
+            note=request.note,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return LiveLinkedRunResponse(run=run, link=link)
+
+
+@app.post(
+    "/api/v1/live/events/{signal_reference}/reevaluate",
+    response_model=LiveLinkedRunResponse,
+)
+def create_live_reevaluation_run(
+    signal_reference: str,
+    request: LiveLinkedRunRequest,
+) -> LiveLinkedRunResponse:
+    if not request.parent_run_id:
+        raise HTTPException(
+            status_code=422,
+            detail="Linked re-evaluation requires parent_run_id.",
+        )
+    return create_live_linked_run(signal_reference, request)
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/live-context",
+    response_model=LiveRunContextLink,
+)
+def attach_live_context_to_run(
+    run_id: str,
+    request: LiveRunContextRequest,
+) -> LiveRunContextLink:
+    bridge = _live_bridge()
+    try:
+        return bridge.link_run_context(
+            run_id,
+            request.signal_reference,
+            include_observations=request.include_observations,
+            include_analysis=request.include_analysis,
+            include_proposal=request.include_proposal,
+            note=request.note,
+            confirmed=request.confirmed,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/runs/{run_id}/live-context",
+    response_model=list[LiveRunContextLink],
+)
+def list_run_live_context(run_id: str) -> list[LiveRunContextLink]:
+    if load_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="Research run not found.")
+    return _live_bridge().store.list_run_context_links(run_id=run_id)
+
+
+@app.get(
+    "/api/v1/live/events/{signal_reference}/audit",
+    response_model=list[LiveAuditEntry],
+)
+def get_live_event_audit(signal_reference: str) -> list[LiveAuditEntry]:
+    try:
+        return _live_bridge().audit_timeline(signal_reference)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
 @app.post("/api/v1/live/events/{signal_reference}/actions")
 def act_on_live_event(
     signal_reference: str,
@@ -1080,8 +1456,8 @@ def act_on_live_event(
         raise HTTPException(
             status_code=409,
             detail=(
-                "Attaching Evidence or launching a linked re-evaluation belongs to M7. "
-                "M6 records watch, verify, read, dismiss, mute, and ignore decisions only."
+                "Use the M7 verification-task or linked-run endpoints so Evidence review, "
+                "explicit confirmation, immutable context, and audit lineage are enforced."
             ),
         )
     now = datetime.now(UTC)

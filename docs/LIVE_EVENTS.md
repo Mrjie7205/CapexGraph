@@ -1,6 +1,6 @@
 # Live event gateway
 
-This guide covers the implemented v0.5.1 M0-M6 path. It is a local, single-user market-signal
+This guide covers the implemented v0.5.1 M0-M7 path. It is a local, single-user market-signal
 workspace. It does not place trades, treat aggregator content as Evidence, or complete the missing
 v0.4 mainline policy.
 
@@ -31,6 +31,8 @@ The same path is available from CLI:
 capexgraph live demo
 capexgraph live status
 capexgraph live providers
+capexgraph live soak --mode fixture --cycles 6 --failure-every 3
+capexgraph live doctor
 ```
 
 The replay is not current market information. It is intentionally dated and labeled synthetic.
@@ -103,7 +105,10 @@ Live Desk exposes:
 - relevance, urgency, importance, novelty, entity/theme, exclusion, and injection-rule results;
 - no-key rules analysis or an explicitly selected Codex/OpenAI model path;
 - model/provider/prompt/call/failure lineage;
-- Watch, Verify, Dismiss, and Mute actions; and
+- Watch, Dismiss, and Mute actions;
+- a human-gated Research Bridge for official-source tasks, guarded capture, Evidence review,
+  immutable run context, and parent-preserving linked re-evaluation;
+- the complete signal/observation/analysis/action/verification/run audit timeline; and
 - browser notifications only after explicit permission.
 
 Settings control channel switches, polling cadence, thresholds, cooldown, include/exclude keywords,
@@ -114,6 +119,8 @@ and notification preference. They never contain credentials.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/v1/live/status` | runtime, independent channel state, unread and coverage |
+| `GET` | `/api/v1/live/doctor` | local integrity, queue, channel, and release-gate diagnostics |
+| `GET` | `/api/v1/live/soak-reports` | persisted bounded release-gate reports |
 | `POST` | `/api/v1/live/demo` | persist the synthetic no-key replay |
 | `POST` | `/api/v1/live/poll` | one MCP flash/calendar head poll |
 | `POST` | `/api/v1/live/monitor/start\|stop` | control the local supervisor |
@@ -123,6 +130,15 @@ and notification preference. They never contain credentials.
 | `GET/PATCH` | `/api/v1/live/settings` | non-secret operator settings |
 | `POST` | `/api/v1/live/events/{id}/analyze` | rules or explicit model impact analysis |
 | `POST` | `/api/v1/live/events/{id}/actions` | read/watch/verify/dismiss/mute/ignore |
+| `POST` | `/api/v1/live/events/{id}/verify` | confirmed official-source verification task |
+| `GET` | `/api/v1/live/verification-tasks[/{id}]` | inspect the durable verification queue |
+| `POST` | `/api/v1/live/verification-tasks/{id}/sources` | confirmed regulator/issuer source candidate |
+| `POST` | `/api/v1/live/verification-tasks/{id}/capture` | guarded capture or visible retry |
+| `POST` | `/api/v1/live/verification-tasks/{id}/review` | explicit approve/reject and Evidence gate |
+| `POST` | `/api/v1/live/events/{id}/runs` | create a new linked Theme/Anchor research run |
+| `POST` | `/api/v1/live/events/{id}/reevaluate` | create a child run without mutating the parent |
+| `GET/POST` | `/api/v1/runs/{id}/live-context` | list or attach immutable signal snapshots |
+| `GET` | `/api/v1/live/events/{id}/audit` | synthesized and persisted audit timeline |
 | `GET` | `/api/v1/live/stream` | reconnectable SSE using `Last-Event-ID` |
 
 SSE alert IDs are durable SQLite row IDs. Reconnect with `Last-Event-ID` to resume after the last
@@ -136,10 +152,43 @@ delivered canonical alert. Cross-channel revisions do not create duplicate alert
 - Provider picture URLs are omitted and never hotlinked.
 - Dead letters contain a payload hash and safe validation error only.
 - Provider content is treated as hostile input and isolated from model instructions.
-- A signal cannot become Evidence, an official event, or a medium/high-confidence relationship.
+- An aggregator signal itself cannot become Evidence, an official event, or a
+  medium/high-confidence relationship.
 
-M7 will add explicit official-source tasks, reviewed Evidence attachment, and linked re-evaluation.
-M6 intentionally returns a conflict if a caller requests `attach` or `linked_reevaluation`.
+M7 adds the bridge without weakening that boundary:
+
+1. a confirmed task moves the signal to `official_source_pending` by appending a signal version;
+2. only recognized regulator or explicitly supplied issuer domains enter the task;
+3. guarded capture remains `captured` until a human reviews the unchanged source hash;
+4. approval creates a separate `LiveEvidenceLink` and a new `evidence_linked` signal version;
+5. rejection creates no link;
+6. run context is stored as an immutable snapshot and content hash; and
+7. linked re-evaluation creates a new child run and leaves the parent unchanged.
+
+Generic `attach` and `linked_reevaluation` actions still return a conflict. Callers must use the
+dedicated endpoints so confirmation, source authority, human review, hash integrity, and audit
+lineage cannot be skipped.
+
+## Release and recovery gates
+
+The no-key fixture soak repeatedly replays both channels, injects an alternating one-channel
+failure, checks checkpoint isolation, and requires recovery plus stable canonical identity. It
+uses a temporary exercise database and persists only a bounded report:
+
+```powershell
+capexgraph live soak --mode fixture --cycles 6 --failure-every 3
+capexgraph live doctor
+```
+
+The credentialed provider soak requires both equal-priority channel credentials:
+
+```powershell
+capexgraph live soak --mode providers --cycles 30 --interval 10
+```
+
+Missing WebSocket access fails that credentialed gate explicitly; it does not downgrade MCP to a
+fallback or manufacture a passing report. See [`LIVE_OPERATIONS.md`](LIVE_OPERATIONS.md) for
+Windows process operation, backup/restore, restart, retry, and incident handling.
 
 ## Troubleshooting
 

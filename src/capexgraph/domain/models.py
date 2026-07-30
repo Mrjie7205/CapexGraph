@@ -153,6 +153,17 @@ class LiveAnalysisStatus(StrEnum):
     SKIPPED = "skipped"
 
 
+class LiveVerificationTaskStatus(StrEnum):
+    PENDING = "pending"
+    SOURCE_SUGGESTED = "source_suggested"
+    CAPTURE_PENDING = "capture_pending"
+    CAPTURED = "captured"
+    EVIDENCE_LINKED = "evidence_linked"
+    REJECTED = "rejected"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class ResearchAction(StrEnum):
     IGNORE = "ignore"
     READ = "read"
@@ -684,6 +695,124 @@ class LiveUserAction(BaseModel):
         if self.created_at.tzinfo is None:
             raise ValueError("user action created_at must be timezone-aware")
         self.created_at = self.created_at.astimezone(UTC)
+        return self
+
+
+class LiveVerificationTask(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    signal_version_id: str = Field(min_length=1)
+    query: str = Field(min_length=1)
+    status: LiveVerificationTaskStatus = LiveVerificationTaskStatus.PENDING
+    run_id: str | None = None
+    source_suggestion_id: str | None = None
+    evidence_id: str | None = None
+    evidence_link_id: str | None = None
+    note: str = ""
+    attempts: int = Field(default=0, ge=0)
+    error: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+    @model_validator(mode="after")
+    def validate_verification_task(self) -> LiveVerificationTask:
+        if self.created_at.tzinfo is None or self.updated_at.tzinfo is None:
+            raise ValueError("verification-task timestamps must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        self.updated_at = self.updated_at.astimezone(UTC)
+        if self.updated_at < self.created_at:
+            raise ValueError("verification task cannot be updated before creation")
+        if self.evidence_id and not self.run_id:
+            raise ValueError("verification-task evidence requires a research run")
+        if self.evidence_link_id and self.status != LiveVerificationTaskStatus.EVIDENCE_LINKED:
+            raise ValueError("evidence_link_id requires evidence_linked task status")
+        return self
+
+
+class LiveEvidenceLink(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    signal_version_id: str = Field(min_length=1)
+    verification_task_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    evidence_id: str = Field(min_length=1)
+    source_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    link_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    linked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    linked_by: str = Field(default="human", min_length=1)
+
+    @model_validator(mode="after")
+    def validate_evidence_link(self) -> LiveEvidenceLink:
+        if self.linked_at.tzinfo is None:
+            raise ValueError("evidence-link timestamp must be timezone-aware")
+        self.linked_at = self.linked_at.astimezone(UTC)
+        return self
+
+
+class LiveRunContextLink(BaseModel):
+    id: str = Field(min_length=1)
+    signal_key: str = Field(min_length=1)
+    signal_version_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    parent_run_id: str | None = None
+    context_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    context: dict[str, Any]
+    note: str = ""
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_by: str = Field(default="human", min_length=1)
+
+    @model_validator(mode="after")
+    def validate_run_context_link(self) -> LiveRunContextLink:
+        if self.created_at.tzinfo is None:
+            raise ValueError("run-context timestamp must be timezone-aware")
+        self.created_at = self.created_at.astimezone(UTC)
+        if not self.context:
+            raise ValueError("run-context links require an immutable context snapshot")
+        return self
+
+
+class LiveAuditEntry(BaseModel):
+    id: int | None = Field(default=None, ge=1)
+    signal_key: str = Field(min_length=1)
+    event_type: str = Field(min_length=1)
+    object_type: str = Field(min_length=1)
+    object_id: str = Field(min_length=1)
+    actor: str = Field(default="system", min_length=1)
+    summary: str = Field(min_length=1)
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    details: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_audit_entry(self) -> LiveAuditEntry:
+        if self.occurred_at.tzinfo is None:
+            raise ValueError("audit timestamp must be timezone-aware")
+        self.occurred_at = self.occurred_at.astimezone(UTC)
+        return self
+
+
+class LiveSoakReport(BaseModel):
+    id: str = Field(min_length=1)
+    mode: str = Field(min_length=1)
+    cycles: int = Field(ge=1)
+    observations: int = Field(ge=0)
+    created_versions: int = Field(ge=0)
+    duplicates: int = Field(ge=0)
+    injected_failures: int = Field(ge=0)
+    observed_failures: int = Field(ge=0)
+    checkpoint_isolation_ok: bool
+    passed: bool
+    started_at: datetime
+    completed_at: datetime
+    notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_soak_report(self) -> LiveSoakReport:
+        if self.started_at.tzinfo is None or self.completed_at.tzinfo is None:
+            raise ValueError("soak-report timestamps must be timezone-aware")
+        self.started_at = self.started_at.astimezone(UTC)
+        self.completed_at = self.completed_at.astimezone(UTC)
+        if self.completed_at < self.started_at:
+            raise ValueError("soak report cannot complete before it starts")
         return self
 
 

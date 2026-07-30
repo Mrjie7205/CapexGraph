@@ -63,6 +63,17 @@ and it does not modify credentials, Evidence, corporate events, runs, financial/
 tracking history. Provider credentials remain environment-only; `live_settings` contains cadence,
 filters, thresholds, channel switches, and notification preference only.
 
+The v0.5.1 M7 research bridge adds version 8:
+
+8. official-source verification tasks, reviewed live-to-Evidence links, immutable run-context
+   links, append-only bridge audit entries, and bounded soak reports.
+
+Version 8 is additive and safe for startup. It does not rewrite prior observations, signal
+versions, Evidence, corporate events, runs, financial/market facts, or tracking history. A linked
+re-evaluation is a new run referencing its parent; the migration does not retrofit or mutate older
+runs. Provider credentials remain environment-only and are never stored in bridge/audit/soak
+payloads.
+
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
 to run `capexgraph db upgrade`.
@@ -81,6 +92,16 @@ the target atomically, verifies it again, and applies any currently registered m
 
 Use `--path` on any database command when operating on a workspace other than
 `CAPEXGRAPH_STATE_DB` or `runs/capexgraph.db`.
+
+After upgrading to schema 8, run the isolated release and integrity gates:
+
+```powershell
+capexgraph live soak --mode fixture --cycles 6 --failure-every 3
+capexgraph live doctor
+```
+
+See [`LIVE_OPERATIONS.md`](LIVE_OPERATIONS.md) for the credentialed provider gate, restart flow,
+failure recovery, and incident checklist.
 
 ## Moving from v0.2 to v0.3
 

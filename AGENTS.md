@@ -25,8 +25,9 @@ Read these files in order:
 7. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
 8. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
 9. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
-10. the workflow-specific document under `docs/`; and
-11. `CONTRIBUTING.md` — validation and documentation contract.
+10. the workflow-specific document under `docs/`;
+11. `docs/LIVE_OPERATIONS.md` for live release, restart, and recovery work; and
+12. `CONTRIBUTING.md` — validation and documentation contract.
 
 For live-gateway work, the workflow-specific document is `docs/LIVE_EVENTS.md`.
 
@@ -82,9 +83,10 @@ advertise it as shipped until its roadmap acceptance criteria and tests are comp
 ## Working method
 
 1. Start from an active item in `ROADMAP.md` or a scoped user request. The user explicitly advanced
-   active development to the isolated v0.5 event foundation and completed v0.5.1 M0-M6. Follow
-   `docs/V0_5_PLAN.md` and `docs/V0_5_1_PLAN.html`; treat M7 as next and do not claim the paused
-   v0.4 theme/mainline work is complete.
+   active development to the isolated v0.5 event foundation and completed v0.5.1 M0-M7 in code.
+   Follow `docs/V0_5_PLAN.md`, `docs/V0_5_1_PLAN.html`, and `docs/LIVE_OPERATIONS.md`. The
+   credentialed WebSocket live soak remains an external gate until a Secret-Key exists; do not
+   claim the paused v0.4 theme/mainline work is complete.
 2. Inspect the actual code path and tests before proposing architecture.
 3. State any assumption that changes evidence semantics, provider trust, or repository boundaries.
 4. Implement the smallest end-to-end vertical slice with durable artifacts and failure states.

@@ -9,15 +9,21 @@ from pathlib import Path
 from capexgraph.domain import (
     LiveAlertDelivery,
     LiveAlertState,
+    LiveAuditEntry,
     LiveChannel,
     LiveDeadLetter,
     LiveDeskSettings,
+    LiveEvidenceLink,
     LiveProviderCheckpoint,
     LiveRetentionClass,
     LiveRuleAssessment,
+    LiveRunContextLink,
     LiveSignalAnalysis,
     LiveSignalVersion,
+    LiveSoakReport,
     LiveUserAction,
+    LiveVerificationTask,
+    LiveVerificationTaskStatus,
     ResearchActionProposal,
     SignalObservation,
 )
@@ -226,6 +232,18 @@ class LiveSignalStore:
             key=lambda item: (item.last_observed_at, item.signal_key, item.version),
             reverse=True,
         )
+
+    def list_signal_versions(self, signal_key: str) -> list[LiveSignalVersion]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload FROM live_signal_versions
+                WHERE signal_key = ?
+                ORDER BY version, id
+                """,
+                (signal_key,),
+            ).fetchall()
+        return [self._signal_from_row(row) for row in rows]
 
     def get_checkpoint(
         self,
@@ -600,7 +618,7 @@ class LiveSignalStore:
         with self._connect() as connection:
             connection.execute(
                 """
-                INSERT INTO live_user_actions (
+                INSERT OR IGNORE INTO live_user_actions (
                     id, signal_key, action, created_at, payload
                 ) VALUES (?, ?, ?, ?, ?)
                 """,
@@ -625,3 +643,286 @@ class LiveSignalStore:
                 (signal_key,),
             ).fetchall()
         return [LiveUserAction.model_validate_json(row["payload"]) for row in rows]
+
+    def save_verification_task(
+        self,
+        task: LiveVerificationTask,
+    ) -> LiveVerificationTask:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO live_verification_tasks (
+                    id, signal_key, signal_version_id, run_id, status,
+                    source_suggestion_id, evidence_id, evidence_link_id,
+                    created_at, updated_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    run_id = excluded.run_id,
+                    status = excluded.status,
+                    source_suggestion_id = excluded.source_suggestion_id,
+                    evidence_id = excluded.evidence_id,
+                    evidence_link_id = excluded.evidence_link_id,
+                    updated_at = excluded.updated_at,
+                    payload = excluded.payload
+                """,
+                (
+                    task.id,
+                    task.signal_key,
+                    task.signal_version_id,
+                    task.run_id,
+                    task.status.value,
+                    task.source_suggestion_id,
+                    task.evidence_id,
+                    task.evidence_link_id,
+                    task.created_at.isoformat(),
+                    task.updated_at.isoformat(),
+                    task.model_dump_json(),
+                ),
+            )
+        return task
+
+    def get_verification_task(self, task_id: str) -> LiveVerificationTask | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM live_verification_tasks WHERE id = ?",
+                (task_id,),
+            ).fetchone()
+        return LiveVerificationTask.model_validate_json(row["payload"]) if row else None
+
+    def list_verification_tasks(
+        self,
+        *,
+        signal_key: str | None = None,
+        run_id: str | None = None,
+        statuses: Sequence[LiveVerificationTaskStatus] | None = None,
+    ) -> list[LiveVerificationTask]:
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if signal_key:
+            clauses.append("signal_key = ?")
+            parameters.append(signal_key)
+        if run_id:
+            clauses.append("run_id = ?")
+            parameters.append(run_id)
+        if statuses:
+            placeholders = ",".join("?" for _ in statuses)
+            clauses.append(f"status IN ({placeholders})")
+            parameters.extend(item.value for item in statuses)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT payload FROM live_verification_tasks
+                {where}
+                ORDER BY updated_at DESC, id DESC
+                """,
+                tuple(parameters),
+            ).fetchall()
+        return [LiveVerificationTask.model_validate_json(row["payload"]) for row in rows]
+
+    def save_evidence_link(self, link: LiveEvidenceLink) -> LiveEvidenceLink:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO live_evidence_links (
+                    id, signal_key, signal_version_id, verification_task_id,
+                    run_id, evidence_id, source_hash, link_hash, linked_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    link.id,
+                    link.signal_key,
+                    link.signal_version_id,
+                    link.verification_task_id,
+                    link.run_id,
+                    link.evidence_id,
+                    link.source_hash,
+                    link.link_hash,
+                    link.linked_at.isoformat(),
+                    link.model_dump_json(),
+                ),
+            )
+            row = connection.execute(
+                "SELECT payload FROM live_evidence_links WHERE link_hash = ?",
+                (link.link_hash,),
+            ).fetchone()
+            if row is None:
+                row = connection.execute(
+                    """
+                    SELECT payload FROM live_evidence_links
+                    WHERE signal_key = ? AND run_id = ? AND evidence_id = ?
+                    """,
+                    (link.signal_key, link.run_id, link.evidence_id),
+                ).fetchone()
+        if row is None:
+            raise RuntimeError("Live Evidence link could not be persisted")
+        return LiveEvidenceLink.model_validate_json(row["payload"])
+
+    def get_evidence_link(self, link_id: str) -> LiveEvidenceLink | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT payload FROM live_evidence_links WHERE id = ?",
+                (link_id,),
+            ).fetchone()
+        return LiveEvidenceLink.model_validate_json(row["payload"]) if row else None
+
+    def list_evidence_links(
+        self,
+        *,
+        signal_key: str | None = None,
+        run_id: str | None = None,
+    ) -> list[LiveEvidenceLink]:
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if signal_key:
+            clauses.append("signal_key = ?")
+            parameters.append(signal_key)
+        if run_id:
+            clauses.append("run_id = ?")
+            parameters.append(run_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT payload FROM live_evidence_links
+                {where}
+                ORDER BY linked_at DESC, id DESC
+                """,
+                tuple(parameters),
+            ).fetchall()
+        return [LiveEvidenceLink.model_validate_json(row["payload"]) for row in rows]
+
+    def save_run_context_link(
+        self,
+        link: LiveRunContextLink,
+    ) -> LiveRunContextLink:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO live_run_context_links (
+                    id, signal_key, signal_version_id, run_id, parent_run_id,
+                    context_hash, created_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    link.id,
+                    link.signal_key,
+                    link.signal_version_id,
+                    link.run_id,
+                    link.parent_run_id,
+                    link.context_hash,
+                    link.created_at.isoformat(),
+                    link.model_dump_json(),
+                ),
+            )
+            row = connection.execute(
+                """
+                SELECT payload FROM live_run_context_links
+                WHERE signal_key = ? AND run_id = ? AND context_hash = ?
+                """,
+                (link.signal_key, link.run_id, link.context_hash),
+            ).fetchone()
+        return LiveRunContextLink.model_validate_json(row["payload"])
+
+    def list_run_context_links(
+        self,
+        *,
+        signal_key: str | None = None,
+        run_id: str | None = None,
+    ) -> list[LiveRunContextLink]:
+        clauses: list[str] = []
+        parameters: list[object] = []
+        if signal_key:
+            clauses.append("signal_key = ?")
+            parameters.append(signal_key)
+        if run_id:
+            clauses.append("run_id = ?")
+            parameters.append(run_id)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        with self._connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT payload FROM live_run_context_links
+                {where}
+                ORDER BY created_at DESC, id DESC
+                """,
+                tuple(parameters),
+            ).fetchall()
+        return [LiveRunContextLink.model_validate_json(row["payload"]) for row in rows]
+
+    def append_audit(self, entry: LiveAuditEntry) -> LiveAuditEntry:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                INSERT INTO live_audit_entries (
+                    signal_key, event_type, object_type, object_id,
+                    actor, occurred_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entry.signal_key,
+                    entry.event_type,
+                    entry.object_type,
+                    entry.object_id,
+                    entry.actor,
+                    entry.occurred_at.isoformat(),
+                    entry.model_dump_json(exclude={"id"}),
+                ),
+            )
+            entry_id = int(cursor.lastrowid)
+        return entry.model_copy(update={"id": entry_id})
+
+    def list_audit(
+        self,
+        signal_key: str,
+        *,
+        after_id: int = 0,
+        limit: int = 500,
+    ) -> list[LiveAuditEntry]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, payload FROM live_audit_entries
+                WHERE signal_key = ? AND id > ?
+                ORDER BY id
+                LIMIT ?
+                """,
+                (signal_key, after_id, max(1, min(limit, 2000))),
+            ).fetchall()
+        return [
+            LiveAuditEntry.model_validate_json(row["payload"]).model_copy(
+                update={"id": int(row["id"])}
+            )
+            for row in rows
+        ]
+
+    def save_soak_report(self, report: LiveSoakReport) -> LiveSoakReport:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO live_soak_reports (
+                    id, mode, passed, started_at, completed_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    report.id,
+                    report.mode,
+                    int(report.passed),
+                    report.started_at.isoformat(),
+                    report.completed_at.isoformat(),
+                    report.model_dump_json(),
+                ),
+            )
+        return report
+
+    def list_soak_reports(self, *, limit: int = 20) -> list[LiveSoakReport]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT payload FROM live_soak_reports
+                ORDER BY completed_at DESC, id DESC
+                LIMIT ?
+                """,
+                (max(1, min(limit, 500)),),
+            ).fetchall()
+        return [LiveSoakReport.model_validate_json(row["payload"]) for row in rows]

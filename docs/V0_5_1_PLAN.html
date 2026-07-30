@@ -196,7 +196,7 @@
       </section>
 
       <section class="meta" aria-label="计划元信息">
-        <article><span>开发状态</span><strong>M0–M6 complete</strong><small>M7 next · WS live smoke waits key</small></article>
+        <article><span>开发状态</span><strong>M0–M7 complete</strong><small>release-ready · WS live smoke waits key</small></article>
         <article><span>开发基线</span><strong>v0.5 branch</strong><small>SEC 事件底座已存在</small></article>
         <article><span>运行策略</span><strong>MCP + WebSocket</strong><small>同级 · 独立健康度</small></article>
         <article><span>安全底线</span><strong>Human confirm</strong><small>建议不等于订单</small></article>
@@ -401,7 +401,7 @@ human_status</code></pre></article>
           <article class="milestone"><span class="mid">M4</span><span class="priority">COMPLETE · reconcile</span><h3>双通道合流与确定性规则</h3><p>匹配两路 observation，同时完成版本、去重、覆盖指标、重要度、冷却、实体别名和现有图匹配。</p><ul><li>match / divergence state</li><li>coverage / P50 / P95</li><li>ruleset / novelty</li><li>entity / theme mapping</li></ul><span class="exit">Exit · 单次提醒、双路谱系、低价值事件零模型费用</span></article>
           <article class="milestone"><span class="mid">M5</span><span class="priority">COMPLETE · optional AI</span><h3>AI 影响分析器</h3><p>高优先事件输出结构化影响路径、条件、证伪、缺口和成本谱系。</p><ul><li>rules-only baseline</li><li>selective model gate</li><li>typed output</li><li>failure / retry / cost</li></ul><span class="exit">Exit · 无模型、有模型和模型失败路径均诚实</span></article>
           <article class="milestone"><span class="mid">M6</span><span class="priority">COMPLETE · Cockpit</span><h3>Live Desk 前端</h3><p>实现双通道状态、覆盖差异、实时流、事件详情、影响分析、筛选、通知和用户动作。</p><ul><li>independent channel chips</li><li>coverage / source filter</li><li>SSE reconnect</li><li>responsive settings</li></ul><span class="exit">Exit · MCP 首发与双通道桌面/390px 窄屏路径通过</span></article>
-          <article class="milestone"><span class="mid">M7</span><span class="priority">P0 · release</span><h3>补证、链接重评与发布</h3><p>把高价值信号连接到官方源队列、不可变 Run、审计、迁移与发布验证。</p><ul><li>official-source task</li><li>linked run</li><li>audit timeline</li><li>CI / wheel / Web / docs</li></ul><span class="exit">Exit · Definition of Done 全部满足</span></article>
+          <article class="milestone"><span class="mid">M7</span><span class="priority">COMPLETE · release-ready</span><h3>补证、链接重评与发布</h3><p>把高价值信号连接到官方源队列、不可变 Run、审计、迁移与发布验证。</p><ul><li>official-source task</li><li>reviewed Evidence link</li><li>immutable linked run</li><li>audit / soak / doctor / runbook</li></ul><span class="exit">Exit · 本地 Definition of Done 通过；凭证化 WS soak 等待 Secret-Key</span></article>
         </div>
         <div class="path"><span>M0 契约</span><i>→</i><span>M1 双源冻结流</span><i>→</i><span>M2 MCP 首发 ∥ M3 WS 并行</span><i>→</i><span>M4 合流规则</span><i>→</i><span>M5 AI</span><i>→</i><span>M6 前端</span><i>→</i><span>M7 发布</span></div>
       </section>
@@ -459,11 +459,11 @@ human_status</code></pre></article>
       </section>
 
       <section class="handoff">
-        <div><h2>下一步：M7 补证闭环与发布。</h2><p>M0–M6 已完成双通道契约、迁移 6/7、真实 MCP、完整 WebSocket 工作器、确定性合流规则、可选 AI、API/SSE 与响应式 Live Desk。当前没有 Secret-Key，因此 WebSocket 只诚实声明合约测试完成、live smoke 待凭证；M7 继续官方补证任务、Evidence 附着、链接重评、运行手册和发布门禁。</p></div>
+        <div><h2>M7 已完成：补证闭环与发布门禁可用。</h2><p>M0–M7 已完成双通道契约、迁移 6/7/8、真实 MCP、完整 WebSocket 工作器、确定性合流规则、可选 AI、API/SSE、响应式 Live Desk/Research Bridge、官方捕获与人工审核、不可变链接重评、审计、隔离式 chaos soak、doctor 与运行手册。当前没有 Secret-Key，因此 WebSocket 只诚实声明合约测试完成、凭证化 live smoke/soak 待执行；它不是一个伪造的通过项，也不改变 MCP 的同级角色。</p></div>
         <div class="links"><a href="../ROADMAP.md">Roadmap</a><a href="V0_5_PLAN.md">v0.5 Plan</a><a href="V0_4_PLAN.md">v0.4 Dependencies</a><a href="DECISIONS.md">Decisions</a><button class="print" type="button" onclick="window.print()">打印 / 导出 PDF</button></div>
       </section>
     </main>
-    <footer><span>CapexGraph / v0.5.1 planning artifact</span><span>Research infrastructure · not autonomous trading</span><span>Last updated 2026-07-29</span></footer>
+    <footer><span>CapexGraph / v0.5.1 execution record</span><span>Research infrastructure · not autonomous trading</span><span>Last updated 2026-07-30</span></footer>
   </div>
   <script>
     const architecture=document.querySelector(".architecture");

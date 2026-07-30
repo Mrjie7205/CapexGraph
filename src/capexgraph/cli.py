@@ -30,6 +30,8 @@ from capexgraph.live import (
     LiveGatewayRuntime,
     LiveSignalService,
     LiveSignalStore,
+    LiveSoakRunner,
+    build_live_diagnostics,
     calculate_live_coverage,
     get_live_runtime,
     load_frozen_dual_channel_feeds,
@@ -945,6 +947,72 @@ def live_monitor(
     except KeyboardInterrupt:
         runtime.stop()
         console.print("Live gateway stopped.")
+
+
+@live_app.command("soak")
+def live_soak(
+    mode: Annotated[
+        str,
+        typer.Option("--mode", help="fixture or providers"),
+    ] = "fixture",
+    cycles: Annotated[
+        int,
+        typer.Option("--cycles", min=1, max=10000),
+    ] = 6,
+    failure_every: Annotated[
+        int,
+        typer.Option(
+            "--failure-every",
+            min=0,
+            help="Fixture-only: inject an alternating single-channel failure every N cycles.",
+        ),
+    ] = 3,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", min=0, max=3600),
+    ] = 10,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run a bounded live release gate and persist its report."""
+
+    runner = LiveSoakRunner(path)
+    try:
+        if mode == "fixture":
+            report = runner.run_fixture(
+                cycles=cycles,
+                failure_every=failure_every,
+            )
+        elif mode == "providers":
+            report = runner.run_providers(
+                cycles=cycles,
+                interval_seconds=interval,
+            )
+        else:
+            raise typer.BadParameter("--mode must be fixture or providers")
+    except ValueError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=report.model_dump(mode="json"))
+    if not report.passed:
+        raise typer.Exit(1)
+
+
+@live_app.command("doctor")
+def live_doctor(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Check local schema, channel health, queue state, and the latest soak gate."""
+
+    report = build_live_diagnostics(path)
+    console.print_json(data=report)
+    if not report["ready"]:
+        raise typer.Exit(1)
 
 
 @financials_app.command("import")

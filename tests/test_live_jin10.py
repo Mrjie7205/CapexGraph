@@ -676,7 +676,7 @@ async def test_live_desk_api_no_key_demo_settings_actions_and_sse(
             json={"action": "linked_reevaluation"},
         )
         assert blocked.status_code == 409
-        assert "M7" in blocked.json()["detail"]
+        assert "verification-task or linked-run endpoints" in blocked.json()["detail"]
 
         settings = await client.patch(
             "/api/v1/live/settings",

@@ -280,3 +280,32 @@ M6 may record reversible read/watch/verify/dismiss/mute/ignore actions and expos
 notifications after explicit permission. It may not attach a signal as Evidence or create a linked
 research run. Those state-changing bridges remain M7 and must pass through official-source capture,
 human review, and explicit confirmation.
+
+## D021 — M7 research mutation is explicit, append-only, and parent-preserving
+
+- **Status:** accepted
+- **Date:** 2026-07-30
+
+M7 implements the state-changing bridge through dedicated verification-task, Evidence-link, and
+run-context endpoints. Every write requires an explicit confirmation flag and appends an audit
+entry. Generic live actions cannot attach Evidence or create linked re-evaluations, so callers
+cannot bypass source authority, guarded capture, hash verification, or human review.
+
+An official-source task may use a recognized regulator domain or an explicitly identified issuer
+domain. A successful capture remains `captured` and cannot verify the signal. Only unchanged
+`reviewed` Evidence can create a `LiveEvidenceLink`; rejection creates no link. Verification-state
+changes append a `LiveSignalVersion` rather than rewriting the signal that originally arrived from
+the aggregator.
+
+Live context is stored as an immutable snapshot plus `context_hash`. Research context loading
+recomputes the hash and omits a tampered snapshot. Attaching context to an existing run does not
+change its prior artifacts. A linked re-evaluation creates a new child run with `parent_run_id` and
+leaves the parent payload byte-for-byte unchanged. The live snapshot retains the trust class
+`secondary_live_signal`; separately listed reviewed Evidence links are the only factual source
+upgrade.
+
+The deterministic fixture chaos/soak gate runs observations in an isolated temporary database and
+persists only its bounded report. This prevents release testing from contaminating the operator's
+current signal ledger. A credentialed provider soak requires both equal-priority channel
+credentials; missing WebSocket access remains an explicit external live-smoke gate, not a passing
+or fallback result.
