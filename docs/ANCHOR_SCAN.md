@@ -27,11 +27,12 @@ capexgraph anchor "兆易创新" --provider codex_subscription --execute
 capexgraph anchor "兆易创新" --provider openai --execute
 ```
 
-The Codex subscription path requires a loopback CLIProxyAPI bridge plus
-`CAPEXGRAPH_CODEX_MODEL` and `CAPEXGRAPH_CODEX_PROXY_KEY`. The OpenAI path requires
-`OPENAI_API_KEY` and `CAPEXGRAPH_OPENAI_MODEL` and is billed separately. Neither path silently
-falls back to the other. Once the first step is attempted, the run is locked to its selected
-provider and model so resumed checkpoints cannot drift from their manifest.
+The Codex subscription path requires the official local Codex CLI plus a ChatGPT login; Connection
+Center can detect or start that login and choose an account-available model. It does not require an
+OpenAI Platform API key. The OpenAI path requires `OPENAI_API_KEY` and
+`CAPEXGRAPH_OPENAI_MODEL` and is billed separately. Neither path silently falls back to the other.
+Once the first step is attempted, the run is locked to its selected provider and model so resumed
+checkpoints cannot drift from their manifest.
 
 The golden case intentionally uses only peer relationships. Product overlap is not converted
 into a customer, supplier, or beneficiary claim. Outputs are written as `graph.json`,

@@ -23,7 +23,11 @@ from capexgraph.live.mcp import (
     Jin10McpSource,
 )
 from capexgraph.live.rules import LiveRuleEngine
-from capexgraph.live.runtime import LiveGatewayRuntime, get_live_runtime
+from capexgraph.live.runtime import (
+    LiveGatewayRuntime,
+    get_live_runtime,
+    reload_live_runtime,
+)
 from capexgraph.live.service import LiveIngestionResult, LiveSignalService
 from capexgraph.live.soak import LiveSoakRunner
 from capexgraph.live.store import LiveSignalStore
@@ -60,5 +64,6 @@ __all__ = [
     "calculate_live_coverage",
     "build_live_diagnostics",
     "get_live_runtime",
+    "reload_live_runtime",
     "load_frozen_dual_channel_feeds",
 ]

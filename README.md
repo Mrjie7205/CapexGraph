@@ -28,7 +28,8 @@ CapexGraph `0.3.0` is an **alpha research workspace** with:
 - seven-stage Theme and Anchor Scan agent workflows;
 - typed, schema-validated outputs and code-enforced integrity checks;
 - curated no-key semiconductor-wafer and 兆易创新 golden cases;
-- three explicit model channels: no-key fixtures, a local Codex-subscription bridge, and the
+- three explicit model channels: no-key fixtures, the official local Codex CLI using a ChatGPT
+  subscription, and the
   separately billed OpenAI Responses API;
 - resumable foreground or background execution with SQLite checkpoints;
 - SSRF-safe HTML/PDF evidence capture, hashing, and explicit review;
@@ -136,7 +137,7 @@ same. Each run explicitly selects one channel and keeps it for the lifetime of t
 | Provider | Setup | Usage boundary |
 | --- | --- | --- |
 | `fixture` | none | bundled, frozen golden cases |
-| `codex_subscription` | local CLIProxyAPI plus ChatGPT/Codex login | ChatGPT/Codex subscription pool |
+| `codex_subscription` | official local Codex CLI plus ChatGPT login | ChatGPT/Codex subscription pool |
 | `openai` | OpenAI Platform API key | separately billed OpenAI API |
 
 Inspect configuration without exposing credentials:
@@ -146,25 +147,40 @@ capexgraph model providers
 capexgraph model providers --probe-codex
 ```
 
-For personal local Codex-subscription execution, keep CLIProxyAPI bound to loopback, give it a
-separate local access key, and configure:
+For personal Codex-subscription execution, install the official Codex CLI and sign in with
+ChatGPT. In the Cockpit, open **Connections**, select **Codex Subscription**, and click
+**使用 ChatGPT 登录** if the account is not already available. No OpenAI Platform API key is
+required. The same login can be prepared from a terminal:
 
-```dotenv
-CAPEXGRAPH_CODEX_BASE_URL=http://127.0.0.1:8317/v1
-CAPEXGRAPH_CODEX_PROXY_KEY=your-local-proxy-key
-CAPEXGRAPH_CODEX_MODEL=the-model-slug-exposed-by-your-proxy
+```powershell
+codex login
+codex login status
 ```
 
-Then run:
+The Connection Center discovers the models available to that account. An optional selection is
+stored locally as `CAPEXGRAPH_CODEX_MODEL`; otherwise the Codex default is used. Then run:
 
 ```powershell
 capexgraph theme "AI数据中心电力" --provider codex_subscription --execute
 ```
 
-CapexGraph talks only to the proxy's Responses-compatible endpoint. It does not read or persist
-ChatGPT OAuth files. Remote proxy URLs are rejected unless
-`CAPEXGRAPH_ALLOW_REMOTE_CODEX_PROXY=1` is explicitly set. A proxy, authentication, quota, or
-schema failure is persisted on the selected run and never falls back to the OpenAI API or fixture.
+CapexGraph invokes `codex exec` in an ephemeral, read-only temporary workspace and validates the
+final JSON against the requested Pydantic schema. Account discovery and browser login use the
+official local Codex app-server; OAuth tokens remain owned by Codex and are never returned through
+the CapexGraph API. A login, quota, execution, or schema failure is persisted on the selected run
+and never falls back to the OpenAI API or fixture.
+
+An existing CLIProxyAPI deployment remains available only as an advanced compatibility transport:
+set `CAPEXGRAPH_CODEX_TRANSPORT=proxy`, keep it bound to loopback, and configure its base URL,
+model, and separate proxy key. Remote proxy URLs still require the explicit
+`CAPEXGRAPH_ALLOW_REMOTE_CODEX_PROXY=1` opt-in.
+
+```dotenv
+CAPEXGRAPH_CODEX_TRANSPORT=proxy
+CAPEXGRAPH_CODEX_BASE_URL=http://127.0.0.1:8317/v1
+CAPEXGRAPH_CODEX_PROXY_KEY=your-local-proxy-key
+CAPEXGRAPH_CODEX_MODEL=the-model-slug-exposed-by-your-proxy
+```
 
 For the separately billed official OpenAI API channel:
 
@@ -226,7 +242,11 @@ EODHD without a token fails clearly instead of silently changing providers.
 
 Open `http://127.0.0.1:5173`. Creating a workspace, discovering/capturing/reviewing sources, and
 extracting SEC facts do not require a model key. The Cockpit shows all three model channels and
-their credential-safe readiness state. Codex subscription execution requires the local bridge;
+their credential-safe readiness state. **Connections** in the top bar is the product setup entry
+for Jin10 MCP, Jin10 WebSocket, and the Codex subscription. It verifies MCP before saving, stores
+provider secrets only in the ignored local `.env`, detects the official Codex login and available
+models, and never returns a secret to the browser. Codex subscription execution requires the
+official local Codex CLI and ChatGPT login;
 OpenAI execution requires its separately billed API key. The Cockpit can run one durable stage at
 a time, run all remaining stages, retry a failed checkpoint, inspect coverage and provider
 failures, render the real graph, open the portable report, and manage forward tracking.
@@ -243,7 +263,9 @@ capexgraph live soak --mode fixture --cycles 6 --failure-every 3
 capexgraph live doctor
 ```
 
-For real MCP polling, put the Bearer token only in the repository-local `.env`:
+For real MCP polling, open **Connections → 金十 MCP**, paste the Bearer token, and choose
+**连接并验证**. The backend completes MCP initialization plus tool/resource discovery before it
+persists the value. The equivalent manual local `.env` configuration is:
 
 ```dotenv
 JIN10_MCP_BEARER_TOKEN=your-bearer-token
@@ -258,7 +280,8 @@ capexgraph live poll --stream calendar
 capexgraph live monitor
 ```
 
-WebSocket uses an independent credential and remains equal priority after it is enabled:
+WebSocket uses an independent credential and remains equal priority after it is enabled. Save it
+through **Connections → 金十 WebSocket**, or configure the same backend-only value manually:
 
 ```dotenv
 JIN10_WEBSOCKET_SECRET_KEY=your-open-platform-secret-key
@@ -272,7 +295,8 @@ matched/divergent lineage and delivery delay, supports no-key rules analysis, an
 Watch/Dismiss/Mute actions. Its Research Bridge creates confirmed official-source tasks, captures
 and reviews official material, links only unchanged reviewed Evidence, attaches immutable context,
 creates parent-preserving child re-evaluations, and exposes the complete audit timeline. Provider
-credentials are backend-only and never appear in the settings API or browser. Browser
+credentials are submitted once over the loopback API, are never put in browser storage, and never
+appear in status/settings responses. Browser
 notifications require a direct user opt-in.
 See [the live event operator guide](docs/LIVE_EVENTS.md) for API contracts, retention, cursor
 semantics, and troubleshooting, and [the live operations runbook](docs/LIVE_OPERATIONS.md) for

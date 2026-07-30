@@ -7,8 +7,8 @@
   and Open Platform WebSocket channels; M0 through M7 are implemented in code, including real MCP
   polling, the WebSocket protocol/worker, reconciliation/rules, optional AI analysis, API/SSE,
   Cockpit Live Desk/Research Bridge, official-source/Evidence/run integration, audit, diagnostics,
-  and release gates. The credentialed WebSocket live soak remains an external acceptance gate
-  until a Secret-Key is available
+  release gates, and a productized Connection Center for Jin10/Codex onboarding. The credentialed
+  WebSocket live soak remains an external acceptance gate until a Secret-Key is available
 - Incomplete dependency: `v0.4` — cross-market data foundation and mainline monitoring; the market
   slice exists, while theme/mainline automation remains open
 - Active development branch: `codex/v0-5-1-live-event-gateway`
@@ -49,6 +49,15 @@ substantial change, and update it in the same pull request whenever shipped capa
 - a responsive Live Desk with independent channel chips, filters, lineage/detail, coverage audit,
   settings, explicit browser notifications, rules/model analysis selection, and human
   Watch/Dismiss/Mute actions;
+- a productized Connection Center reachable from the top bar and Live Desk, with verify-before-save
+  Jin10 MCP setup, independent WebSocket setup, redacted status, explicit disconnect, runtime
+  refresh, and no secret in browser storage or GET responses;
+- official Codex CLI account/model discovery and ChatGPT browser login through the official
+  app-server, plus ephemeral read-only schema-bound `codex exec` for subscription analysis without
+  an OpenAI Platform API key; strict schema normalization and disabled plugin/catalog loading keep
+  that subprocess bounded and deterministic;
+- immediate `live.ready` SSE delivery, truthful `WAIT KEY` channel cards when formal credentials
+  are absent, and bounded CN/US/KR Market selection in the research composer;
 - additive migration 8 plus typed verification tasks, reviewed Evidence links, immutable run
   context links, durable bridge audit entries, and bounded soak reports;
 - `LiveResearchBridge` with explicit confirmation on every mutation, regulator/issuer source
@@ -74,9 +83,9 @@ credentials exist.
 
 ## Implemented on the v0.5 development branch
 
-- three isolated model-execution channels: no-key fixtures, a loopback CLIProxyAPI
+- three isolated model-execution channels: no-key fixtures, the official local Codex CLI
   `codex_subscription` adapter using the ChatGPT/Codex subscription boundary, and the separately
-  billed official OpenAI API adapter;
+  billed official OpenAI API adapter; CLIProxyAPI remains an explicit compatibility transport;
 - per-channel model configuration, strict Responses/Pydantic output, provider/model locking after
   execution starts, typed retry policy, credential-safe provider status in CLI/API/Cockpit, and
   manifest/report transport plus billing provenance without silent fallback;
@@ -107,7 +116,12 @@ guarded official-source capture and human-review path.
 
 ## Verified for the current development slice
 
-- 116 Python tests pass and Ruff passes;
+- the official Codex subscription path completed a real `gpt-5.6-sol` call through an authenticated
+  ChatGPT subscription on 2026-07-30 and passed the requested Pydantic output contract;
+- the productized connection flow was browser-verified at desktop and 390px width: Codex account
+  and models load, missing Jin10 credentials remain `WAIT KEY`, SSE becomes `CONNECTED`
+  immediately, and the Market selector exposes exactly CN/US/KR without horizontal overflow;
+- 122 Python tests pass locally and Ruff passes;
 - the React/Vite production build passes;
 - a fresh wheel build includes `capexgraph.events`, the complete
   `capexgraph.live` package, both adapters, the synthetic dual-channel fixture, and shared
@@ -224,12 +238,13 @@ Future code or documentation changes must pass the same remote release gate agai
 - Catalyst Scan is only a scaffold. It has no research schemas, handlers, audit, golden fixture, or
   live execution path.
 - Creating a workspace, collecting/reviewing sources, replaying fixtures, and extracting SEC facts
-  need no model key. Live execution explicitly selects either a local
-  `codex_subscription` bridge with its own proxy key/model or the separately billed OpenAI API with
-  `OPENAI_API_KEY` and `CAPEXGRAPH_OPENAI_MODEL`; neither channel falls back to the other.
-- The CLIProxyAPI adapter is source-contract and mock-transport verified. A real subscription call
-  still requires the operator to install, authenticate, and run the third-party local proxy; this
-  checkout does not bundle it or claim an official OpenAI support contract for that relay.
+  need no model key. Live execution explicitly selects either the official local Codex CLI with a
+  ChatGPT login or the separately billed OpenAI API with `OPENAI_API_KEY` and
+  `CAPEXGRAPH_OPENAI_MODEL`; neither channel falls back to the other.
+- Codex subscription execution still requires a locally installed official Codex CLI and an
+  eligible authenticated ChatGPT account. The Connection Center can start the official browser
+  login but never receives OAuth tokens. CLIProxyAPI is compatibility-only and retains its
+  loopback/explicit-opt-in security boundary.
 - CapexGraph does not autonomously browse the broad Web. Official discovery currently covers
   SEC/EDGAR plus user-supplied official URLs.
 - Automatic filing facts currently cover a bounded US-GAAP metric set through SEC Company Facts.

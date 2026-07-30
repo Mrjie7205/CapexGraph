@@ -85,6 +85,7 @@ advertise it as shipped until its roadmap acceptance criteria and tests are comp
 1. Start from an active item in `ROADMAP.md` or a scoped user request. The user explicitly advanced
    active development to the isolated v0.5 event foundation and completed v0.5.1 M0-M7 in code.
    Follow `docs/V0_5_PLAN.md`, `docs/V0_5_1_PLAN.html`, and `docs/LIVE_OPERATIONS.md`. The
+   Cockpit now has a local Connection Center for Jin10 and official Codex onboarding. The
    credentialed WebSocket live soak remains an external gate until a Secret-Key exists; do not
    claim the paused v0.4 theme/mainline work is complete.
 2. Inspect the actual code path and tests before proposing architecture.

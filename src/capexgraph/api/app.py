@@ -13,9 +13,19 @@ from fastapi.responses import (
     PlainTextResponse,
     StreamingResponse,
 )
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, SecretStr
 
 from capexgraph import __version__
+from capexgraph.connections import (
+    codex_login_state,
+    connect_jin10_mcp,
+    connect_jin10_websocket,
+    connection_status,
+    disconnect_jin10_mcp,
+    disconnect_jin10_websocket,
+    select_codex_model,
+    start_codex_login,
+)
 from capexgraph.domain import (
     CorporateEventStatus,
     CorporateEventType,
@@ -310,6 +320,18 @@ class LiveSettingsPatch(BaseModel):
     theme_keywords: dict[str, list[str]] | None = None
     desktop_notifications: bool | None = None
     model_provider: ProviderName | None = None
+
+
+class SecretConnectionRequest(BaseModel):
+    secret: SecretStr = Field(min_length=1, max_length=4096)
+
+
+class ConnectionConfirmationRequest(BaseModel):
+    confirmed: bool = False
+
+
+class CodexModelSelectionRequest(BaseModel):
+    model: str = Field(min_length=1, max_length=160)
 
 
 @app.get("/api/health")
@@ -668,6 +690,90 @@ def model_provider_status(probe_codex: bool = False) -> dict[str, object]:
             probe_codex=probe_codex
         )
     }
+
+
+@app.get("/api/v1/connections")
+def local_connection_status(probe_mcp: bool = False) -> dict[str, object]:
+    """Return local integration readiness without returning credentials."""
+
+    return connection_status(probe_mcp=probe_mcp)
+
+
+@app.post("/api/v1/connections/jin10-mcp")
+def connect_mcp(request: SecretConnectionRequest) -> dict[str, object]:
+    try:
+        return connect_jin10_mcp(request.secret.get_secret_value())
+    except (ValueError, RuntimeError, httpx.HTTPError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail=redact_provider_secrets(error),
+        ) from error
+
+
+@app.post("/api/v1/connections/jin10-mcp/disconnect")
+def disconnect_mcp(
+    request: ConnectionConfirmationRequest,
+) -> dict[str, object]:
+    if not request.confirmed:
+        raise HTTPException(status_code=409, detail="Explicit confirmation is required.")
+    return disconnect_jin10_mcp()
+
+
+@app.post("/api/v1/connections/jin10-websocket")
+def connect_websocket(request: SecretConnectionRequest) -> dict[str, object]:
+    try:
+        return connect_jin10_websocket(request.secret.get_secret_value())
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail=redact_provider_secrets(error),
+        ) from error
+
+
+@app.post("/api/v1/connections/jin10-websocket/disconnect")
+def disconnect_websocket(
+    request: ConnectionConfirmationRequest,
+) -> dict[str, object]:
+    if not request.confirmed:
+        raise HTTPException(status_code=409, detail="Explicit confirmation is required.")
+    return disconnect_jin10_websocket()
+
+
+@app.post("/api/v1/connections/codex/login")
+def connect_codex_account(
+    request: ConnectionConfirmationRequest,
+) -> dict[str, object]:
+    if not request.confirmed:
+        raise HTTPException(status_code=409, detail="Explicit confirmation is required.")
+    try:
+        return start_codex_login()
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=redact_provider_secrets(error),
+        ) from error
+
+
+@app.get("/api/v1/connections/codex/login")
+def get_codex_login_state() -> dict[str, object]:
+    try:
+        return codex_login_state()
+    except RuntimeError as error:
+        raise HTTPException(
+            status_code=409,
+            detail=redact_provider_secrets(error),
+        ) from error
+
+
+@app.post("/api/v1/connections/codex/model")
+def save_codex_model(request: CodexModelSelectionRequest) -> dict[str, object]:
+    try:
+        return select_codex_model(request.model)
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(
+            status_code=409,
+            detail=redact_provider_secrets(error),
+        ) from error
 
 
 @app.post("/api/v1/market/sync", response_model=list[MarketSyncResult])
@@ -1505,6 +1611,10 @@ async def stream_live_events(
     async def generate():
         cursor = after
         heartbeat = 0
+        yield (
+            "event: live.ready\n"
+            f"data: {json.dumps({'connected_at': datetime.now(UTC).isoformat()})}\n\n"
+        )
         while True:
             alerts = store.list_alerts(after_id=cursor, limit=100)
             for alert in alerts:

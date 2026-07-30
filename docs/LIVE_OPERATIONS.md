@@ -51,6 +51,10 @@ connectivity. Until a Secret-Key is available and this soak passes, report WebSo
 
 ## Daily operation
 
+Open the Cockpit **Connections** panel for credential-safe onboarding and readiness checks. MCP is
+verified before persistence. WebSocket remains `WAIT KEY` / `待启动验证` until the monitor completes
+a real authenticated connection. The Codex card is independent of these market-data channels.
+
 Inspect configuration without revealing credential values:
 
 ```powershell
@@ -81,8 +85,10 @@ Task Scheduler entry or service wrapper under the same user account that owns th
 - one instance only; and
 - stdout/stderr to an operator-owned log directory that is not committed.
 
-Do not copy credentials into command-line arguments, task names, logs, browser storage, or frontend
-settings. The process reads them from the ignored backend environment only.
+Do not copy credentials into command-line arguments, task names, logs, or browser storage.
+Connection Center is the only frontend credential-entry surface: it sends each value once to the
+loopback backend, never reads it back, and leaves ongoing processes to read the ignored local
+backend environment.
 
 ## Research Bridge operation
 

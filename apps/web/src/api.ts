@@ -11,12 +11,73 @@ export interface ModelProviderStatus {
   configured: boolean;
   model?: string;
   setup_kind: string;
+  transport?: string;
   billing_mode: string;
   endpoint_scope: string;
   reachability: string;
   missing: string[];
   errors: string[];
+  cli_version?: string;
+  auth_mode?: string;
   legacy_model_setting?: boolean;
+}
+
+export interface Jin10McpConnection {
+  configured: boolean;
+  enabled: boolean;
+  reachability: string;
+  tools: string[];
+  resources: string[];
+  call_budget: number;
+  error?: string;
+}
+
+export interface Jin10WebSocketConnection {
+  configured: boolean;
+  enabled: boolean;
+  reachability: string;
+  streams: Record<string, unknown[]>;
+  error?: string;
+}
+
+export interface CodexModelOption {
+  id: string;
+  display_name: string;
+  is_default: boolean;
+}
+
+export interface CodexConnection {
+  installed: boolean;
+  authenticated: boolean;
+  auth_mode?: string;
+  version?: string;
+  reachability: string;
+  errors: string[];
+  account?: {
+    type?: string;
+    email?: string;
+    plan_type?: string;
+  };
+  models: CodexModelOption[];
+  selected_model?: string;
+  transport: string;
+}
+
+export interface ConnectionStatus {
+  local_only: boolean;
+  storage: string;
+  jin10_mcp: Jin10McpConnection;
+  jin10_websocket: Jin10WebSocketConnection;
+  codex_subscription: CodexConnection;
+}
+
+export interface CodexLoginState {
+  login_id?: string;
+  completed?: boolean;
+  success?: boolean;
+  error?: string;
+  auth_url?: string;
+  connection?: CodexConnection;
 }
 
 export interface PipelineStep {
@@ -470,6 +531,62 @@ export async function listModelProviders(probeCodex = false): Promise<ModelProvi
     `/api/v1/model/providers?probe_codex=${probeCodex ? "true" : "false"}`,
   );
   return payload.providers;
+}
+
+export function getConnections(probeMcp = false): Promise<ConnectionStatus> {
+  return request(`/api/v1/connections?probe_mcp=${probeMcp ? "true" : "false"}`);
+}
+
+export function connectJin10Mcp(secret: string): Promise<Jin10McpConnection> {
+  return request("/api/v1/connections/jin10-mcp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ secret }),
+  });
+}
+
+export function disconnectJin10Mcp(): Promise<Jin10McpConnection> {
+  return request("/api/v1/connections/jin10-mcp/disconnect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmed: true }),
+  });
+}
+
+export function connectJin10WebSocket(secret: string): Promise<Jin10WebSocketConnection> {
+  return request("/api/v1/connections/jin10-websocket", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ secret }),
+  });
+}
+
+export function disconnectJin10WebSocket(): Promise<Jin10WebSocketConnection> {
+  return request("/api/v1/connections/jin10-websocket/disconnect", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmed: true }),
+  });
+}
+
+export function startCodexLogin(): Promise<CodexLoginState> {
+  return request("/api/v1/connections/codex/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmed: true }),
+  });
+}
+
+export function getCodexLoginState(): Promise<CodexLoginState> {
+  return request("/api/v1/connections/codex/login");
+}
+
+export function saveCodexModel(model: string): Promise<CodexConnection> {
+  return request("/api/v1/connections/codex/model", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model }),
+  });
 }
 
 export function getRun(runId: string): Promise<ResearchRun> {

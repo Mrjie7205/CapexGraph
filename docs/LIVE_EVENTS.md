@@ -39,7 +39,16 @@ The replay is not current market information. It is intentionally dated and labe
 
 ## Configure real channels
 
-Put credentials only in the repository-local ignored `.env`:
+In the Cockpit, choose **Connections** from the top bar or Live Desk. The product setup flow:
+
+1. accepts the MCP Bearer Token in a password field;
+2. completes the standard MCP handshake and tool/resource discovery before saving it;
+3. accepts the independent WebSocket Secret-Key for later live authentication; and
+4. refreshes the running gateway without exposing either value in the response.
+
+The browser submits each value once to the loopback backend and does not put it in local/session
+storage. The backend atomically updates only allowlisted keys in the repository-local ignored
+`.env`. Manual configuration remains available:
 
 ```dotenv
 JIN10_MCP_BEARER_TOKEN=
@@ -59,8 +68,8 @@ The local MCP budget must be between 1 and the provider's documented 1500 calls 
 Beijing day. The default target is 1200. Budget usage resets by UTC+8 calendar date. Flash and
 calendar keep independent counters because the provider rate-limits per tool.
 
-The frontend never accepts or returns credentials. `live providers` and `/api/v1/live/status`
-report only configured/missing state.
+Status endpoints never return credentials. `live providers`, `/api/v1/live/status`, and
+`/api/v1/connections` report only configured/missing/readiness state.
 
 ## Operate the gateway
 
@@ -96,6 +105,8 @@ it is never mistaken for a forward stream offset.
 
 Live Desk exposes:
 
+- a productized Connection Center for Jin10 MCP, Jin10 WebSocket, and official Codex login/model
+  selection;
 - independent MCP, WebSocket, and SSE state;
 - call-budget usage, freshness, unread alerts, and runtime controls;
 - category/channel/search filters;
@@ -112,12 +123,18 @@ Live Desk exposes:
 - browser notifications only after explicit permission.
 
 Settings control channel switches, polling cadence, thresholds, cooldown, include/exclude keywords,
-and notification preference. They never contain credentials.
+and notification preference. Credentials are managed separately in Connection Center and never
+appear in settings responses.
 
 ## API
 
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api/v1/connections` | redacted local connection and Codex account/model readiness |
+| `POST` | `/api/v1/connections/jin10-mcp` | verify then persist one MCP credential locally |
+| `POST` | `/api/v1/connections/jin10-websocket` | persist one WebSocket credential locally |
+| `POST/GET` | `/api/v1/connections/codex/login` | start/poll official Codex ChatGPT login |
+| `POST` | `/api/v1/connections/codex/model` | persist an available Codex model selection |
 | `GET` | `/api/v1/live/status` | runtime, independent channel state, unread and coverage |
 | `GET` | `/api/v1/live/doctor` | local integrity, queue, channel, and release-gate diagnostics |
 | `GET` | `/api/v1/live/soak-reports` | persisted bounded release-gate reports |

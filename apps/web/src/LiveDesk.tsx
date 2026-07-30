@@ -85,9 +85,10 @@ function channelHealth(
   enabled: boolean,
 ): { health: LiveHealth | "standby"; freshness?: string; budget?: string } {
   if (!enabled) return { health: "off" };
+  if (!configured) return { health: "not_configured" };
   const relevant = checkpoints.filter((item) => item.channel === channel);
   if (relevant.length === 0) {
-    return { health: configured ? "standby" : "not_configured" };
+    return { health: "standby" };
   }
   const order: Array<LiveHealth> = ["degraded", "exhausted", "active", "replay", "not_configured", "off"];
   const health = order.find((candidate) => relevant.some((item) => item.health === candidate)) ?? "standby";
@@ -104,7 +105,7 @@ function channelHealth(
   };
 }
 
-export function LiveDesk() {
+export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void }) {
   const [status, setStatus] = useState<LiveStatus | null>(null);
   const [events, setEvents] = useState<LiveEventRecord[]>([]);
   const [selectedKey, setSelectedKey] = useState("");
@@ -147,10 +148,19 @@ export function LiveDesk() {
     refresh().catch((reason) => {
       setError(reason instanceof Error ? reason.message : "Live Desk unavailable");
     });
+    const refreshConnections = () => {
+      refresh().catch((reason) => {
+        setError(reason instanceof Error ? reason.message : "连接状态刷新失败");
+      });
+    };
+    window.addEventListener("capexgraph:connections-changed", refreshConnections);
     const timer = window.setInterval(() => {
       getLiveStatus().then(setStatus).catch(() => undefined);
     }, 15000);
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("capexgraph:connections-changed", refreshConnections);
+    };
   }, []);
 
   useEffect(() => {
@@ -158,6 +168,7 @@ export function LiveDesk() {
     setStreamState("connecting");
     source.onopen = () => setStreamState("connected");
     source.onerror = () => setStreamState("reconnecting");
+    source.addEventListener("live.ready", () => setStreamState("connected"));
     source.addEventListener("live.signal", (rawEvent) => {
       const message = rawEvent as MessageEvent<string>;
       try {
@@ -468,6 +479,7 @@ export function LiveDesk() {
             >
               {status?.running ? "Stop monitor" : "Start monitor"}
             </button>
+            <button className="connection-button" onClick={onOpenConnections}>Connections</button>
             <button onClick={() => setSettingsOpen(true)}>Settings</button>
           </div>
         </div>
@@ -907,7 +919,11 @@ export function LiveDesk() {
         <div className="settings-scrim" role="presentation" onMouseDown={() => setSettingsOpen(false)}>
           <aside className="live-settings" role="dialog" aria-modal="true" aria-label="Live Desk settings" onMouseDown={(event) => event.stopPropagation()}>
             <header><div><span>Gateway controls</span><h3>Live Desk 设置</h3></div><button onClick={() => setSettingsOpen(false)}>×</button></header>
-            <p className="settings-notice">密钥只从后端环境变量读取；本面板不会接收、显示或返回任何 Bearer Token / Secret-Key。</p>
+            <p className="settings-notice">
+              本面板只调整运行策略；Bearer Token、Secret-Key 和 Codex 登录由
+              <button type="button" onClick={() => { setSettingsOpen(false); onOpenConnections?.(); }}> Connection Center </button>
+              一次性提交给本机后端，前端不会回显或保存。
+            </p>
             <fieldset>
               <legend>Equal-priority channels</legend>
               <label><input type="checkbox" checked={settings.mcp_enabled} onChange={(event) => setSettings({ ...settings, mcp_enabled: event.target.checked })} /> MCP adaptive polling</label>

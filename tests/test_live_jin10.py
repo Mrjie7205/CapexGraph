@@ -694,4 +694,5 @@ async def test_live_desk_api_no_key_demo_settings_actions_and_sse(
         stream = await client.get("/api/v1/live/stream?once=true")
         assert stream.status_code == 200
         assert stream.headers["content-type"].startswith("text/event-stream")
+        assert stream.text.startswith("event: live.ready")
         assert "event: live.signal" in stream.text

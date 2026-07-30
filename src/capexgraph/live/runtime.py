@@ -227,3 +227,21 @@ def get_live_runtime(db_path: Path | None = None) -> LiveGatewayRuntime:
             runtime = LiveGatewayRuntime(candidate)
             _RUNTIMES[candidate] = runtime
         return runtime
+
+
+def reload_live_runtime(db_path: Path | None = None) -> LiveGatewayRuntime:
+    """Rebuild one runtime after local provider credentials change."""
+
+    candidate = LiveSignalStore(db_path).db_path
+    with _RUNTIMES_LOCK:
+        previous = _RUNTIMES.pop(candidate, None)
+    was_running = bool(previous and previous.running)
+    if previous is not None:
+        previous.stop()
+        previous.mcp_client.close()
+    replacement = LiveGatewayRuntime(candidate)
+    with _RUNTIMES_LOCK:
+        _RUNTIMES[candidate] = replacement
+    if was_running:
+        replacement.start()
+    return replacement

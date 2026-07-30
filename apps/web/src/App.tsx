@@ -25,8 +25,14 @@ import {
 import { ResearchReadiness } from "./ResearchReadiness";
 import { SourceQueue } from "./SourceQueue";
 import { LiveDesk } from "./LiveDesk";
+import { ConnectionCenter } from "./ConnectionCenter";
 
 const FINAL_STATUSES = new Set(["needs_review", "completed", "failed", "cancelled"]);
+const MARKET_OPTIONS = [
+  { value: "CN", label: "CN · 中国 A股" },
+  { value: "US", label: "US · 美国" },
+  { value: "KR", label: "KR · 韩国" },
+] as const;
 
 function GraphView({ run }: { run: ResearchRun | null }) {
   const geometry = useMemo(() => {
@@ -111,6 +117,12 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState("");
+  const [connectionsOpen, setConnectionsOpen] = useState(false);
+
+  async function refreshModelProviders() {
+    const providers = await listModelProviders(true);
+    setModelProviders(providers);
+  }
 
   async function refreshRuns(selectId?: string) {
     const latest = await listRuns();
@@ -125,7 +137,7 @@ function App() {
   useEffect(() => {
     refreshRuns().catch(() => setError("API unavailable · run `capexgraph serve` first."));
     listTracking().then(setTracking).catch(() => undefined);
-    listModelProviders(true).then(setModelProviders).catch(() => undefined);
+    refreshModelProviders().catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -313,7 +325,12 @@ function App() {
           <span>CapexGraph<small>evidence-led research</small></span>
         </a>
         <nav><a className="active" href="#live">Live Desk</a><a href="#runs">Runs</a><a href="#sources">Sources</a><a href="#graph">Graph</a><a href="#radar">Candidates</a></nav>
-        <div className="system-state"><span /> Local research workspace</div>
+        <div className="topbar-tools">
+          <div className="system-state"><span /> Local workspace</div>
+          <button className="connection-trigger" type="button" onClick={() => setConnectionsOpen(true)}>
+            <i /> Connections
+          </button>
+        </div>
       </header>
 
       <section className="hero" id="top">
@@ -332,11 +349,21 @@ function App() {
             <div className="composer-options">
               <label>Model channel<select value={provider} onChange={(event) => { if (isProvider(event.target.value)) setProvider(event.target.value); }}><option value="fixture">Fixture · no model</option><option value="codex_subscription">Codex subscription · local</option><option value="openai">OpenAI API · metered</option></select></label>
               <label>Evidence<select value={evidenceMode} onChange={(event) => setEvidenceMode(event.target.value as EvidenceMode)}><option value="partial">Partial · continue with gaps</option><option value="strict">Strict · reviewed first</option></select></label>
-              <label>Market<input value={market} onChange={(event) => setMarket(event.target.value)} maxLength={12} /></label>
+              <label>
+                Market
+                <select value={market} onChange={(event) => setMarket(event.target.value)}>
+                  {MARKET_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </label>
             </div>
             <label htmlFor="subject">{mode === "theme" ? "Investment theme" : "Ticker or company"}</label>
             <div className="subject-row"><input id="subject" value={subject} onChange={(event) => setSubject(event.target.value)} /><button className="launch" disabled={busy}>{busy ? "Creating…" : "Create workspace ↗"}</button></div>
-            <p className="composer-note">通道状态：{providerReadiness}。Fixture 无需配置；Codex 订阅需要本机代理和登录；OpenAI API 使用独立 API Key 计费。</p>
+            <p className="composer-note">
+              通道状态：{providerReadiness}。Fixture 无需配置；Codex 可直接使用本机 ChatGPT 订阅；OpenAI API 使用独立 API Key 计费。
+              <button type="button" className="inline-connect" onClick={() => setConnectionsOpen(true)}>管理连接 ↗</button>
+            </p>
             <button className="demo-launch" type="button" disabled={busy} onClick={runGoldenDemo}>Run {mode} golden case · 无需 API Key</button>
             {error && <p className="run-error">{error}</p>}
           </form>
@@ -350,7 +377,7 @@ function App() {
         <article><span>Research queue</span><strong>{selected?.candidates.length ?? "—"}</strong><small>candidates, not buy calls</small></article>
       </section>
 
-      <LiveDesk />
+      <LiveDesk onOpenConnections={() => setConnectionsOpen(true)} />
 
       <section className="workbench" id="runs">
         <article className="pipeline panel">
@@ -422,6 +449,11 @@ function App() {
       </section>
 
       <footer><span>CapexGraph / local</span><p>Research infrastructure, not investment advice.</p><span>Evidence over narrative.</span></footer>
+      <ConnectionCenter
+        open={connectionsOpen}
+        onClose={() => setConnectionsOpen(false)}
+        onChanged={() => refreshModelProviders().catch(() => undefined)}
+      />
     </main>
   );
 }

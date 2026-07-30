@@ -41,14 +41,17 @@ explicit model channels:
 
 ```text
 fixture             → bundled outputs                    → no credential or usage
-codex_subscription  → loopback CLIProxyAPI / Responses  → ChatGPT OAuth and subscription pool
+codex_subscription  → official Codex CLI / codex exec   → ChatGPT OAuth and subscription pool
 openai              → official Responses API            → Platform API key and API billing
 ```
 
-The two live adapters share Pydantic structured-output machinery, but their configuration,
-provider identity, error state, and usage boundary are separate. A selected channel never falls
-back to another. CLIProxyAPI owns ChatGPT OAuth; CapexGraph sees only a loopback Responses endpoint
-and a local proxy access key. Remote Codex proxy endpoints require an explicit opt-in.
+The two live adapters share typed structured-output contracts, but their configuration, provider
+identity, error state, and usage boundary are separate. A selected channel never falls back to
+another. The default subscription path discovers the official local Codex CLI, reads account/model
+readiness through the official app-server, and runs schema-bound reasoning with ephemeral
+`codex exec`. Codex owns ChatGPT OAuth storage; CapexGraph receives neither OAuth tokens nor API
+keys. CLIProxyAPI remains an explicit compatibility transport, loopback-only unless the operator
+opts into a secured remote endpoint.
 
 A run records provider, adapter version, model, transport, authentication mode, billing mode,
 endpoint scope, and model-call count before or during its first checkpoint. The provider and model
@@ -112,9 +115,12 @@ not a falsely model-authored proposal.
 
 `LiveGatewayRuntime` supervises independent MCP and WebSocket loops. The API exposes state,
 poll/start/stop, events, coverage, settings, analysis, actions, and reconnectable SSE. Live Desk
-consumes that surface, while provider credentials remain environment-only. A `signal_only` record
-still cannot become Evidence or an official corporate event without guarded capture and human
-review.
+consumes that surface. Connection Center is the local onboarding boundary: it submits a secret
+once to the loopback backend, verifies MCP before persistence, atomically updates only an
+allowlisted ignored `.env` setting, rebuilds the affected runtime, and returns status without the
+secret. Browser storage and GET responses never contain provider credentials. A `signal_only`
+record still cannot become Evidence or an official corporate event without guarded capture and
+human review.
 
 `LiveResearchBridge` implements that explicit M7 boundary. A confirmed verification task moves the
 signal to `official_source_pending` through a new signal version. Regulator or explicitly identified

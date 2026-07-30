@@ -309,3 +309,26 @@ persists only its bounded report. This prevents release testing from contaminati
 current signal ledger. A credentialed provider soak requires both equal-priority channel
 credentials; missing WebSocket access remains an explicit external live-smoke gate, not a passing
 or fallback result.
+
+## D022 — Local onboarding uses a one-way secret boundary and the official Codex transport
+
+- **Status:** accepted; supersedes D018 only for the default Codex transport
+- **Date:** 2026-07-30
+
+CapexGraph exposes one product entry, Connection Center, for local single-user integrations. A
+Jin10 secret may travel once from a password field to the loopback backend. It is never placed in
+browser storage, returned by a GET/status response, embedded in a run, or written to logs. The
+backend may atomically update only an allowlisted repository-local `.env` key. MCP credentials are
+persisted only after a successful standard handshake plus tool/resource discovery; WebSocket
+credentials remain visibly `live_probe_pending` until an authenticated monitor run proves the
+stream. Disconnect remains an explicit destructive action.
+
+The default `codex_subscription` transport is the official local Codex CLI, not a third-party
+proxy. Account and available-model discovery plus browser login use the official Codex app-server.
+Research execution uses ephemeral, read-only `codex exec` with a requested JSON schema and validates
+the final result again with Pydantic. Codex owns ChatGPT OAuth storage; CapexGraph receives no OAuth
+token and requires no OpenAI Platform API key for this channel. CLIProxyAPI remains an explicit
+compatibility transport for existing users, bound to loopback by default.
+
+No onboarding convenience changes the trust model: provider secrets unlock data/model transport,
+not Evidence authority, and no model channel silently falls back to another.

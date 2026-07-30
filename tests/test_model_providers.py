@@ -10,6 +10,7 @@ from openai import OpenAI
 from capexgraph.providers import (
     ModelSettings,
     ProviderUnavailableError,
+    codex_subscription,
 )
 from capexgraph.providers.codex_subscription import CodexSubscriptionResearchModel
 from capexgraph.providers.config import validate_codex_base_url
@@ -90,6 +91,61 @@ def test_codex_provider_reuses_pydantic_responses_contract(monkeypatch) -> None:
     assert responses.kwargs["text_format"] is ThemeBoundaryOutput
     assert provider.execution_context["billing_mode"] == "chatgpt_subscription"
     assert provider.call_count == 1
+
+
+def test_codex_official_cli_uses_chatgpt_subscription_without_api_key(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_CODEX_TRANSPORT", "cli")
+    monkeypatch.delenv("CAPEXGRAPH_CODEX_PROXY_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(
+        codex_subscription,
+        "probe_codex_cli",
+        lambda _explicit=None: {
+            "installed": True,
+            "authenticated": True,
+            "auth_mode": "chatgpt",
+            "version": "codex-cli test",
+            "reachability": "ready",
+            "errors": [],
+        },
+    )
+    monkeypatch.setattr(
+        codex_subscription,
+        "resolve_codex_model",
+        lambda _configured=None: "gpt-test",
+    )
+    captured: dict[str, object] = {}
+
+    def fake_generate(output_model, **kwargs):
+        captured.update(kwargs)
+        assert output_model is ThemeBoundaryOutput
+        return _boundary()
+
+    monkeypatch.setattr(
+        codex_subscription,
+        "generate_codex_cli_output",
+        fake_generate,
+    )
+
+    provider = CodexSubscriptionResearchModel()
+    actual = provider.generate(
+        ThemeBoundaryOutput,
+        system_prompt="system",
+        user_prompt="user",
+    )
+
+    assert actual == _boundary()
+    assert captured["model"] == "gpt-test"
+    assert provider.execution_context == {
+        "api_surface": "codex_exec",
+        "transport": "official_codex_cli",
+        "auth_mode": "chatgpt_managed",
+        "billing_mode": "chatgpt_subscription",
+        "endpoint_scope": "local_process",
+        "cli_version": "codex-cli test",
+    }
 
 
 def test_openai_sdk_sends_strict_schema_to_codex_responses_endpoint(monkeypatch) -> None:

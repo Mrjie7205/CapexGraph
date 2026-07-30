@@ -4,8 +4,18 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
-- added three explicit, non-fallback model channels: frozen fixtures, a local CLIProxyAPI-backed
-  Codex subscription adapter, and the separately billed official OpenAI API;
+- made the official local Codex CLI the default `codex_subscription` transport, with official
+  app-server account/login/model discovery, ephemeral read-only schema-bound `codex exec`, and no
+  OpenAI Platform API key; recursively normalized Pydantic schemas for strict structured output,
+  disabled plugin/catalog loading in the bounded subprocess, and retained CLIProxyAPI as an
+  explicit compatibility transport;
+- added a productized Connection Center for verify-before-save Jin10 MCP setup, independent
+  WebSocket credential setup, official Codex ChatGPT login/model selection, one-way secret entry,
+  redacted status, runtime refresh, and explicit disconnect;
+- changed the research composer Market field to a bounded CN/US/KR dropdown and made the SSE
+  stream emit an immediate readiness event so Live Desk no longer waits for the first heartbeat;
+- added three explicit, non-fallback model channels: frozen fixtures, a Codex subscription
+  adapter, and the separately billed official OpenAI API;
 - isolated model names and credentials per channel, enforced loopback-by-default proxy URLs,
   retained strict Responses/Pydantic parsing, disabled nested SDK retries, and categorized
   credential-safe provider failures;
