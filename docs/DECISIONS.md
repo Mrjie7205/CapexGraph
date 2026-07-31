@@ -332,3 +332,24 @@ compatibility transport for existing users, bound to loopback by default.
 
 No onboarding convenience changes the trust model: provider secrets unlock data/model transport,
 not Evidence authority, and no model channel silently falls back to another.
+
+## D023 — Alert delivery and the canonical event ledger have separate refresh semantics
+
+- **Status:** accepted
+- **Date:** 2026-07-31
+
+The reconnectable SSE cursor represents durable alert delivery. It must not be broadened into an
+implicit alert for every persisted signal: rules are allowed to retain a low-score signal without
+creating `LiveAlertDelivery`. Live Desk therefore combines SSE readiness/alert notifications with
+a server-paged canonical ledger refresh on relevant local or cross-tab operations, tab visibility,
+and a bounded 30-second visible-tab interval.
+
+Event totals and filtering are computed by the backend. Full detail records are assembled only for
+the requested page with batched reads, so increasing history does not turn a list request into one
+detail query per signal. `source_scope=live|fixture|mixed` is derived from observation retention
+class. Channel names cannot identify a frozen replay because the synthetic fixture deliberately
+uses MCP and WebSocket observations.
+
+Cross-tab messages are coordination signals only. They contain a topic, random message ID, tab ID,
+and timestamp; no provider credential, market payload, or research artifact may enter
+BroadcastChannel or the localStorage notification fallback.

@@ -459,7 +459,16 @@ export interface LiveEventRecord {
   verification_tasks: LiveVerificationTask[];
   evidence_links: LiveEvidenceLink[];
   run_links: LiveRunContextLink[];
+  source_scope: "live" | "fixture" | "mixed";
   trust_notice: string;
+}
+
+export interface LiveEventPage {
+  items: LiveEventRecord[];
+  total: number;
+  offset: number;
+  limit: number;
+  has_more: boolean;
 }
 
 export interface LiveCoverage {
@@ -760,6 +769,11 @@ export function getLiveStatus(): Promise<LiveStatus> {
 export function listLiveEvents(params: Record<string, string> = {}): Promise<LiveEventRecord[]> {
   const query = new URLSearchParams(params).toString();
   return request(`/api/v1/live/events${query ? `?${query}` : ""}`);
+}
+
+export function listLiveEventPage(params: Record<string, string> = {}): Promise<LiveEventPage> {
+  const query = new URLSearchParams(params).toString();
+  return request(`/api/v1/live/events/page${query ? `?${query}` : ""}`);
 }
 
 export function getLiveEvent(signalReference: string): Promise<LiveEventRecord> {

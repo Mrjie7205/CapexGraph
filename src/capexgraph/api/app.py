@@ -41,6 +41,7 @@ from capexgraph.domain import (
     LiveDeskSettings,
     LiveEvidenceLink,
     LiveMatchStatus,
+    LiveRetentionClass,
     LiveRunContextLink,
     LiveSignalCategory,
     LiveSoakReport,
@@ -1064,24 +1065,50 @@ def _live_task_record(
     )
 
 
-def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
-    observations = store.observations_by_ids(signal.observation_ids)
-    assessment = store.get_assessment(signal.id)
-    proposals = store.list_proposals(signal_key=signal.signal_key)
-    analyses = store.list_analyses(signal_key=signal.signal_key)
-    alert = store.get_alert(signal.signal_key)
-    actions = store.list_user_actions(signal.signal_key)
-    verification_tasks = store.list_verification_tasks(signal_key=signal.signal_key)
-    evidence_links = store.list_evidence_links(signal_key=signal.signal_key)
-    run_links = store.list_run_context_links(signal_key=signal.signal_key)
+def _live_source_scope(observations) -> str:
+    fixture_observations = sum(
+        item.retention_class == LiveRetentionClass.FIXTURE for item in observations
+    )
+    if observations and fixture_observations == len(observations):
+        return "fixture"
+    if fixture_observations:
+        return "mixed"
+    return "live"
+
+
+def _observations_by_ids_batched(
+    store: LiveSignalStore,
+    observation_ids: list[str],
+) -> list:
+    observations: list = []
+    for start in range(0, len(observation_ids), 500):
+        observations.extend(
+            store.observations_by_ids(observation_ids[start : start + 500])
+        )
+    return observations
+
+
+def _live_event_payload(
+    signal,
+    *,
+    observations,
+    assessment,
+    proposal,
+    analysis,
+    alert,
+    actions,
+    verification_tasks,
+    evidence_links,
+    run_links,
+) -> dict[str, object]:
     return {
         "signal": signal.model_dump(mode="json"),
         "observations": [item.model_dump(mode="json") for item in observations],
         "assessment": (
             assessment.model_dump(mode="json") if assessment is not None else None
         ),
-        "proposal": proposals[0].model_dump(mode="json") if proposals else None,
-        "analysis": analyses[0].model_dump(mode="json") if analyses else None,
+        "proposal": proposal.model_dump(mode="json") if proposal is not None else None,
+        "analysis": analysis.model_dump(mode="json") if analysis is not None else None,
         "alert": alert.model_dump(mode="json") if alert is not None else None,
         "actions": [item.model_dump(mode="json") for item in actions],
         "verification_tasks": [
@@ -1089,12 +1116,201 @@ def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
         ],
         "evidence_links": [item.model_dump(mode="json") for item in evidence_links],
         "run_links": [item.model_dump(mode="json") for item in run_links],
+        "source_scope": _live_source_scope(observations),
         "trust_notice": (
             "The aggregator message remains a secondary signal, not Evidence. "
             "Only separately listed reviewed official Evidence links may support "
             "factual research claims."
         ),
     }
+
+
+def _live_event_record(store: LiveSignalStore, signal) -> dict[str, object]:
+    proposals = store.list_proposals(signal_key=signal.signal_key)
+    analyses = store.list_analyses(signal_key=signal.signal_key)
+    return _live_event_payload(
+        signal,
+        observations=store.observations_by_ids(signal.observation_ids),
+        assessment=store.get_assessment(signal.id),
+        proposal=proposals[0] if proposals else None,
+        analysis=analyses[0] if analyses else None,
+        alert=store.get_alert(signal.signal_key),
+        actions=store.list_user_actions(signal.signal_key),
+        verification_tasks=store.list_verification_tasks(
+            signal_key=signal.signal_key
+        ),
+        evidence_links=store.list_evidence_links(signal_key=signal.signal_key),
+        run_links=store.list_run_context_links(signal_key=signal.signal_key),
+    )
+
+
+def _live_event_records(store: LiveSignalStore, signals: list) -> list[dict[str, object]]:
+    if not signals:
+        return []
+    signal_keys = {signal.signal_key for signal in signals}
+    signal_ids = {signal.id for signal in signals}
+    observation_ids = list(
+        dict.fromkeys(
+            observation_id
+            for signal in signals
+            for observation_id in signal.observation_ids
+        )
+    )
+    observations_by_id = {
+        item.id: item
+        for item in _observations_by_ids_batched(store, observation_ids)
+    }
+    assessments_by_signal_id = {
+        item.signal_version_id: item
+        for item in store.list_assessments()
+        if item.signal_version_id in signal_ids
+    }
+    proposals_by_key = {}
+    for item in store.list_proposals():
+        if item.signal_key in signal_keys:
+            proposals_by_key.setdefault(item.signal_key, item)
+    analyses_by_key = {}
+    for item in store.list_analyses():
+        if item.signal_key in signal_keys:
+            analyses_by_key.setdefault(item.signal_key, item)
+    alerts_by_key = {
+        item.signal_key: item
+        for item in store.list_alerts(limit=1_000_000)
+        if item.signal_key in signal_keys
+    }
+
+    def group_by_signal(items) -> dict[str, list]:
+        grouped: dict[str, list] = {}
+        for item in items:
+            if item.signal_key in signal_keys:
+                grouped.setdefault(item.signal_key, []).append(item)
+        return grouped
+
+    actions_by_key = group_by_signal(store.list_user_actions())
+    tasks_by_key = group_by_signal(store.list_verification_tasks())
+    evidence_by_key = group_by_signal(store.list_evidence_links())
+    runs_by_key = group_by_signal(store.list_run_context_links())
+    return [
+        _live_event_payload(
+            signal,
+            observations=[
+                observations_by_id[item_id]
+                for item_id in signal.observation_ids
+                if item_id in observations_by_id
+            ],
+            assessment=assessments_by_signal_id.get(signal.id),
+            proposal=proposals_by_key.get(signal.signal_key),
+            analysis=analyses_by_key.get(signal.signal_key),
+            alert=alerts_by_key.get(signal.signal_key),
+            actions=actions_by_key.get(signal.signal_key, []),
+            verification_tasks=tasks_by_key.get(signal.signal_key, []),
+            evidence_links=evidence_by_key.get(signal.signal_key, []),
+            run_links=runs_by_key.get(signal.signal_key, []),
+        )
+        for signal in signals
+    ]
+
+
+def _filtered_live_signals(
+    store: LiveSignalStore,
+    *,
+    channel: LiveChannel | None = None,
+    category: LiveSignalCategory | None = None,
+    match_status: LiveMatchStatus | None = None,
+    state: LiveAlertState | None = None,
+    q: str | None = None,
+    source_scope: str = "all",
+    min_score: float | None = None,
+    theme: str | None = None,
+    entity: str | None = None,
+    alerts_only: bool = False,
+) -> list:
+    all_signals = store.list_signals()
+    candidates: list = []
+    query = q.casefold() if q else None
+    theme_query = theme.casefold() if theme else None
+    entity_query = entity.casefold() if entity else None
+    for signal in all_signals:
+        if channel is not None and channel not in signal.channels:
+            continue
+        if category is not None and signal.category != category:
+            continue
+        if match_status is not None and signal.match_status != match_status:
+            continue
+        if query and query not in signal.title.casefold():
+            continue
+        candidates.append(signal)
+
+    alerts_by_key = (
+        {
+            item.signal_key: item
+            for item in store.list_alerts(limit=max(1, len(all_signals)))
+        }
+        if alerts_only or state is not None
+        else {}
+    )
+    observations_by_id = {}
+    if source_scope != "all":
+        observation_ids = list(
+            dict.fromkeys(
+                observation_id
+                for signal in candidates
+                for observation_id in signal.observation_ids
+            )
+        )
+        observations_by_id = {
+            item.id: item
+            for item in _observations_by_ids_batched(store, observation_ids)
+        }
+    assessments_by_signal_id = (
+        {
+            item.signal_version_id: item
+            for item in store.list_assessments()
+        }
+        if min_score is not None or theme_query or entity_query
+        else {}
+    )
+
+    signals: list = []
+    for signal in candidates:
+        alert = alerts_by_key.get(signal.signal_key)
+        if alerts_only and alert is None:
+            continue
+        if state is not None and (alert is None or alert.state != state):
+            continue
+        if source_scope != "all":
+            record_scope = _live_source_scope([
+                observations_by_id[item_id]
+                for item_id in signal.observation_ids
+                if item_id in observations_by_id
+            ])
+            if source_scope == "formal" and record_scope == "fixture":
+                continue
+            if source_scope != "formal" and record_scope != source_scope:
+                continue
+        assessment = assessments_by_signal_id.get(signal.id)
+        if min_score is not None and (
+            assessment is None or assessment.total_score < min_score
+        ):
+            continue
+        if theme_query and (
+            assessment is None
+            or not any(
+                theme_query in value.casefold()
+                for value in assessment.matched_themes
+            )
+        ):
+            continue
+        if entity_query and (
+            assessment is None
+            or not any(
+                entity_query in value.casefold()
+                for value in assessment.matched_entities
+            )
+        ):
+            continue
+        signals.append(signal)
+    return signals
 
 
 @app.get("/api/v1/live/status")
@@ -1195,23 +1411,58 @@ def list_live_events(
     limit: Annotated[int, Query(ge=1, le=500)] = 100,
 ) -> list[dict[str, object]]:
     store = get_live_runtime().store
-    records: list[dict[str, object]] = []
-    for signal in store.list_signals():
-        if channel is not None and channel not in signal.channels:
-            continue
-        if category is not None and signal.category != category:
-            continue
-        if match_status is not None and signal.match_status != match_status:
-            continue
-        if q and q.casefold() not in signal.title.casefold():
-            continue
-        alert = store.get_alert(signal.signal_key)
-        if state is not None and (alert is None or alert.state != state):
-            continue
-        records.append(_live_event_record(store, signal))
-        if len(records) >= limit:
-            break
-    return records
+    signals = _filtered_live_signals(
+        store,
+        channel=channel,
+        category=category,
+        match_status=match_status,
+        state=state,
+        q=q,
+    )
+    return _live_event_records(store, signals[:limit])
+
+
+@app.get("/api/v1/live/events/page")
+def page_live_events(
+    channel: LiveChannel | None = None,
+    category: LiveSignalCategory | None = None,
+    match_status: LiveMatchStatus | None = None,
+    state: LiveAlertState | None = None,
+    q: Annotated[str | None, Query(max_length=120)] = None,
+    source_scope: Annotated[
+        str,
+        Query(pattern=r"^(all|formal|live|fixture|mixed)$"),
+    ] = "all",
+    min_score: Annotated[float | None, Query(ge=0, le=100)] = None,
+    theme: Annotated[str | None, Query(max_length=120)] = None,
+    entity: Annotated[str | None, Query(max_length=120)] = None,
+    alerts_only: bool = False,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> dict[str, object]:
+    store = get_live_runtime().store
+    signals = _filtered_live_signals(
+        store,
+        channel=channel,
+        category=category,
+        match_status=match_status,
+        state=state,
+        q=q,
+        source_scope=source_scope,
+        min_score=min_score,
+        theme=theme,
+        entity=entity,
+        alerts_only=alerts_only,
+    )
+    total = len(signals)
+    items = _live_event_records(store, signals[offset : offset + limit])
+    return {
+        "items": items,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + len(items) < total,
+    }
 
 
 @app.get("/api/v1/live/events/{signal_reference}")

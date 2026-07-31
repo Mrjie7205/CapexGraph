@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import {
   addLiveVerificationSource,
   actOnLiveEvent,
@@ -6,13 +6,12 @@ import {
   attachLiveContextToRun,
   captureLiveVerificationSource,
   createLiveLinkedRun,
-  getLiveCoverage,
   getLiveEvent,
   getLiveSettings,
   getLiveStatus,
   getLiveVerificationTask,
   listLiveAudit,
-  listLiveEvents,
+  listLiveEventPage,
   listRuns,
   liveStreamUrl,
   openLiveVerificationTask,
@@ -34,6 +33,7 @@ import {
   type ResearchRun,
   type RunMode,
 } from "./api";
+import { publishSync, subscribeSync } from "./sync";
 import {
   BilingualText,
   humanizeUiValue,
@@ -42,6 +42,15 @@ import {
 
 type StreamState = "connecting" | "connected" | "reconnecting";
 type AnalyzeProvider = "rules" | "codex_subscription" | "openai";
+type SourceScope = "all" | "formal" | "fixture" | "mixed";
+
+const LIVE_EVENT_PAGE_SIZE = 50;
+
+const SOURCE_SCOPE_LABELS = {
+  live: ["正式信号", "Live"],
+  fixture: ["演示样例", "Fixture"],
+  mixed: ["混合谱系", "Mixed"],
+} as const;
 
 const HEALTH_LABELS: Record<LiveHealth | "standby", string> = {
   active: "运行中",
@@ -150,7 +159,16 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
   const [streamState, setStreamState] = useState<StreamState>("connecting");
   const [category, setCategory] = useState("all");
   const [channel, setChannel] = useState("all");
+  const [sourceScope, setSourceScope] = useState<SourceScope>("all");
+  const [minScore, setMinScore] = useState("all");
+  const [theme, setTheme] = useState("");
+  const [entity, setEntity] = useState("");
+  const [alertsOnly, setAlertsOnly] = useState(false);
   const [query, setQuery] = useState("");
+  const [eventTotal, setEventTotal] = useState(0);
+  const [hasMoreEvents, setHasMoreEvents] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [lastEventSync, setLastEventSync] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [analysisProvider, setAnalysisProvider] = useState<AnalyzeProvider>("rules");
   const [busy, setBusy] = useState("");
@@ -167,54 +185,132 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
   const [sourceTitle, setSourceTitle] = useState("");
   const [sourcePublisher, setSourcePublisher] = useState("");
   const [issuerDomain, setIssuerDomain] = useState("");
+  const eventRequestId = useRef(0);
+  const loadedEventCount = useRef(LIVE_EVENT_PAGE_SIZE);
+  const fetchEventsRef = useRef<(offset?: number, append?: boolean) => Promise<void>>(
+    async () => undefined,
+  );
 
-  async function refresh() {
-    const [nextStatus, nextEvents, nextCoverage, nextSettings] = await Promise.all([
-      getLiveStatus(),
-      listLiveEvents(),
-      getLiveCoverage(),
-      getLiveSettings(),
-    ]);
-    setStatus({ ...nextStatus, coverage: nextCoverage });
-    setEvents(nextEvents);
-    setSettings(nextSettings);
-    setSelectedKey((current) => current || nextEvents[0]?.signal.signal_key || "");
-  }
+  const refreshStatus = useCallback(async () => {
+    setStatus(await getLiveStatus());
+  }, []);
+
+  const refreshSettings = useCallback(async () => {
+    setSettings(await getLiveSettings());
+  }, []);
+
+  const fetchEvents = useCallback(async (offset = 0, append = false) => {
+    const requestId = ++eventRequestId.current;
+    setEventsLoading(true);
+    const requestedLimit = append
+      ? LIVE_EVENT_PAGE_SIZE
+      : Math.max(LIVE_EVENT_PAGE_SIZE, Math.min(200, loadedEventCount.current));
+    const params: Record<string, string> = {
+      offset: String(offset),
+      limit: String(requestedLimit),
+      source_scope: sourceScope,
+    };
+    if (category !== "all") params.category = category;
+    if (channel !== "all") params.channel = channel;
+    if (minScore !== "all") params.min_score = minScore;
+    if (query.trim()) params.q = query.trim();
+    if (theme.trim()) params.theme = theme.trim();
+    if (entity.trim()) params.entity = entity.trim();
+    if (alertsOnly) params.alerts_only = "true";
+    try {
+      const page = await listLiveEventPage(params);
+      if (requestId !== eventRequestId.current) return;
+      setEvents((current) => {
+        if (!append) {
+          loadedEventCount.current = Math.max(page.items.length, LIVE_EVENT_PAGE_SIZE);
+          return page.items;
+        }
+        const merged = new Map(
+          [...current, ...page.items].map((item) => [item.signal.signal_key, item]),
+        );
+        const next = [...merged.values()];
+        loadedEventCount.current = Math.max(next.length, LIVE_EVENT_PAGE_SIZE);
+        return next;
+      });
+      setEventTotal(page.total);
+      setHasMoreEvents(page.has_more);
+      setLastEventSync(new Date().toISOString());
+      if (!append) {
+        setSelectedKey((current) =>
+          page.items.some((item) => item.signal.signal_key === current)
+            ? current
+            : page.items[0]?.signal.signal_key ?? ""
+        );
+      }
+    } finally {
+      if (requestId === eventRequestId.current) setEventsLoading(false);
+    }
+  }, [alertsOnly, category, channel, entity, minScore, query, sourceScope, theme]);
 
   useEffect(() => {
-    refresh().catch((reason) => {
+    fetchEventsRef.current = fetchEvents;
+  }, [fetchEvents]);
+
+  const refreshAll = useCallback(
+    async () => {
+      await Promise.all([refreshStatus(), refreshSettings(), fetchEvents(0, false)]);
+    },
+    [fetchEvents, refreshSettings, refreshStatus],
+  );
+
+  useEffect(() => {
+    Promise.all([refreshStatus(), refreshSettings()]).catch((reason) => {
       setError(reason instanceof Error ? reason.message : "实时台暂不可用");
     });
-    const refreshConnections = () => {
-      refresh().catch((reason) => {
-        setError(reason instanceof Error ? reason.message : "连接状态刷新失败");
+    const refreshFromSync = () => {
+      Promise.all([refreshStatus(), fetchEventsRef.current(0, false)]).catch((reason) => {
+        setError(reason instanceof Error ? reason.message : "实时台状态同步失败");
       });
     };
-    window.addEventListener("capexgraph:connections-changed", refreshConnections);
-    const timer = window.setInterval(() => {
-      getLiveStatus().then(setStatus).catch(() => undefined);
+    const unsubscribe = subscribeSync(["connections", "live"], refreshFromSync);
+    const statusTimer = window.setInterval(() => {
+      refreshStatus().catch(() => undefined);
     }, 15000);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("capexgraph:connections-changed", refreshConnections);
+    const eventTimer = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        fetchEventsRef.current(0, false).catch(() => undefined);
+      }
+    }, 30000);
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshFromSync();
     };
-  }, []);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(statusTimer);
+      window.clearInterval(eventTimer);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      unsubscribe();
+    };
+  }, [refreshSettings, refreshStatus]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      fetchEvents(0, false).catch((reason) => {
+        setError(reason instanceof Error ? reason.message : "事件列表刷新失败");
+      });
+    }, query.trim() || theme.trim() || entity.trim() ? 250 : 0);
+    return () => window.clearTimeout(timer);
+  }, [fetchEvents, query, theme, entity]);
 
   useEffect(() => {
     const source = new EventSource(liveStreamUrl());
     setStreamState("connecting");
     source.onopen = () => setStreamState("connected");
     source.onerror = () => setStreamState("reconnecting");
-    source.addEventListener("live.ready", () => setStreamState("connected"));
+    source.addEventListener("live.ready", () => {
+      setStreamState("connected");
+      fetchEventsRef.current(0, false).catch(() => undefined);
+    });
     source.addEventListener("live.signal", (rawEvent) => {
       const message = rawEvent as MessageEvent<string>;
       try {
         const incoming = JSON.parse(message.data) as LiveEventRecord;
-        setEvents((current) => [
-          incoming,
-          ...current.filter((item) => item.signal.signal_key !== incoming.signal.signal_key),
-        ]);
-        setSelectedKey((current) => current || incoming.signal.signal_key);
+        fetchEventsRef.current(0, false).catch(() => undefined);
         if (
           settings?.desktop_notifications &&
           typeof Notification !== "undefined" &&
@@ -233,20 +329,19 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
     return () => source.close();
   }, [settings?.desktop_notifications]);
 
-  const visibleEvents = useMemo(
-    () =>
-      events.filter((item) => {
-        if (category !== "all" && item.signal.category !== category) return false;
-        if (channel !== "all" && !item.signal.channels.includes(channel as LiveChannel)) return false;
-        if (query && !item.signal.title.toLocaleLowerCase().includes(query.toLocaleLowerCase())) return false;
-        return true;
-      }),
-    [events, category, channel, query],
-  );
   const selected =
     events.find((item) => item.signal.signal_key === selectedKey) ??
-    visibleEvents[0] ??
+    events[0] ??
     null;
+  const hasActiveFilters =
+    category !== "all"
+    || channel !== "all"
+    || sourceScope !== "all"
+    || minScore !== "all"
+    || Boolean(query.trim())
+    || Boolean(theme.trim())
+    || Boolean(entity.trim())
+    || alertsOnly;
   const mcp = channelHealth(
     "mcp",
     status?.checkpoints ?? [],
@@ -314,7 +409,8 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
     setError("");
     try {
       await action();
-      await refresh();
+      await refreshAll();
+      publishSync("live");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `${label} 操作失败`);
     } finally {
@@ -345,8 +441,9 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
     setError("");
     try {
       await action();
-      await refresh();
+      await refreshAll();
       await refreshBridge(selected.signal.signal_key);
+      publishSync("live");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : `${label} 操作失败`);
     } finally {
@@ -465,7 +562,8 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
       const updated = await patchLiveSettings(settings);
       setSettings(updated);
       setSettingsOpen(false);
-      await refresh();
+      await refreshAll();
+      publishSync("live");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "实时台设置更新失败");
     } finally {
@@ -486,6 +584,17 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
       }
     }
     setSettings((current) => current ? { ...current, desktop_notifications: enabled } : current);
+  }
+
+  function resetEventFilters() {
+    setCategory("all");
+    setChannel("all");
+    setSourceScope("all");
+    setMinScore("all");
+    setTheme("");
+    setEntity("");
+    setAlertsOnly(false);
+    setQuery("");
   }
 
   return (
@@ -540,23 +649,44 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
         <aside className="signal-feed">
           <div className="live-panel-head">
             <BilingualText zh="信号台账" en="Signal ledger" compact />
-            <b>{visibleEvents.length.toString().padStart(2, "0")}</b>
+            <b>
+              <span>{events.length} / {eventTotal}</span>
+              <small>已加载 / total</small>
+            </b>
           </div>
           <div className="feed-filters">
-            <input placeholder="搜索事件…" value={query} onChange={(event) => setQuery(event.target.value)} />
-            <select value={category} onChange={(event) => setCategory(event.target.value)}>
-              <option value="all">全部类型</option><option value="flash">快讯</option><option value="calendar">日历</option><option value="quote">行情</option>
+            <input aria-label="搜索事件" placeholder="搜索事件…" value={query} onChange={(event) => setQuery(event.target.value)} />
+            <select aria-label="事件类型" value={category} onChange={(event) => setCategory(event.target.value)}>
+              <option value="all">全部类型</option><option value="flash">快讯</option><option value="calendar">日历</option><option value="quote">行情</option><option value="news">资讯</option><option value="other">其他</option>
             </select>
-            <select value={channel} onChange={(event) => setChannel(event.target.value)}>
-              <option value="all">全部通道</option><option value="mcp">MCP 轮询</option><option value="websocket">实时推送 · WebSocket</option><option value="fixture">冻结样例 · Fixture</option>
+            <select aria-label="采集通道" value={channel} onChange={(event) => setChannel(event.target.value)}>
+              <option value="all">全部通道</option><option value="mcp">MCP 轮询</option><option value="websocket">实时推送 · WebSocket</option>
             </select>
+          </div>
+          <div className="feed-priority-filters">
+            <select aria-label="数据来源" value={sourceScope} onChange={(event) => setSourceScope(event.target.value as SourceScope)}>
+              <option value="all">正式 + 演示</option><option value="formal">仅正式信号</option><option value="fixture">仅演示样例</option><option value="mixed">混合谱系</option>
+            </select>
+            <select aria-label="最低规则评分" value={minScore} onChange={(event) => setMinScore(event.target.value)}>
+              <option value="all">全部评分</option><option value="50">50 分以上</option><option value="65">65 分以上</option><option value="80">80 分以上</option>
+            </select>
+            <input aria-label="主题筛选" placeholder="主题…" value={theme} onChange={(event) => setTheme(event.target.value)} />
+            <input aria-label="实体筛选" placeholder="公司 / 实体…" value={entity} onChange={(event) => setEntity(event.target.value)} />
+            <label className="alert-filter">
+              <input type="checkbox" checked={alertsOnly} onChange={(event) => setAlertsOnly(event.target.checked)} />
+              <span>仅提醒<small>Alerts</small></span>
+            </label>
+            <button type="button" onClick={resetEventFilters} disabled={!hasActiveFilters}>重置<small>Reset</small></button>
           </div>
           <div className="feed-actions">
             <button disabled={Boolean(busy)} onClick={() => doRefresh(() => pollLiveStream("flash"), "poll-flash")}><BilingualText zh="轮询快讯" en="Poll flash" compact align="center" /></button>
             <button disabled={Boolean(busy)} onClick={() => doRefresh(() => pollLiveStream("calendar"), "poll-calendar")}><BilingualText zh="轮询日历" en="Poll calendar" compact align="center" /></button>
+            <button disabled={eventsLoading} onClick={() => fetchEvents(0, false).catch((reason) => setError(reason instanceof Error ? reason.message : "事件列表刷新失败"))}>
+              <BilingualText zh={eventsLoading ? "同步中" : "刷新列表"} en="Refresh feed" compact align="center" />
+            </button>
           </div>
           <div className="signal-list">
-            {visibleEvents.map((item) => (
+            {events.map((item) => (
               <button
                 key={item.signal.signal_key}
                 className={selected?.signal.signal_key === item.signal.signal_key ? "selected" : ""}
@@ -564,7 +694,13 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
               >
                 <div className="signal-stamp">
                   <time>{formatTime(item.signal.last_observed_at)}</time>
-                  <span className={item.signal.match_status}>{translateUiValue(item.signal.match_status)}<small>{humanizeUiValue(item.signal.match_status)}</small></span>
+                  <span className="signal-states">
+                    <em className={`source-scope ${item.source_scope}`}>
+                      {SOURCE_SCOPE_LABELS[item.source_scope][0]}
+                      <small>{SOURCE_SCOPE_LABELS[item.source_scope][1]}</small>
+                    </em>
+                    <i className={item.signal.match_status}>{translateUiValue(item.signal.match_status)}<small>{humanizeUiValue(item.signal.match_status)}</small></i>
+                  </span>
                 </div>
                 <strong>{item.signal.title}</strong>
                 <div className="signal-tags">
@@ -579,11 +715,35 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
                 </div>
               </button>
             ))}
-            {visibleEvents.length === 0 && (
+            {eventsLoading && events.length === 0 && (
+              <div className="live-empty loading">
+                <strong>正在同步事件台账</strong>
+                <p>从本机后端读取最新规范化信号与筛选结果。</p>
+              </div>
+            )}
+            {!eventsLoading && events.length === 0 && (
               <div className="live-empty">
-                <strong>还没有实时事件</strong>
-                <p>配置 MCP 后可正式轮询；也可以先加载冻结双通道样例验证完整路径。</p>
-                <button disabled={Boolean(busy)} onClick={() => doRefresh(replayLiveDemo, "demo")}><BilingualText zh="加载免密钥回放" en="Load no-key replay" compact align="center" /></button>
+                <strong>{hasActiveFilters ? "没有符合条件的事件" : "还没有实时事件"}</strong>
+                <p>{hasActiveFilters ? "放宽评分、主题、实体或来源条件后再查看。" : "配置 MCP 后可正式轮询；也可以先加载冻结双通道样例验证完整路径。"}</p>
+                {hasActiveFilters
+                  ? <button onClick={resetEventFilters}>清除全部筛选<small>Clear filters</small></button>
+                  : <button disabled={Boolean(busy)} onClick={() => doRefresh(replayLiveDemo, "demo")}><BilingualText zh="加载免密钥回放" en="Load no-key replay" compact align="center" /></button>}
+              </div>
+            )}
+            {events.length > 0 && (
+              <div className="feed-pagination">
+                <span>
+                  已加载 {events.length} / {eventTotal}
+                  <small>最近同步 {formatTime(lastEventSync)}</small>
+                </span>
+                {hasMoreEvents && (
+                  <button
+                    disabled={eventsLoading}
+                    onClick={() => fetchEvents(events.length, true).catch((reason) => setError(reason instanceof Error ? reason.message : "加载更多失败"))}
+                  >
+                    {eventsLoading ? "加载中…" : "加载更多"}<small>Load more</small>
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -605,8 +765,8 @@ export function LiveDesk({ onOpenConnections }: { onOpenConnections?: () => void
                 </div>
                 <div>
                   <span className="detail-overline">
-                    {translateUiValue(selected.signal.category)} · V{selected.signal.version} · {translateUiValue(selected.signal.match_status)}
-                    <small>{selected.signal.category} · {humanizeUiValue(selected.signal.match_status)}</small>
+                    {SOURCE_SCOPE_LABELS[selected.source_scope][0]} · {translateUiValue(selected.signal.category)} · V{selected.signal.version} · {translateUiValue(selected.signal.match_status)}
+                    <small>{SOURCE_SCOPE_LABELS[selected.source_scope][1]} · {selected.signal.category} · {humanizeUiValue(selected.signal.match_status)}</small>
                   </span>
                   <h3>{selected.signal.title}</h3>
                   <p className="trust-notice">

@@ -122,6 +122,19 @@ secret. Browser storage and GET responses never contain provider credentials. A 
 record still cannot become Evidence or an official corporate event without guarded capture and
 human review.
 
+The durable SSE cursor belongs to alert delivery, not to every canonical signal. Signals below the
+alert threshold still persist and appear through the paged `/api/v1/live/events/page` ledger.
+Live Desk synchronizes that ledger on SSE readiness, local/cross-tab operations, visibility
+changes, and a bounded 30-second visible-tab interval. Page filtering and totals are server-side;
+full records are assembled only for the requested page through batched store reads.
+
+Open Cockpit tabs coordinate connection and monitor changes through a browser message containing
+only a topic, random message ID, tab ID, and timestamp. BroadcastChannel is paired with a
+localStorage notification fallback, but no credential, provider payload, or research artifact is
+stored there. Formal versus frozen provenance is derived from observation retention class, not
+from the MCP/WebSocket channel name, because the frozen dual-channel replay intentionally exercises
+both formal channel contracts.
+
 `LiveResearchBridge` implements that explicit M7 boundary. A confirmed verification task moves the
 signal to `official_source_pending` through a new signal version. Regulator or explicitly identified
 issuer URLs enter the existing source queue; guarded capture remains `captured` until a human

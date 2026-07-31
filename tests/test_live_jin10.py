@@ -16,6 +16,7 @@ from capexgraph.domain import (
     LiveDeskSettings,
     LiveProviderCheckpoint,
     LiveProviderHealth,
+    LiveRetentionClass,
     LiveSignalCategory,
     SignalObservation,
 )
@@ -32,6 +33,7 @@ from capexgraph.live import (
     LiveSignalService,
     LiveSignalStore,
     calculate_live_coverage,
+    get_live_runtime,
     load_frozen_dual_channel_feeds,
 )
 from capexgraph.live.mcp import LiveProviderError, LiveProviderProtocolError
@@ -696,3 +698,73 @@ async def test_live_desk_api_no_key_demo_settings_actions_and_sse(
         assert stream.headers["content-type"].startswith("text/event-stream")
         assert stream.text.startswith("event: live.ready")
         assert "event: live.signal" in stream.text
+
+
+@pytest.mark.anyio
+async def test_live_event_page_filters_scope_score_theme_entity_and_alerts(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_STATE_DB", str(tmp_path / "live-page-api.db"))
+    monkeypatch.delenv("JIN10_MCP_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("JIN10_WEBSOCKET_SECRET_KEY", raising=False)
+    runtime = get_live_runtime()
+    runtime.store.save_settings(
+        LiveDeskSettings(
+            alert_score_threshold=0,
+            entity_aliases={"安集科技": ["安集科技"]},
+            theme_keywords={"存储材料": ["存储", "材料"]},
+        )
+    )
+    runtime.service.ingest_observation(
+        SignalObservation(
+            provider="jin10",
+            provider_version="2025-11-25",
+            channel=LiveChannel.MCP,
+            stream="flash",
+            external_id="formal-1",
+            event_key="jin10:formal-1",
+            category=LiveSignalCategory.FLASH,
+            title="安集科技存储材料订单增加",
+            published_at=datetime(2026, 7, 31, 1, 0, tzinfo=UTC),
+            observed_at=datetime(2026, 7, 31, 1, 0, 1, tzinfo=UTC),
+            retention_class=LiveRetentionClass.METADATA_ONLY,
+        )
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        demo = await client.post("/api/v1/live/demo")
+        assert demo.status_code == 200
+
+        first_page = await client.get("/api/v1/live/events/page?limit=2")
+        assert first_page.status_code == 200
+        payload = first_page.json()
+        assert payload["total"] == 4
+        assert len(payload["items"]) == 2
+        assert payload["has_more"] is True
+
+        second_page = await client.get("/api/v1/live/events/page?limit=2&offset=2")
+        assert second_page.status_code == 200
+        assert len(second_page.json()["items"]) == 2
+        assert second_page.json()["has_more"] is False
+
+        fixture = await client.get(
+            "/api/v1/live/events/page?source_scope=fixture"
+        )
+        assert fixture.status_code == 200
+        assert fixture.json()["total"] == 3
+        assert {
+            item["source_scope"] for item in fixture.json()["items"]
+        } == {"fixture"}
+
+        formal = await client.get(
+            "/api/v1/live/events/page"
+            "?source_scope=formal&theme=存储&entity=安集&min_score=0&alerts_only=true"
+        )
+        assert formal.status_code == 200
+        assert formal.json()["total"] == 1
+        assert formal.json()["items"][0]["source_scope"] == "live"
+        assert formal.json()["items"][0]["signal"]["title"] == "安集科技存储材料订单增加"

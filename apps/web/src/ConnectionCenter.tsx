@@ -10,6 +10,7 @@ import {
   startCodexLogin,
   type ConnectionStatus,
 } from "./api";
+import { publishSync, subscribeSync } from "./sync";
 import { BilingualText, humanizeUiValue } from "./UiText";
 
 interface ConnectionCenterProps {
@@ -56,7 +57,7 @@ export function ConnectionCenter({
 
   function announceChange() {
     onChanged();
-    window.dispatchEvent(new Event("capexgraph:connections-changed"));
+    publishSync("connections");
   }
 
   async function refresh(probeMcp = false) {
@@ -75,9 +76,23 @@ export function ConnectionCenter({
     if (!open) return;
     setError("");
     setNotice("");
-    refresh().catch((reason) => {
+    refresh(true).catch((reason) => {
       setError(reason instanceof Error ? reason.message : "连接状态读取失败");
     });
+    const refreshRemote = () => {
+      refresh(true).catch((reason) => {
+        setError(reason instanceof Error ? reason.message : "连接状态同步失败");
+      });
+    };
+    const unsubscribe = subscribeSync("connections", refreshRemote, { remoteOnly: true });
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refreshRemote();
+    };
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      unsubscribe();
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
   }, [open]);
 
   useEffect(() => {

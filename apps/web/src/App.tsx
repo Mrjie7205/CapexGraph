@@ -26,6 +26,7 @@ import { ResearchReadiness } from "./ResearchReadiness";
 import { SourceQueue } from "./SourceQueue";
 import { LiveDesk } from "./LiveDesk";
 import { ConnectionCenter } from "./ConnectionCenter";
+import { subscribeSync } from "./sync";
 import {
   BilingualText,
   LocalizedValue,
@@ -153,6 +154,15 @@ function App() {
     listTracking().then(setTracking).catch(() => undefined);
     refreshModelProviders().catch(() => undefined);
   }, []);
+
+  useEffect(
+    () => subscribeSync(
+      "connections",
+      () => refreshModelProviders().catch(() => undefined),
+      { remoteOnly: true },
+    ),
+    [],
+  );
 
   useEffect(() => {
     if (!selected || !polling) return;

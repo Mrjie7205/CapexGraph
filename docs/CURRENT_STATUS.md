@@ -1,6 +1,6 @@
 # Current status
 
-- Last verified: 2026-07-30
+- Last verified: 2026-07-31
 - Release: `v0.3.0` — Trustworthy live research
 - Active target: `v0.5` — official disclosure events, by explicit user priority
 - Active extension: `v0.5.1` — provider-neutral live-event gateway with equal-priority Jin10 MCP
@@ -78,6 +78,11 @@ substantial change, and update it in the same pull request whenever shipped capa
   and machine states are Chinese, while compact English sublabels preserve product and audit
   vocabulary; native selectors use Chinese-first option text, and the bridge Market control is
   bounded to CN/US/KR instead of accepting free text.
+- a paged canonical event ledger with filtered totals, load-more, formal/fixture/mixed provenance,
+  score/theme/entity/alert filtering, batched sub-second page assembly at the current local scale,
+  and automatic visibility/interval synchronization for non-alert signals; and
+- credential-free cross-tab synchronization for connection and monitor state so multiple open
+  Cockpit tabs converge without reload.
 
 This completes M0 through M7 in code and makes the branch release-ready; it does not merge, tag, or
 publish a release. The current checkout has no Jin10 WebSocket
@@ -123,13 +128,18 @@ guarded official-source capture and human-review path.
 
 - the official Codex subscription path completed a real `gpt-5.6-sol` call through an authenticated
   ChatGPT subscription on 2026-07-30 and passed the requested Pydantic output contract;
+- the v0.5.1 closeout on 2026-07-31 repeated the real integrated path: Connection Center reported
+  MCP and Codex ready, a bounded MCP monitor run grew the canonical ledger from 407 to 427, both
+  open Cockpit tabs updated automatically, and one formal storage-related signal completed a
+  one-call Codex subscription analysis whose structured proposal appeared in Research Bridge
+  audit history;
 - the productized connection flow was browser-verified at desktop and 390px width: Codex account
   and models load, missing Jin10 credentials remain `WAIT KEY`, SSE becomes `CONNECTED`
   immediately, and the Market selector exposes exactly CN/US/KR without horizontal overflow;
 - the Chinese-first interface was browser-verified at desktop and 390px width across the landing
   composer, Live Desk, connection onboarding, gateway settings, Research Bridge, dynamic run and
   evidence states, with English retained only as compact secondary vocabulary;
-- 122 Python tests pass locally and Ruff passes;
+- 123 Python tests pass locally and Ruff passes;
 - the React/Vite production build passes;
 - a fresh wheel build includes `capexgraph.events`, the complete
   `capexgraph.live` package, both adapters, the synthetic dual-channel fixture, and shared
@@ -152,6 +162,9 @@ guarded official-source capture and human-review path.
 - desktop and 390-pixel browser QA verified the no-key replay, SSE connection, matched/divergent
   display, rules analysis, backend-only credential boundary, responsive settings/Research Bridge,
   four-stage workflow, audit timeline, and no horizontal overflow or console errors;
+- desktop and 390-pixel closeout QA verified formal/fixture source badges, filtered totals,
+  50-to-100 load-more pagination, theme filtering, automatic all-signal refresh, and cross-tab
+  start/stop convergence without horizontal overflow;
 - frozen SEC tests cover acceptance timestamps, conservative form classification, idempotent
   discovery, capture-to-Evidence versioning, point-in-time history, CLI, API, and artifacts; and
 - the official SEC schema was probed successfully with an identifying test User-Agent. A real

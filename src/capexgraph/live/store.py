@@ -632,15 +632,17 @@ class LiveSignalStore:
             )
         return action
 
-    def list_user_actions(self, signal_key: str) -> list[LiveUserAction]:
+    def list_user_actions(self, signal_key: str | None = None) -> list[LiveUserAction]:
+        where = "WHERE signal_key = ?" if signal_key else ""
+        parameters: tuple[object, ...] = (signal_key,) if signal_key else ()
         with self._connect() as connection:
             rows = connection.execute(
-                """
+                f"""
                 SELECT payload FROM live_user_actions
-                WHERE signal_key = ?
+                {where}
                 ORDER BY created_at DESC, id DESC
                 """,
-                (signal_key,),
+                parameters,
             ).fetchall()
         return [LiveUserAction.model_validate_json(row["payload"]) for row in rows]
 

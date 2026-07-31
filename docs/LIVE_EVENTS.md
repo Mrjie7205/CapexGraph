@@ -113,7 +113,9 @@ Native dropdowns use Chinese-first option text. Live Desk exposes:
   selection;
 - independent MCP, WebSocket, and SSE state;
 - call-budget usage, freshness, unread alerts, and runtime controls;
-- category/channel/search filters;
+- server-backed category, channel, formal/fixture source, score, theme, entity, alert-only, and
+  title filters;
+- loaded/filtered-total counts plus bounded load-more pagination;
 - canonical signals with matched, divergent, and channel-only state;
 - every retained observation and its published/observed timestamps;
 - overlap, MCP-only, WebSocket-only, and P50/P95 delivery delay;
@@ -129,6 +131,22 @@ Native dropdowns use Chinese-first option text. Live Desk exposes:
 Settings control channel switches, polling cadence, thresholds, cooldown, include/exclude keywords,
 and notification preference. Credentials are managed separately in Connection Center and never
 appear in settings responses.
+
+Connection and monitor changes are synchronized across open Cockpit tabs. The sync envelope
+contains only a topic, random message ID, tab ID, and timestamp; credentials and research payloads
+never enter browser storage. Returning to a visible tab refreshes status and the current event
+page.
+
+SSE remains the reconnectable alert-delivery stream. Because a correctly persisted low-score
+signal may not create an alert, Live Desk also synchronizes the current event page when SSE becomes
+ready, after local/cross-tab operations, when the tab becomes visible, and every 30 seconds while
+visible. This keeps the ledger complete without weakening alert thresholds.
+
+`source_scope` describes provenance, not confidence:
+
+- `live`: all retained observations came from formal provider adapters;
+- `fixture`: all observations came from frozen synthetic replay; and
+- `mixed`: a canonical signal contains both formal and frozen observations.
 
 ## API
 
@@ -146,6 +164,7 @@ appear in settings responses.
 | `POST` | `/api/v1/live/poll` | one MCP flash/calendar head poll |
 | `POST` | `/api/v1/live/monitor/start\|stop` | control the local supervisor |
 | `GET` | `/api/v1/live/events` | filter canonical current signals |
+| `GET` | `/api/v1/live/events/page` | filtered total plus offset/limit/has-more event page |
 | `GET` | `/api/v1/live/events/{id}` | signal, observations, rules, analysis, alert, actions |
 | `GET` | `/api/v1/live/coverage` | overlap/channel-only/divergence and delay metrics |
 | `GET/PATCH` | `/api/v1/live/settings` | non-secret operator settings |
@@ -210,6 +229,8 @@ capexgraph live soak --mode providers --cycles 30 --interval 10
 Missing WebSocket access fails that credentialed gate explicitly; it does not downgrade MCP to a
 fallback or manufacture a passing report. See [`LIVE_OPERATIONS.md`](LIVE_OPERATIONS.md) for
 Windows process operation, backup/restore, restart, retry, and incident handling.
+The completed local acceptance record is in
+[`V0_5_1_ACCEPTANCE.md`](V0_5_1_ACCEPTANCE.md).
 
 ## Troubleshooting
 

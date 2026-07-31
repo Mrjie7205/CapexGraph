@@ -4,6 +4,11 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- closed the local v0.5.1 acceptance gap with cross-tab connection/monitor synchronization,
+  visibility and 30-second canonical-ledger refresh, formal/fixture/mixed provenance labels,
+  filtered totals, load-more pagination, score/theme/entity/alert filters, batched event-page
+  assembly, credential-isolated tests, and a durable acceptance record; the independent
+  credentialed WebSocket soak remains `WAIT KEY`;
 - made Chinese the primary Cockpit operating language across navigation, research creation,
   workflow and evidence states, source/readiness tools, Live Desk, Connection Center, settings,
   and Research Bridge; retained compact English sublabels for audit vocabulary, localized

@@ -314,10 +314,11 @@ execution queue.
    remain.
 7. Paused dependency P0 — v0.4 M2: point-in-time theme registry and historical membership.
 8. Paused dependency P1 — v0.4 M3/M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
-9. Completed v0.5.1 M0-M7 — typed contracts, migrations 6/7/8, independent fixtures and real
-   adapters, rules/reconciliation, optional AI analysis, supervisor/API/SSE, and responsive
-   Live Desk/Research Bridge plus Connection Center. MCP live smoke passes; missing WebSocket
-   credentials block only its credentialed live smoke/soak.
+9. Completed and locally acceptance-closed v0.5.1 M0-M7 — typed contracts, migrations 6/7/8,
+   independent fixtures and real adapters, rules/reconciliation, optional AI analysis,
+   supervisor/API/SSE, paged and cross-tab synchronized Live Desk/Research Bridge, plus Connection
+   Center. MCP and Codex subscription live paths pass; missing WebSocket credentials block only
+   its credentialed live smoke/soak. See `docs/V0_5_1_ACCEPTANCE.md`.
 10. External v0.5.1 acceptance gate — run the credentialed WebSocket/MCP provider soak when a
     Secret-Key is available; do not block or demote MCP and do not call WebSocket live before it
     passes.
