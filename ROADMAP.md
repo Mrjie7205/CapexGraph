@@ -64,15 +64,17 @@ Completed in `v0.3.0`; the execution record and test matrix remain in
 The active development branch now keeps three model execution channels explicit:
 
 1. `fixture` for frozen no-key demos and regression tests;
-2. `codex_subscription` for a personal loopback CLIProxyAPI bridge using the operator's
-   ChatGPT/Codex subscription boundary; and
+2. `codex_subscription` for the official local Codex CLI using the operator's ChatGPT/Codex
+   subscription boundary; and
 3. `openai` for the separately billed official OpenAI Platform API.
 
 The channels share typed research schemas but never share credentials, model settings, billing
 identity, fallback, or durable provider records. A run locks its provider and model when execution
 starts. CLI, API, Cockpit, manifests, failures, and reports expose the actual channel without
-returning secrets. The local relay is an optional adapter, not a dependency for fixtures, evidence,
-market data, official events, or the OpenAI API path.
+returning secrets. The official Codex app-server owns account/login/model discovery and
+`codex exec` owns schema-bound execution; CapexGraph receives no OAuth token. CLIProxyAPI is an
+explicit compatibility adapter, not a dependency for fixtures, evidence, market data, official
+events, or the OpenAI API path.
 
 ## v0.4 — Cross-market data foundation and mainline monitoring
 
@@ -150,10 +152,30 @@ Detailed implementation order and the current SEC-first boundary are in
 - Missing official coverage remains visible and cannot be silently filled with model prose.
 - Licensed aggregators remain optional accelerators; official captures remain the evidence anchor.
 
-### v0.5.1 planned extension — live event gateway
+### v0.5.1 development extension — live event gateway
 
 The complete product, architecture, frontend, operation, delivery, and test plan is the standalone
 HTML artifact [`docs/V0_5_1_PLAN.html`](docs/V0_5_1_PLAN.html).
+
+Development status:
+
+- M0/M1 complete: signal/retention/checkpoint contracts, migration 6, common `LiveEventSource`,
+  independent dual-channel fixtures, deterministic matching, persistence, and no-key replay;
+- M2/M3 complete: strict Jin10 MCP negotiation/structuredContent/head polling/budget control and
+  the co-equal Open Platform WebSocket flash/calendar/quote worker with auth, heartbeat, reconnect,
+  and independent health. MCP is live-smoke verified; WebSocket live smoke still needs its separate
+  Secret-Key;
+- M4/M5 complete: deterministic rules/entity/theme/injection gates, single alerts, cross-channel
+  coverage/delay metrics, rules-only impact analysis, and an explicit typed model path with visible
+  cost/failure lineage;
+- M6 complete: CLI/runtime supervisor, `/api/v1/live` status/events/coverage/settings/actions/SSE,
+  a responsive Live Desk, immediate SSE readiness, and a productized local Connection Center for
+  Jin10/Codex onboarding with one-way credential handling; and
+- M7 complete in code: explicit official-source task → guarded capture → human-reviewed Evidence
+  link → immutable run context/linked re-evaluation, migration 8, audit timeline, Research Bridge,
+  isolated chaos soak, diagnostics, operating runbook, and release gates. The credentialed
+  WebSocket live soak remains an external acceptance gate until a Secret-Key exists and is not
+  reported as a passing connection.
 
 Goals:
 
@@ -184,7 +206,8 @@ Acceptance criteria:
 - Cross-channel matching emits one canonical alert while preserving all observations. The product
   reports overlap, channel-only events, revision/field differences, and P50/P95 delivery delay
   instead of claiming that MCP and WebSocket content are identical.
-- Provider credentials stay backend-only and licensed raw data is never committed or exported.
+- Provider credentials are submitted only to the loopback backend, are never returned or stored by
+  the browser, and licensed raw data is never committed or exported.
 - No-key fixtures and rules-only analysis remain useful without Jin10 or model credentials.
 - A Jin10 signal cannot become Evidence or raise a relationship to medium/high confidence without
   the existing guarded official-source capture and human-review path.
@@ -291,5 +314,13 @@ execution queue.
    remain.
 7. Paused dependency P0 — v0.4 M2: point-in-time theme registry and historical membership.
 8. Paused dependency P1 — v0.4 M3/M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
-9. Next v0.5 P0 — CNINFO/SSE/SZSE/BSE, then OpenDART/KIND official disclosure adapters.
-10. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).
+9. Completed and locally acceptance-closed v0.5.1 M0-M7 — typed contracts, migrations 6/7/8,
+   independent fixtures and real adapters, rules/reconciliation, optional AI analysis,
+   supervisor/API/SSE, paged and cross-tab synchronized Live Desk/Research Bridge, plus Connection
+   Center. MCP and Codex subscription live paths pass; missing WebSocket credentials block only
+   its credentialed live smoke/soak. See `docs/V0_5_1_ACCEPTANCE.md`.
+10. External v0.5.1 acceptance gate — run the credentialed WebSocket/MCP provider soak when a
+    Secret-Key is available; do not block or demote MCP and do not call WebSocket live before it
+    passes.
+11. Next v0.5 P0 — CNINFO/SSE/SZSE/BSE, then OpenDART/KIND official disclosure adapters.
+12. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).

@@ -41,14 +41,17 @@ explicit model channels:
 
 ```text
 fixture             → bundled outputs                    → no credential or usage
-codex_subscription  → loopback CLIProxyAPI / Responses  → ChatGPT OAuth and subscription pool
+codex_subscription  → official Codex CLI / codex exec   → ChatGPT OAuth and subscription pool
 openai              → official Responses API            → Platform API key and API billing
 ```
 
-The two live adapters share Pydantic structured-output machinery, but their configuration,
-provider identity, error state, and usage boundary are separate. A selected channel never falls
-back to another. CLIProxyAPI owns ChatGPT OAuth; CapexGraph sees only a loopback Responses endpoint
-and a local proxy access key. Remote Codex proxy endpoints require an explicit opt-in.
+The two live adapters share typed structured-output contracts, but their configuration, provider
+identity, error state, and usage boundary are separate. A selected channel never falls back to
+another. The default subscription path discovers the official local Codex CLI, reads account/model
+readiness through the official app-server, and runs schema-bound reasoning with ephemeral
+`codex exec`. Codex owns ChatGPT OAuth storage; CapexGraph receives neither OAuth tokens nor API
+keys. CLIProxyAPI remains an explicit compatibility transport, loopback-only unless the operator
+opts into a secured remote endpoint.
 
 A run records provider, adapter version, model, transport, authentication mode, billing mode,
 endpoint scope, and model-call count before or during its first checkpoint. The provider and model
@@ -78,6 +81,73 @@ capture creates `Evidence(status=captured)`; explicit human approval is still re
 `reviewed`. SEC discovery uses official EDGAR JSON and document URLs. User-supplied URLs enter the
 same queue and are labeled issuer/regulator only when their domains match deterministic policy.
 Canonical URLs and content hashes are deduplicated independently.
+
+### Live signal gateway
+
+The in-development v0.5.1 gateway is deliberately separate from both official events and
+Evidence. Each provider delivery becomes a `SignalObservation` with its own channel, external ID,
+published/observed timestamps, content hash, and retention class. `LiveSignalService` preserves
+those observations and appends a `LiveSignalVersion` when a second channel, revision, or content
+variant changes the canonical view. A match therefore emits one current signal without erasing
+channel-only, delay, or divergent-content history.
+
+`LiveEventSource` is the common boundary for frozen, MCP, and WebSocket sources. Checkpoints are
+keyed by provider, channel, and stream; health, cursor, freshness, and call budget remain
+independent. A failed source can degrade only its own checkpoint. Raw validation failures enter a
+metadata-only dead-letter record containing a hash and safe schema errors, not the unlicensed or
+potentially sensitive payload.
+
+M0-M7 now provide three executable paths. The frozen, controllable-clock feed preserves a no-key
+replay. `Jin10McpClient` performs strict Streamable HTTP negotiation and consumes only
+`structuredContent`; flash uses repeated latest-page reads with local idempotency because the
+provider cursor pages backward through history. A Beijing-day call target and adaptive cadence
+protect quota. `Jin10WebSocketWorker` independently authenticates/subscribes to flash, calendar,
+and optional quote streams, uses protocol heartbeat plus jittered reconnect, and never changes MCP
+health or cadence.
+
+Every new signal version receives an immutable rules assessment. The L0 gate maps configured
+entities/themes, scores relevance/urgency/importance/novelty, flags prompt-injection patterns, and
+creates at most one alert per signal key. Coverage is calculated from preserved observations,
+including channel-only counts, matched/divergent state, and P50/P95 delivery delay. Optional model
+analysis is a separately selected L1 path; typed outputs, model/provider, prompt hash, call count,
+and failures are persisted. A model failure leaves a visible failed analysis and a rules baseline,
+not a falsely model-authored proposal.
+
+`LiveGatewayRuntime` supervises independent MCP and WebSocket loops. The API exposes state,
+poll/start/stop, events, coverage, settings, analysis, actions, and reconnectable SSE. Live Desk
+consumes that surface. Connection Center is the local onboarding boundary: it submits a secret
+once to the loopback backend, verifies MCP before persistence, atomically updates only an
+allowlisted ignored `.env` setting, rebuilds the affected runtime, and returns status without the
+secret. Browser storage and GET responses never contain provider credentials. A `signal_only`
+record still cannot become Evidence or an official corporate event without guarded capture and
+human review.
+
+The durable SSE cursor belongs to alert delivery, not to every canonical signal. Signals below the
+alert threshold still persist and appear through the paged `/api/v1/live/events/page` ledger.
+Live Desk synchronizes that ledger on SSE readiness, local/cross-tab operations, visibility
+changes, and a bounded 30-second visible-tab interval. Page filtering and totals are server-side;
+full records are assembled only for the requested page through batched store reads.
+
+Open Cockpit tabs coordinate connection and monitor changes through a browser message containing
+only a topic, random message ID, tab ID, and timestamp. BroadcastChannel is paired with a
+localStorage notification fallback, but no credential, provider payload, or research artifact is
+stored there. Formal versus frozen provenance is derived from observation retention class, not
+from the MCP/WebSocket channel name, because the frozen dual-channel replay intentionally exercises
+both formal channel contracts.
+
+`LiveResearchBridge` implements that explicit M7 boundary. A confirmed verification task moves the
+signal to `official_source_pending` through a new signal version. Regulator or explicitly identified
+issuer URLs enter the existing source queue; guarded capture remains `captured` until a human
+reviews the unchanged hash. Approval creates a separate `LiveEvidenceLink` and a new
+`evidence_linked` signal version. Rejection creates no link.
+
+Run integration uses `LiveRunContextLink`: a bounded immutable snapshot, trust class, content hash,
+and optional reviewed Evidence links. Context loading recomputes the hash and excludes a tampered
+snapshot. A linked re-evaluation creates a new child `ResearchRun` with `parent_run_id`; it does not
+mutate the parent's payload or artifacts. Dedicated audit rows plus synthesized observation,
+signal, analysis, and action entries form the event timeline. `LiveSoakRunner` exercises duplicate
+replay, one-channel failure isolation, and recovery in an isolated temporary database, then
+persists only its bounded report.
 
 ### Corporate event calendar
 
@@ -148,12 +218,26 @@ records.
 Schema version 5 adds append-only corporate event versions. It is additive and does not rewrite
 market bars, financial facts, source suggestions, tracking history, or run payloads.
 
+Schema version 6 adds live observations, append-only canonical signal versions and their links,
+independent provider/channel checkpoints, redacted dead letters, and human-gated action proposals.
+It is additive and does not modify prior research, market, official-event, or tracking history.
+
+Schema version 7 adds immutable rules assessments and analysis lineage, one canonical alert-delivery
+record per signal key, persisted Live Desk settings, and append-only user actions. It is additive
+and does not reinterpret prior observations, signals, Evidence, events, runs, or tracking history.
+
+Schema version 8 adds official-source verification tasks, reviewed live-to-Evidence links,
+immutable run-context links, bridge audit entries, and soak reports. It is additive and does not
+rewrite prior observations, signals, Evidence, events, runs, financial/market facts, or tracking
+history.
+
 ### Applications
 
 - FastAPI exposes runs, evidence review, official events, artifacts, market sync/status, tracking,
-  and HTML reports.
-- React/Vite provides the live Research Cockpit and stage board.
-- CLI supports local, batch, tracking, and portable-report workflows.
+  HTML reports, live gateway/SSE, Research Bridge, audit, diagnostics, and soak-report surfaces.
+- React/Vite provides the Research Cockpit, responsive Live Desk/Research Bridge, and stage board.
+- CLI supports local, batch, tracking, portable-report, synthetic replay, real MCP polling, and
+  the equal-priority live supervisor plus deterministic soak and local diagnostics.
 
 ## Runtime lifecycle
 

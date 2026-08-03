@@ -14,12 +14,15 @@ def test_cross_session_handoff_files_exist() -> None:
         "AGENTS.md",
         "ROADMAP.md",
         "docs/V0_5_PLAN.md",
+        "docs/V0_5_1_PLAN.html",
         "docs/V0_4_PLAN.md",
         "docs/V0_3_PLAN.md",
         "docs/PROJECT_CONTEXT.md",
         "docs/CURRENT_STATUS.md",
         "docs/DECISIONS.md",
         "docs/ARCHITECTURE.md",
+        "docs/LIVE_EVENTS.md",
+        "docs/LIVE_OPERATIONS.md",
         "docs/MARKET_DATA.md",
         "SECURITY.md",
         "CONTRIBUTING.md",
@@ -41,6 +44,7 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     v03_plan = (ROOT / "docs/V0_3_PLAN.md").read_text(encoding="utf-8")
     v04_plan = (ROOT / "docs/V0_4_PLAN.md").read_text(encoding="utf-8")
     v05_plan = (ROOT / "docs/V0_5_PLAN.md").read_text(encoding="utf-8")
+    v051_plan = (ROOT / "docs/V0_5_1_PLAN.html").read_text(encoding="utf-8")
     market_data = (ROOT / "docs/MARKET_DATA.md").read_text(encoding="utf-8")
     architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
     decisions = (ROOT / "docs/DECISIONS.md").read_text(encoding="utf-8")
@@ -69,6 +73,17 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     )
     assert "v0.5" in status and "official disclosure events" in status
     assert all(
+        term in v051_plan
+        for term in (
+            "D019",
+            "SignalObservation",
+            "M0–M7 complete",
+            "MCP 与 WebSocket 同级",
+        )
+    )
+    assert "MCP is live-verified" in status
+    assert "M0 through M7 are implemented in code" in status
+    assert all(
         term in market_data
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")
     )
@@ -77,7 +92,8 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
         term in architecture
         for term in ("fixture", "codex_subscription", "openai", "never falls")
     )
-    assert "D018" in decisions and "billing are separate boundaries" in decisions
+    assert all(term in decisions for term in ("D018", "D021", "parent-preserving"))
+    assert "billing are separate boundaries" in decisions
     assert all(
         term in readme
         for term in (

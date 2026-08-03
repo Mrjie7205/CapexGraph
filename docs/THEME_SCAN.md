@@ -43,16 +43,19 @@ convert product mentions or aggregate capital expenditure into named supplier re
 
 ### Codex subscription
 
-`--provider codex_subscription` uses the same strict Pydantic/Responses contract through a
-loopback CLIProxyAPI bridge. It requires `CAPEXGRAPH_CODEX_MODEL`,
-`CAPEXGRAPH_CODEX_PROXY_KEY`, and a running authenticated proxy. The proxy key is a local access
-credential, not an OpenAI Platform key or ChatGPT OAuth token. CapexGraph never reads the proxy's
-OAuth files and never falls back to the official API when this channel fails.
+`--provider codex_subscription` uses the same strict Pydantic contract through the official local
+Codex CLI. It requires an installed Codex CLI and a ChatGPT login, but no OpenAI Platform API key.
+Connection Center can start the official browser login and select a model available to the
+account. CapexGraph runs an ephemeral, read-only, schema-bound `codex exec`, never receives OAuth
+tokens, and never falls back to the official API channel when subscription execution fails.
 
 ```powershell
 capexgraph model providers --probe-codex
 capexgraph theme "AI数据中心电力" --provider codex_subscription --execute
 ```
+
+CLIProxyAPI remains an explicit `CAPEXGRAPH_CODEX_TRANSPORT=proxy` compatibility path for existing
+local installations; it is no longer the default.
 
 ### OpenAI API
 

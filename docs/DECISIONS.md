@@ -257,3 +257,99 @@ cannot disable or demote WebSocket; WebSocket disconnects may trigger its own re
 state but cannot change MCP cadence or role. Cross-channel data can corroborate delivery and improve
 coverage, but two aggregator observations still remain secondary signals. They do not satisfy the
 official-source capture and human-review gate established by D017.
+
+## D020 — Live polling is head-refresh, analysis is rules-first, and M6 stops before research mutation
+
+- **Status:** accepted
+- **Date:** 2026-07-29
+
+Jin10 `list_flash` cursors page toward older history; they are not forward incremental cursors.
+Continuous MCP operation therefore calls the un-cursored latest page on each cycle, relies on
+stable external identities plus content hashes for local idempotency/revisions, and records the
+returned `next_cursor` only for explicit historical backfill. Calendar observations separate the
+scheduled publication time from when CapexGraph observed the current calendar row.
+
+Every new signal version runs through a deterministic rules layer before an optional model. The
+ruleset owns relevance, urgency, importance, novelty, entity/theme mapping, exclusions, injection
+flags, and the single-alert decision. Model execution is explicit, threshold/cost gated, typed, and
+audited; model failure is visible and cannot be labeled as model-generated output. Licensed
+provider bodies default to metadata-only retention, HTML is sanitized, and picture URLs are not
+hotlinked or persisted.
+
+M6 may record reversible read/watch/verify/dismiss/mute/ignore actions and expose browser
+notifications after explicit permission. It may not attach a signal as Evidence or create a linked
+research run. Those state-changing bridges remain M7 and must pass through official-source capture,
+human review, and explicit confirmation.
+
+## D021 — M7 research mutation is explicit, append-only, and parent-preserving
+
+- **Status:** accepted
+- **Date:** 2026-07-30
+
+M7 implements the state-changing bridge through dedicated verification-task, Evidence-link, and
+run-context endpoints. Every write requires an explicit confirmation flag and appends an audit
+entry. Generic live actions cannot attach Evidence or create linked re-evaluations, so callers
+cannot bypass source authority, guarded capture, hash verification, or human review.
+
+An official-source task may use a recognized regulator domain or an explicitly identified issuer
+domain. A successful capture remains `captured` and cannot verify the signal. Only unchanged
+`reviewed` Evidence can create a `LiveEvidenceLink`; rejection creates no link. Verification-state
+changes append a `LiveSignalVersion` rather than rewriting the signal that originally arrived from
+the aggregator.
+
+Live context is stored as an immutable snapshot plus `context_hash`. Research context loading
+recomputes the hash and omits a tampered snapshot. Attaching context to an existing run does not
+change its prior artifacts. A linked re-evaluation creates a new child run with `parent_run_id` and
+leaves the parent payload byte-for-byte unchanged. The live snapshot retains the trust class
+`secondary_live_signal`; separately listed reviewed Evidence links are the only factual source
+upgrade.
+
+The deterministic fixture chaos/soak gate runs observations in an isolated temporary database and
+persists only its bounded report. This prevents release testing from contaminating the operator's
+current signal ledger. A credentialed provider soak requires both equal-priority channel
+credentials; missing WebSocket access remains an explicit external live-smoke gate, not a passing
+or fallback result.
+
+## D022 — Local onboarding uses a one-way secret boundary and the official Codex transport
+
+- **Status:** accepted; supersedes D018 only for the default Codex transport
+- **Date:** 2026-07-30
+
+CapexGraph exposes one product entry, Connection Center, for local single-user integrations. A
+Jin10 secret may travel once from a password field to the loopback backend. It is never placed in
+browser storage, returned by a GET/status response, embedded in a run, or written to logs. The
+backend may atomically update only an allowlisted repository-local `.env` key. MCP credentials are
+persisted only after a successful standard handshake plus tool/resource discovery; WebSocket
+credentials remain visibly `live_probe_pending` until an authenticated monitor run proves the
+stream. Disconnect remains an explicit destructive action.
+
+The default `codex_subscription` transport is the official local Codex CLI, not a third-party
+proxy. Account and available-model discovery plus browser login use the official Codex app-server.
+Research execution uses ephemeral, read-only `codex exec` with a requested JSON schema and validates
+the final result again with Pydantic. Codex owns ChatGPT OAuth storage; CapexGraph receives no OAuth
+token and requires no OpenAI Platform API key for this channel. CLIProxyAPI remains an explicit
+compatibility transport for existing users, bound to loopback by default.
+
+No onboarding convenience changes the trust model: provider secrets unlock data/model transport,
+not Evidence authority, and no model channel silently falls back to another.
+
+## D023 — Alert delivery and the canonical event ledger have separate refresh semantics
+
+- **Status:** accepted
+- **Date:** 2026-07-31
+
+The reconnectable SSE cursor represents durable alert delivery. It must not be broadened into an
+implicit alert for every persisted signal: rules are allowed to retain a low-score signal without
+creating `LiveAlertDelivery`. Live Desk therefore combines SSE readiness/alert notifications with
+a server-paged canonical ledger refresh on relevant local or cross-tab operations, tab visibility,
+and a bounded 30-second visible-tab interval.
+
+Event totals and filtering are computed by the backend. Full detail records are assembled only for
+the requested page with batched reads, so increasing history does not turn a list request into one
+detail query per signal. `source_scope=live|fixture|mixed` is derived from observation retention
+class. Channel names cannot identify a frozen replay because the synthetic fixture deliberately
+uses MCP and WebSocket observations.
+
+Cross-tab messages are coordination signals only. They contain a topic, random message ID, tab ID,
+and timestamp; no provider credential, market payload, or research artifact may enter
+BroadcastChannel or the localStorage notification fallback.

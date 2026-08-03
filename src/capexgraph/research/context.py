@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from typing import Any
 
@@ -12,6 +13,7 @@ from capexgraph.domain import (
     ResearchRun,
     SourceSuggestionStatus,
 )
+from capexgraph.live.store import LiveSignalStore
 from capexgraph.runtime.artifacts import atomic_write_json
 from capexgraph.runtime.store import runs_dir
 from capexgraph.sources.store import SourceSuggestionStore
@@ -20,6 +22,7 @@ from capexgraph.tools.evidence import read_run_evidence_text, verify_evidence_ha
 MAX_EVIDENCE_CHARACTERS = 24_000
 MAX_SOURCE_CHARACTERS = 6_000
 MAX_FINANCIAL_CHARACTERS = 12_000
+MAX_LIVE_CONTEXT_CHARACTERS = 20_000
 
 
 class EvidenceCoverage(BaseModel):
@@ -212,12 +215,57 @@ def _financial_context(run: ResearchRun) -> list[dict[str, Any]]:
     return bounded
 
 
+def _live_context(run: ResearchRun) -> list[dict[str, Any]]:
+    try:
+        links = LiveSignalStore().list_run_context_links(run_id=run.id)
+    except Exception:  # noqa: BLE001 - ordinary run context remains usable if bridge state fails
+        return []
+    bounded: list[dict[str, Any]] = []
+    used = 0
+    for link in reversed(links):
+        raw = json.dumps(
+            link.context,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            default=str,
+        ).encode()
+        actual_hash = hashlib.sha256(raw).hexdigest()
+        if actual_hash != link.context_hash:
+            bounded.append(
+                {
+                    "id": link.id,
+                    "signal_key": link.signal_key,
+                    "context_hash": link.context_hash,
+                    "integrity": "failed",
+                    "context": None,
+                }
+            )
+            continue
+        serialized = raw.decode("utf-8")
+        if used + len(serialized) > MAX_LIVE_CONTEXT_CHARACTERS:
+            break
+        used += len(serialized)
+        bounded.append(
+            {
+                "id": link.id,
+                "signal_key": link.signal_key,
+                "signal_version_id": link.signal_version_id,
+                "context_hash": link.context_hash,
+                "integrity": "verified",
+                "context": link.context,
+            }
+        )
+    return bounded
+
+
 def build_research_context(run: ResearchRun) -> dict[str, Any]:
     coverage = refresh_evidence_coverage(run)
     return {
         "evidence_coverage": coverage.model_dump(mode="json"),
         "reviewed_and_captured_sources": _evidence_context(run),
         "financial_facts": _financial_context(run),
+        "immutable_live_context": _live_context(run),
     }
 
 

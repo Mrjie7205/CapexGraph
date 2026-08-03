@@ -4,16 +4,21 @@ from typing import Any
 from urllib.parse import urlsplit
 
 from capexgraph.providers.base import EvidencePolicy, StructuredOutput
+from capexgraph.providers.codex_cli import (
+    generate_codex_cli_output,
+    probe_codex_cli,
+    resolve_codex_model,
+)
 from capexgraph.providers.config import ModelSettings, validate_codex_base_url
 from capexgraph.providers.errors import ProviderConfigurationError
 from capexgraph.providers.responses import generate_responses_output
 
 
 class CodexSubscriptionResearchModel:
-    """Responses adapter for a local CLIProxyAPI authenticated with ChatGPT OAuth."""
+    """Structured research through official Codex CLI or a legacy loopback proxy."""
 
     provider_name = "codex_subscription"
-    provider_version = "1"
+    provider_version = "2"
     evidence_policy = EvidencePolicy.UNVERIFIED_MODEL
 
     def __init__(
@@ -31,10 +36,37 @@ class CodexSubscriptionResearchModel:
                 settings.configuration_errors[0],
                 provider=self.provider_name,
             )
+        self._settings = settings
+        self._transport = "proxy" if client is not None else settings.codex_transport
+        self._client = None
+        self.call_count = 0
+        if self._transport == "cli":
+            cli = probe_codex_cli(settings.codex_cli_path)
+            if not cli["installed"]:
+                raise ProviderConfigurationError(
+                    "Install the official Codex CLI before using the Codex subscription.",
+                    provider=self.provider_name,
+                )
+            if not cli["authenticated"] or cli["auth_mode"] != "chatgpt":
+                raise ProviderConfigurationError(
+                    "Connect Codex with ChatGPT before using subscription analysis.",
+                    provider=self.provider_name,
+                )
+            self.model_name = resolve_codex_model(model or settings.codex_model)
+            self.execution_context = {
+                "api_surface": "codex_exec",
+                "transport": "official_codex_cli",
+                "auth_mode": "chatgpt_managed",
+                "billing_mode": "chatgpt_subscription",
+                "endpoint_scope": "local_process",
+                "cli_version": cli["version"],
+            }
+            return
+
         self.model_name = (model or settings.codex_model or "").strip()
         if not self.model_name:
             raise ProviderConfigurationError(
-                "Set CAPEXGRAPH_CODEX_MODEL when using the Codex subscription provider.",
+                "Set CAPEXGRAPH_CODEX_MODEL when using the proxy compatibility path.",
                 provider=self.provider_name,
             )
         resolved_base_url = validate_codex_base_url(
@@ -75,7 +107,6 @@ class CodexSubscriptionResearchModel:
                 max_retries=0,
             )
         self._client = client
-        self.call_count = 0
 
     def generate(
         self,
@@ -85,6 +116,23 @@ class CodexSubscriptionResearchModel:
         user_prompt: str,
     ) -> StructuredOutput:
         self.call_count += 1
+        if self._transport == "cli":
+            return generate_codex_cli_output(
+                output_model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                model=(
+                    None
+                    if self.model_name == "codex-cli-default"
+                    else self.model_name
+                ),
+                timeout_seconds=self._settings.codex_timeout_seconds,
+            )
+        if self._client is None:
+            raise ProviderConfigurationError(
+                "Codex proxy client is not configured.",
+                provider=self.provider_name,
+            )
         return generate_responses_output(
             self._client,
             provider_name=self.provider_name,

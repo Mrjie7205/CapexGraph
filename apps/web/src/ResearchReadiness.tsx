@@ -9,6 +9,7 @@ import {
   type FinancialFact,
   type ResearchRun,
 } from "./api";
+import { BilingualText, humanizeUiValue, translateUiValue } from "./UiText";
 
 interface ResearchReadinessProps {
   run: ResearchRun | null;
@@ -17,11 +18,24 @@ interface ResearchReadinessProps {
 }
 
 function providerLabel(value: unknown): string {
-  if (!value || typeof value !== "object") return "not recorded";
+  if (!value || typeof value !== "object") return "未记录";
   const item = value as Record<string, unknown>;
   return [item.name, item.version && `v${item.version}`, item.model]
     .filter(Boolean)
     .join(" · ");
+}
+
+function coverageGapLabel(value: string): string {
+  if (value === "No evidence has been captured for this run.") return "该研究尚未捕获任何证据。";
+  const captured = value.match(/^(\d+) captured source\(s\) still require human review\.$/);
+  if (captured) return `${captured[1]} 条已捕获来源仍需人工审核。`;
+  const hashes = value.match(/^(\d+) captured source hash\(es\) no longer match\.$/);
+  if (hashes) return `${hashes[1]} 条已捕获来源的哈希已不匹配。`;
+  const captureFailures = value.match(/^(\d+) source capture\(s\) failed\.$/);
+  if (captureFailures) return `${captureFailures[1]} 条来源捕获失败。`;
+  const discoveryFailures = value.match(/^(\d+) source discovery request\(s\) failed\.$/);
+  if (discoveryFailures) return `${discoveryFailures[1]} 次来源发现请求失败。`;
+  return value;
 }
 
 function valueLabel(fact: FinancialFact): string {
@@ -57,7 +71,7 @@ export function ResearchReadiness({
   useEffect(() => {
     setIdentifier("");
     refresh().catch((reason) => {
-      onError(reason instanceof Error ? reason.message : "Readiness data unavailable");
+      onError(reason instanceof Error ? reason.message : "研究就绪度数据暂不可用");
     });
   }, [run?.id, evidenceSignal]);
 
@@ -71,7 +85,7 @@ export function ResearchReadiness({
       onRunUpdated(await getRun(run.id));
       setCoverage(await getCoverage(run.id));
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : "Financial extraction failed");
+      onError(reason instanceof Error ? reason.message : "财务事实提取失败");
     } finally {
       setBusy(false);
     }
@@ -112,51 +126,56 @@ export function ResearchReadiness({
   return (
     <section className="readiness panel" id="readiness">
       <div className="panel-title">
-        <span>Research readiness / 研究就绪度</span>
-        <b>{coverage?.status ?? "NO RUN"}</b>
+        <BilingualText zh="研究就绪度" en="Research readiness" />
+        <b>
+          {coverage
+            ? <><span>{translateUiValue(coverage.status)}</span><small>{humanizeUiValue(coverage.status)}</small></>
+            : <><span>暂无研究</span><small>No run</small></>}
+        </b>
       </div>
-      {!run && <p className="empty-state">Create or select a run to inspect evidence coverage.</p>}
+      {!run && <p className="empty-state">请创建或选择研究任务，以检查证据覆盖情况。</p>}
       {run && (
         <>
           <div className="readiness-grid">
             <article className={`coverage-orbit ${coverage?.strict_ready ? "ready" : ""}`}>
               <div className="coverage-ring">
                 <strong>{coverage?.reviewed ?? 0}</strong>
-                <span>reviewed</span>
+                <span>已审核<small>reviewed</small></span>
               </div>
               <div>
-                <small>Evidence mode</small>
-                <h3>{coverage?.mode ?? "partial"}</h3>
+                <BilingualText zh="证据模式" en="Evidence mode" compact />
+                <h3>{coverage?.mode === "strict" ? "严格模式" : "部分模式"}<small>{coverage?.mode ?? "partial"}</small></h3>
                 <p>
-                  {coverage?.captured ?? 0} captured · {coverage?.pending_reviews ?? 0} pending ·{" "}
-                  {coverage?.source_failures ?? 0} failed
+                  已捕获 {coverage?.captured ?? 0} · 待审核 {coverage?.pending_reviews ?? 0} ·{" "}
+                  失败 {coverage?.source_failures ?? 0}
+                  <small>captured · pending · failed</small>
                 </p>
               </div>
             </article>
             <article className="provider-plate">
-              <small>Model adapter</small>
+              <BilingualText zh="模型适配器" en="Model adapter" compact />
               <strong>{modelProvider}</strong>
               <p>
-                Research date {run.as_of_date} · {String(run.manifest.evidence_policy ?? "policy pending")}
+                研究日期 {run.as_of_date} · {String(run.manifest.evidence_policy ?? "证据策略待记录")}
               </p>
               <p>
-                {String(executionContext.transport ?? "transport pending")} ·{" "}
-                {String(executionContext.billing_mode ?? "billing pending")}
+                {translateUiValue(String(executionContext.transport ?? "传输方式待记录"))} ·{" "}
+                {translateUiValue(String(executionContext.billing_mode ?? "计费方式待记录"))}
               </p>
               <a href={reportUrl(run.id)} target="_blank" rel="noreferrer">
-                Open current report ↗
+                打开当前报告<small>Open current report ↗</small>
               </a>
             </article>
             <article className="coverage-gaps">
-              <small>Coverage gaps</small>
+              <BilingualText zh="覆盖缺口" en="Coverage gaps" compact />
               {coverage?.gaps.length ? (
-                <ul>{coverage.gaps.map((gap) => <li key={gap}>{gap}</li>)}</ul>
+                <ul>{coverage.gaps.map((gap) => <li key={gap}>{coverageGapLabel(gap)}</li>)}</ul>
               ) : (
-                <p>No deterministic coverage gaps detected.</p>
+                <p>未检测到确定性的覆盖缺口。</p>
               )}
               {sourceFailures.map((failure, index) => (
                 <p className="provider-failure" key={`${failure.at ?? index}`}>
-                  {String(failure.provider ?? "provider")} · {String(failure.error ?? "failed")}
+                  来源服务：{String(failure.provider ?? "未知")} · {String(failure.error ?? "失败")}
                 </p>
               ))}
             </article>
@@ -164,18 +183,23 @@ export function ResearchReadiness({
 
           <div className="facts-head">
             <div>
-              <small>Official filing facts</small>
-              <h3>Period-aware, source-located, immutable</h3>
+              <BilingualText zh="官方申报事实" en="Official filing facts" compact />
+              <h3>识别报告期、定位原文、不可变留存<small>Period-aware · source-located · immutable</small></h3>
             </div>
             <form onSubmit={extract}>
               <input
-                aria-label="SEC ticker company or CIK for financial facts"
-                placeholder="Exact SEC ticker / company / CIK"
+                aria-label="用于财务事实提取的 SEC 股票代码、公司名或 CIK"
+                placeholder="准确的 SEC 股票代码 / 公司名 / CIK"
                 value={identifier}
                 onChange={(event) => setIdentifier(event.target.value)}
               />
               <button disabled={busy || !identifier.trim()}>
-                {busy ? "Extracting…" : "Extract SEC facts"}
+                <BilingualText
+                  zh={busy ? "正在提取…" : "提取 SEC 事实"}
+                  en={busy ? "Extracting…" : "Extract SEC facts"}
+                  compact
+                  align="center"
+                />
               </button>
             </form>
           </div>
@@ -184,36 +208,36 @@ export function ResearchReadiness({
               <table className="facts-table">
                 <thead>
                   <tr>
-                    <th>Metric</th>
-                    <th>Statement</th>
-                    <th>Period</th>
-                    <th>Value</th>
-                    <th>Unit</th>
-                    <th>Type</th>
-                    <th>Source locator</th>
+                    <th>指标<small>Metric</small></th>
+                    <th>报表<small>Statement</small></th>
+                    <th>报告期<small>Period</small></th>
+                    <th>数值<small>Value</small></th>
+                    <th>单位<small>Unit</small></th>
+                    <th>类型<small>Type</small></th>
+                    <th>来源定位<small>Source locator</small></th>
                   </tr>
                 </thead>
                 <tbody>
                   {visibleFacts.map((fact) => (
                     <tr key={fact.id}>
                       <td><strong>{fact.metric}</strong><small>{fact.ticker}</small></td>
-                      <td>{fact.statement.replaceAll("_", " ")}</td>
-                      <td>{fact.period_end ?? "not reported"}</td>
+                      <td>{translateUiValue(fact.statement)}<small>{humanizeUiValue(fact.statement)}</small></td>
+                      <td>{fact.period_end ?? "未披露"}</td>
                       <td>{valueLabel(fact)}</td>
                       <td>{fact.unit}</td>
-                      <td><span className={`fact-type ${fact.fact_type}`}>{fact.fact_type}</span></td>
+                      <td><span className={`fact-type ${fact.fact_type}`}>{translateUiValue(fact.fact_type)}<small>{humanizeUiValue(fact.fact_type)}</small></span></td>
                       <td title={fact.source_locator}>{fact.source_locator}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
               {facts.length > visibleFacts.length && (
-                <p className="table-note">Showing 24 of {facts.length} persisted facts.</p>
+                <p className="table-note">当前显示 24 / {facts.length} 条已持久化事实。</p>
               )}
             </div>
           ) : (
             <p className="empty-state">
-              No filing facts yet. SEC extraction is no-key, but the issuer must be SEC-registered.
+              暂无申报事实。SEC 提取无需 API Key，但公司必须在 SEC 注册。
             </p>
           )}
         </>

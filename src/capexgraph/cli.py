@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time as time_module
 from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Annotated
@@ -24,6 +25,17 @@ from capexgraph.domain import (
 )
 from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
+from capexgraph.live import (
+    FrozenClock,
+    LiveGatewayRuntime,
+    LiveSignalService,
+    LiveSignalStore,
+    LiveSoakRunner,
+    build_live_diagnostics,
+    calculate_live_coverage,
+    get_live_runtime,
+    load_frozen_dual_channel_feeds,
+)
 from capexgraph.market import (
     MarketDataService,
     MarketSettings,
@@ -65,6 +77,10 @@ evidence_app = typer.Typer(help="Capture and review research evidence.", no_args
 ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
 market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
 model_app = typer.Typer(help="Inspect structured model channels.", no_args_is_help=True)
+live_app = typer.Typer(
+    help="Replay and inspect provider-neutral live-signal streams.",
+    no_args_is_help=True,
+)
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
 events_app = typer.Typer(help="Discover and inspect corporate events.", no_args_is_help=True)
 tracking_app = typer.Typer(
@@ -83,6 +99,7 @@ app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
 app.add_typer(model_app, name="model")
+app.add_typer(live_app, name="live")
 app.add_typer(financials_app, name="financials")
 app.add_typer(events_app, name="events")
 app.add_typer(tracking_app, name="tracking")
@@ -749,6 +766,253 @@ def model_providers(
             )
         }
     )
+
+
+@live_app.command("demo")
+def live_demo(
+    until: Annotated[
+        str | None,
+        typer.Option(
+            "--until",
+            help="Replay observations available by this timezone-aware ISO timestamp",
+        ),
+    ] = None,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Replay the synthetic MCP/WebSocket dual-channel fixture without keys."""
+
+    clock = None
+    if until is not None:
+        try:
+            parsed = datetime.fromisoformat(until.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise typer.BadParameter("--until must be an ISO timestamp") from error
+        if parsed.tzinfo is None:
+            raise typer.BadParameter("--until must include a timezone")
+        clock = FrozenClock(parsed)
+    store = LiveSignalStore(path)
+    service = LiveSignalService(store)
+    feeds = load_frozen_dual_channel_feeds(clock=clock)
+    results = [service.poll_source(feed) for feed in feeds]
+    console.print_json(
+        data={
+            "fixture": "jin10-dual-channel-synthetic-v1",
+            "notice": "Synthetic replay only; not current market data.",
+            "channels": [
+                {
+                    "channel": result.batch.descriptor.channel.value,
+                    "observations": len(result.batch.observations),
+                    "created_versions": result.created_versions,
+                    "cursor": result.batch.checkpoint.cursor,
+                    "health": result.batch.checkpoint.health.value,
+                }
+                for result in results
+            ],
+            "signals": [
+                signal.model_dump(mode="json")
+                for signal in store.list_signals(latest_only=True)
+            ],
+        }
+    )
+
+
+@live_app.command("status")
+def live_status(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Show persisted channel checkpoints and canonical live signals."""
+
+    store = LiveSignalStore(path)
+    console.print_json(
+        data={
+            "checkpoints": [
+                item.model_dump(mode="json") for item in store.list_checkpoints()
+            ],
+            "signals": [
+                item.model_dump(mode="json")
+                for item in store.list_signals(latest_only=True)
+            ],
+            "dead_letters": [
+                item.model_dump(mode="json") for item in store.list_dead_letters()
+            ],
+            "coverage": calculate_live_coverage(
+                store.list_signals(),
+                store.list_observations(limit=5000),
+            ).model_dump(mode="json"),
+            "alerts": [
+                item.model_dump(mode="json") for item in store.list_alerts(limit=200)
+            ],
+        }
+    )
+
+
+@live_app.command("providers")
+def live_providers() -> None:
+    """Show both live channels without revealing provider credentials."""
+
+    console.print_json(data=get_live_runtime().status())
+
+
+@live_app.command("poll")
+def live_poll(
+    stream: Annotated[
+        str,
+        typer.Option("--stream", help="MCP stream: flash or calendar"),
+    ] = "flash",
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run one real MCP head poll and persist normalized signals."""
+
+    try:
+        result = LiveGatewayRuntime(path).poll_once(stream)
+    except (ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(
+        data={
+            "stream": stream,
+            "observations": len(result.batch.observations),
+            "created_versions": result.created_versions,
+            "duplicates": result.duplicate_observations,
+            "checkpoint": result.batch.checkpoint.model_dump(mode="json"),
+        }
+    )
+
+
+@live_app.command("monitor")
+def live_monitor(
+    cycles: Annotated[
+        int,
+        typer.Option(
+            "--cycles",
+            min=0,
+            help="0 keeps the gateway running until interrupted; positive values run test cycles.",
+        ),
+    ] = 0,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", min=0, max=3600),
+    ] = 1,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run equal-priority MCP/WebSocket monitoring with independent health."""
+
+    runtime = LiveGatewayRuntime(path)
+    if cycles:
+        snapshots: list[dict[str, object]] = []
+        for index in range(cycles):
+            for stream in ("flash", "calendar"):
+                try:
+                    result = runtime.poll_once(stream)
+                    snapshots.append(
+                        {
+                            "cycle": index + 1,
+                            "channel": "mcp",
+                            "stream": stream,
+                            "health": result.batch.checkpoint.health.value,
+                            "observations": len(result.batch.observations),
+                        }
+                    )
+                except RuntimeError as error:
+                    snapshots.append(
+                        {
+                            "cycle": index + 1,
+                            "channel": "mcp",
+                            "stream": stream,
+                            "health": "degraded",
+                            "error": f"{type(error).__name__}: poll failed",
+                        }
+                    )
+            if interval and index + 1 < cycles:
+                time_module.sleep(interval)
+        console.print_json(data={"cycles": cycles, "results": snapshots})
+        return
+    runtime.start()
+    console.print("Live gateway started. Press Ctrl+C to stop.")
+    try:
+        while runtime.running:
+            time_module.sleep(1)
+    except KeyboardInterrupt:
+        runtime.stop()
+        console.print("Live gateway stopped.")
+
+
+@live_app.command("soak")
+def live_soak(
+    mode: Annotated[
+        str,
+        typer.Option("--mode", help="fixture or providers"),
+    ] = "fixture",
+    cycles: Annotated[
+        int,
+        typer.Option("--cycles", min=1, max=10000),
+    ] = 6,
+    failure_every: Annotated[
+        int,
+        typer.Option(
+            "--failure-every",
+            min=0,
+            help="Fixture-only: inject an alternating single-channel failure every N cycles.",
+        ),
+    ] = 3,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", min=0, max=3600),
+    ] = 10,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run a bounded live release gate and persist its report."""
+
+    runner = LiveSoakRunner(path)
+    try:
+        if mode == "fixture":
+            report = runner.run_fixture(
+                cycles=cycles,
+                failure_every=failure_every,
+            )
+        elif mode == "providers":
+            report = runner.run_providers(
+                cycles=cycles,
+                interval_seconds=interval,
+            )
+        else:
+            raise typer.BadParameter("--mode must be fixture or providers")
+    except ValueError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=report.model_dump(mode="json"))
+    if not report.passed:
+        raise typer.Exit(1)
+
+
+@live_app.command("doctor")
+def live_doctor(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Check local schema, channel health, queue state, and the latest soak gate."""
+
+    report = build_live_diagnostics(path)
+    console.print_json(data=report)
+    if not report["ready"]:
+        raise typer.Exit(1)
 
 
 @financials_app.command("import")

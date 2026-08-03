@@ -196,7 +196,7 @@
       </section>
 
       <section class="meta" aria-label="计划元信息">
-        <article><span>计划状态</span><strong>Approved design</strong><small>尚未进入实现</small></article>
+        <article><span>开发状态</span><strong>M0–M7 complete</strong><small>本地验收完成 · WS live smoke waits key</small></article>
         <article><span>开发基线</span><strong>v0.5 branch</strong><small>SEC 事件底座已存在</small></article>
         <article><span>运行策略</span><strong>MCP + WebSocket</strong><small>同级 · 独立健康度</small></article>
         <article><span>安全底线</span><strong>Human confirm</strong><small>建议不等于订单</small></article>
@@ -327,7 +327,7 @@
       <section class="section dark" id="usage">
         <div class="section-head"><div><span class="section-label">05 / User operations</span><h2>用户怎么用，<br>从第一天讲清楚。</h2></div><p>v0.5.1 保留渐进式安装，但不建立主备等级：没有任何 Key 可跑冻结演示；前期配置 MCP 即可开始真实轮询；WebSocket 适配器同步开发，获得 Secret-Key 后作为第二条同级通道加入持续采集；模型或本地模型只负责可选 AI 增强。</p></div>
         <div class="operations">
-          <article class="operation"><b>PATH 01</b><h3>首次连接</h3><ol><li>进入 Settings → Data connections。</li><li>先在后端配置 MCP Bearer，并选择自适应轮询计划。</li><li>点击“测试 MCP”，只返回权限、预算和健康状态。</li><li>取得试用后，再配置 <code>CAPEXGRAPH_JIN10_OPEN_SECRET_KEY</code> 并单独测试 WS。</li><li>两个开关彼此独立；启用 WS 不会停掉 MCP。</li><li>最后保存类别、关键词、排除词和静默时段。</li></ol></article>
+          <article class="operation"><b>PATH 01</b><h3>首次连接</h3><ol><li>从顶栏或 Live Desk 打开 Connection Center。</li><li>粘贴 MCP Bearer，点击“连接并验证”；后端握手和发现成功后才写入本机配置。</li><li>取得试用后，独立保存 WebSocket Secret-Key，并由 Monitor 完成真实流验证。</li><li>Codex 卡片检测官方 CLI 与 ChatGPT 登录，可发起官方浏览器登录并选择账号可用模型。</li><li>两个市场通道开关彼此独立；启用 WS 不会停掉 MCP。</li><li>最后在 Settings 保存类别、关键词、排除词和静默时段。</li></ol></article>
           <article class="operation"><b>PATH 02</b><h3>每日监控</h3><ol><li>启动服务，Gateway 分别恢复 MCP 与 WS checkpoint。</li><li>打开 Live Desk 查看两路新鲜度、调用预算和未读事件。</li><li>普通事件只经过规则层，静默进入信息流。</li><li>高分事件触发 AI 快速分析和浏览器提醒。</li><li>任一路异常只标记该通道 DEGRADED，另一通道继续原频率运行。</li><li>同一事件匹配后只提醒一次，但保留两路观察、延迟和字段差异。</li></ol></article>
           <article class="operation"><b>PATH 03</b><h3>从提醒到研究</h3><ol><li>先看来源、时间和验证状态。</li><li>阅读影响路径、价格反应和证据缺口。</li><li>点击“查官方原文”，进入 SourceSuggestion 队列。</li><li>捕获并审核公告后，事件才进入 Evidence。</li><li>选择加入现有 Run 或创建链接重评。</li><li>系统保留原始运行，不用新信息改写历史判断。</li></ol></article>
         </div>
@@ -372,9 +372,9 @@ human_status</code></pre></article>
             <li><span class="method">GET</span><span>/status — 每条通道的连接、新鲜度、调用预算</span></li><li><span class="method">GET</span><span>/stream — 浏览器 SSE 合流提醒</span></li>
             <li><span class="method">GET</span><span>/events — 筛选、观察来源、分页、已读状态</span></li><li><span class="method">GET</span><span>/coverage — 重合率、P50/P95 延迟、缺失与修订差异</span></li>
             <li><span class="method">PATCH</span><span>/settings — 两路独立开关、类别、关键词、阈值、通知</span></li>
-            <li><span class="method">POST</span><span>/events/{id}/analyze — 按需或重试分析</span></li><li><span class="method">POST</span><span>/events/{id}/verify — 建立官方补证任务</span></li>
+            <li><span class="method">POST</span><span>/events/{id}/analyze — 按需或重试分析</span></li><li><span class="method">POST</span><span>/events/{id}/verify — M7：建立官方补证任务</span></li>
           </ul></article>
-          <article class="contract"><div class="contract-head"><span>Run integration</span><b>Immutable links</b></div><ul class="endpoints">
+          <article class="contract"><div class="contract-head"><span>Run integration</span><b>M7 · Immutable links</b></div><ul class="endpoints">
             <li><span class="method">POST</span><span>/events/{id}/runs — 创建链接 Theme/Anchor Run</span></li><li><span class="method">POST</span><span>/runs/{id}/live-context — 选择性加入上下文</span></li>
             <li><span class="method">POST</span><span>/events/{id}/dismiss — 忽略并记录原因</span></li><li><span class="method">POST</span><span>/events/{id}/mute — 主题/实体冷却</span></li>
             <li><span class="method">GET</span><span>/events/{id}/audit — 版本、分析、交付与动作</span></li><li><span class="method">GET</span><span>/settings/schema — 前端动态能力说明</span></li>
@@ -394,19 +394,19 @@ human_status</code></pre></article>
       <section class="section" id="milestones">
         <div class="section-head"><div><span class="section-label">07 / Delivery plan</span><h2>八个里程碑，<br>每个都可回滚。</h2></div><p>先用冻结消息建立共同契约；MCP 作为首个真实运行切片交付，WebSocket 适配器从同一契约并行开发，Secret-Key 只阻塞 live smoke，不阻塞实现。双开后两路同级持续运行。前端“补证”只展示实际覆盖，不用模型填空。</p></div>
         <div class="milestones">
-          <article class="milestone"><span class="mid">M0</span><span class="priority">P0 · foundation</span><h3>决策、许可与契约</h3><p>冻结观察、信号、分析、保留和动作语义，确认双通道同级及聚合资讯与 Evidence 分层。</p><ul><li>SignalObservation</li><li>LiveSignalVersion</li><li>RetentionPolicy</li><li>D017 / D019</li></ul><span class="exit">Exit · schema、同级通道与信任边界测试通过</span></article>
-          <article class="milestone"><span class="mid">M1</span><span class="priority">P0 · no-key</span><h3>双通道接口与冻结流</h3><p>建立共同连接接口、每路独立 checkpoint、模拟时钟和可重放双源事件序列。</p><ul><li>LiveEventSource protocol</li><li>per-channel health</li><li>FrozenEventFeed</li><li>matched / divergent fixture</li></ul><span class="exit">Exit · 无 Key 双源合流演示可运行</span></article>
-          <article class="milestone"><span class="mid">M2</span><span class="priority">P0 · first live</span><h3>MCP 正式轮询通道</h3><p>首个真实运行切片：实现初始化、structuredContent、游标、自适应频率和本地调用预算。</p><ul><li>list_flash / calendar</li><li>30s / 120s / 300s schedule</li><li>1200 target / 1500 hard guard</li><li>credential-safe status</li></ul><span class="exit">Exit · MCP-only Live Desk 可持续运行且预算可控</span></article>
-          <article class="milestone"><span class="mid">M3</span><span class="priority">P0 · co-develop</span><h3>WebSocket 同级通道</h3><p>与 M2 共用契约并行实现 flash、calendar、quotes、认证、心跳、退避和订阅。</p><ul><li>Secret-Key auth</li><li>frozen protocol tests</li><li>jittered reconnect</li><li>independent checkpoint</li></ul><span class="exit">Exit · 无 Key 合约测试通过；有 Key live smoke 通过</span></article>
-          <article class="milestone"><span class="mid">M4</span><span class="priority">P0 · reconcile</span><h3>双通道合流与确定性规则</h3><p>匹配两路 observation，同时完成版本、去重、覆盖指标、重要度、冷却、实体别名和现有图匹配。</p><ul><li>match / divergence state</li><li>coverage / P50 / P95</li><li>ruleset / novelty</li><li>entity / theme mapping</li></ul><span class="exit">Exit · 单次提醒、双路谱系、低价值事件零模型费用</span></article>
-          <article class="milestone"><span class="mid">M5</span><span class="priority">P1 · optional AI</span><h3>AI 影响分析器</h3><p>高优先事件输出结构化影响路径、条件、证伪、缺口和成本谱系。</p><ul><li>rules-only baseline</li><li>selective model gate</li><li>typed output</li><li>failure / retry / cost</li></ul><span class="exit">Exit · 无模型与有模型路径均诚实</span></article>
-          <article class="milestone"><span class="mid">M6</span><span class="priority">P0 · Cockpit</span><h3>Live Desk 前端</h3><p>实现双通道状态、覆盖差异、实时流、事件详情、影响分析、筛选、通知和用户动作。</p><ul><li>independent channel chips</li><li>coverage / source filter</li><li>SSE reconnect</li><li>responsive settings</li></ul><span class="exit">Exit · MCP 首发与双通道桌面/窄屏路径通过</span></article>
-          <article class="milestone"><span class="mid">M7</span><span class="priority">P0 · release</span><h3>补证、链接重评与发布</h3><p>把高价值信号连接到官方源队列、不可变 Run、审计、迁移与发布验证。</p><ul><li>official-source task</li><li>linked run</li><li>audit timeline</li><li>CI / wheel / Web / docs</li></ul><span class="exit">Exit · Definition of Done 全部满足</span></article>
+          <article class="milestone"><span class="mid">M0</span><span class="priority">COMPLETE · foundation</span><h3>决策、许可与契约</h3><p>冻结观察、信号、分析、保留和动作语义，确认双通道同级及聚合资讯与 Evidence 分层。</p><ul><li>SignalObservation</li><li>LiveSignalVersion</li><li>RetentionPolicy</li><li>D017 / D019</li></ul><span class="exit">Exit · schema、同级通道与信任边界测试通过</span></article>
+          <article class="milestone"><span class="mid">M1</span><span class="priority">COMPLETE · no-key</span><h3>双通道接口与冻结流</h3><p>建立共同连接接口、每路独立 checkpoint、模拟时钟和可重放双源事件序列。</p><ul><li>LiveEventSource protocol</li><li>per-channel health</li><li>FrozenEventFeed</li><li>matched / divergent fixture</li></ul><span class="exit">Exit · 无 Key 双源合流演示可运行</span></article>
+          <article class="milestone"><span class="mid">M2</span><span class="priority">COMPLETE · first live</span><h3>MCP 正式轮询通道</h3><p>首个真实运行切片：实现初始化、structuredContent、游标、自适应频率和本地调用预算。</p><ul><li>list_flash / calendar</li><li>30s / 120s / 300s schedule</li><li>1200 target / 1500 hard guard</li><li>credential-safe status</li></ul><span class="exit">Exit · 真实 MCP smoke、预算与 Live Desk 路径通过</span></article>
+          <article class="milestone"><span class="mid">M3</span><span class="priority">COMPLETE · contract</span><h3>WebSocket 同级通道</h3><p>与 M2 共用契约并行实现 flash、calendar、quotes、认证、心跳、退避和订阅。</p><ul><li>Secret-Key auth</li><li>frozen protocol tests</li><li>jittered reconnect</li><li>independent checkpoint</li></ul><span class="exit">Exit · 完整合约/工作器测试通过；live smoke 明确等待 Secret-Key</span></article>
+          <article class="milestone"><span class="mid">M4</span><span class="priority">COMPLETE · reconcile</span><h3>双通道合流与确定性规则</h3><p>匹配两路 observation，同时完成版本、去重、覆盖指标、重要度、冷却、实体别名和现有图匹配。</p><ul><li>match / divergence state</li><li>coverage / P50 / P95</li><li>ruleset / novelty</li><li>entity / theme mapping</li></ul><span class="exit">Exit · 单次提醒、双路谱系、低价值事件零模型费用</span></article>
+          <article class="milestone"><span class="mid">M5</span><span class="priority">COMPLETE · optional AI</span><h3>AI 影响分析器</h3><p>高优先事件输出结构化影响路径、条件、证伪、缺口和成本谱系。</p><ul><li>rules-only baseline</li><li>selective model gate</li><li>typed output</li><li>failure / retry / cost</li></ul><span class="exit">Exit · 无模型、有模型和模型失败路径均诚实</span></article>
+          <article class="milestone"><span class="mid">M6</span><span class="priority">COMPLETE · Cockpit</span><h3>Live Desk 前端</h3><p>实现双通道状态、覆盖差异、实时流、分页台账、正式/演示谱系、影响分析、筛选、通知、跨标签页同步、用户动作和产品化连接入口。</p><ul><li>independent channel chips</li><li>Connection Center</li><li>paged ledger / cross-tab sync</li><li>responsive settings</li></ul><span class="exit">Exit · MCP 首发与双通道桌面/390px 窄屏路径通过</span></article>
+          <article class="milestone"><span class="mid">M7</span><span class="priority">COMPLETE · release-ready</span><h3>补证、链接重评与发布</h3><p>把高价值信号连接到官方源队列、不可变 Run、审计、迁移与发布验证。</p><ul><li>official-source task</li><li>reviewed Evidence link</li><li>immutable linked run</li><li>audit / soak / doctor / runbook</li></ul><span class="exit">Exit · 本地 Definition of Done 通过；凭证化 WS soak 等待 Secret-Key</span></article>
         </div>
         <div class="path"><span>M0 契约</span><i>→</i><span>M1 双源冻结流</span><i>→</i><span>M2 MCP 首发 ∥ M3 WS 并行</span><i>→</i><span>M4 合流规则</span><i>→</i><span>M5 AI</span><i>→</i><span>M6 前端</span><i>→</i><span>M7 发布</span></div>
       </section>
 
-      <section class="section">
+      <section class="section" id="acceptance">
         <div class="section-head"><div><span class="section-label">08 / Test matrix</span><h2>实时系统的质量，<br>藏在断线时。</h2></div><p>测试重点不是“收到一条消息”，而是重复、修订、时区、断线、回补、限额、模型失败、浏览器重连和官方补证都不会破坏历史或制造虚假确定性。</p></div>
         <div class="table-wrap"><table>
           <thead><tr><th>测试层</th><th>必测场景</th><th>关键断言</th></tr></thead><tbody>
@@ -459,11 +459,11 @@ human_status</code></pre></article>
       </section>
 
       <section class="handoff">
-        <div><h2>下一步：M0 / M1 后，M2 首发、M3 并行。</h2><p>先完成双通道契约、迁移草案、独立 checkpoint、双源冻结流和无 Key Live Desk 原型；随后让 MCP 进入真实持续运行，同时用 mock server 完成 WebSocket 适配器。拿到 Secret-Key 后只补 live smoke，稳定形态是两路同级常开。</p></div>
+        <div><h2>M7 与本地验收已完成：补证闭环、连接入口与发布门禁可用。</h2><p>M0–M7 已完成双通道契约、迁移 6/7/8、真实 MCP、完整 WebSocket 工作器、确定性合流规则、可选 AI、API/SSE、分页与跨标签页同步的 Live Desk/Research Bridge、Connection Center、官方 Codex 订阅连接、官方捕获与人工审核、不可变链接重评、审计、隔离式 chaos soak、doctor 与运行手册。2026-07-31 的本地验收再次跑通 MCP → 规则 → Codex → Research Bridge。当前没有 Secret-Key，因此 WebSocket 只诚实声明合约测试完成、凭证化 live smoke/soak 待执行；它不是一个伪造的通过项，也不改变 MCP 的同级角色。</p></div>
         <div class="links"><a href="../ROADMAP.md">Roadmap</a><a href="V0_5_PLAN.md">v0.5 Plan</a><a href="V0_4_PLAN.md">v0.4 Dependencies</a><a href="DECISIONS.md">Decisions</a><button class="print" type="button" onclick="window.print()">打印 / 导出 PDF</button></div>
       </section>
     </main>
-    <footer><span>CapexGraph / v0.5.1 planning artifact</span><span>Research infrastructure · not autonomous trading</span><span>Last updated 2026-07-29</span></footer>
+    <footer><span>CapexGraph / v0.5.1 execution record</span><span>Research infrastructure · not autonomous trading</span><span>Last updated 2026-07-31</span></footer>
   </div>
   <script>
     const architecture=document.querySelector(".architecture");

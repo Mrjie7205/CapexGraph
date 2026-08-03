@@ -9,11 +9,25 @@ import {
   type ResearchRun,
   type SourceSuggestion,
 } from "./api";
+import { BilingualText, humanizeUiValue, translateUiValue } from "./UiText";
 
 interface SourceQueueProps {
   run: ResearchRun | null;
   onRunUpdated: (run: ResearchRun) => void;
   onError: (message: string) => void;
+}
+
+function sourceReasonLabel(value: string): string {
+  const fixed: Record<string, string> = {
+    "URL uses a recognized regulator domain.": "网址使用已识别的监管机构域名。",
+    "URL matches an issuer domain supplied for this run.": "网址与该研究登记的公司官网域名匹配。",
+    "User supplied this public URL; official ownership is not verified.":
+      "该公开网址由用户提供，官方归属尚未验证。",
+  };
+  if (fixed[value]) return fixed[value];
+  const edgar = value.match(/^Official EDGAR (.+) filing discovered for (.+)\.$/);
+  if (edgar) return `已为 ${edgar[2]} 发现 EDGAR 官方 ${edgar[1]} 申报文件。`;
+  return value;
 }
 
 export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
@@ -39,7 +53,7 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
     setTitle("");
     setIssuerDomain("");
     refresh().catch((reason) => {
-      onError(reason instanceof Error ? reason.message : "Source queue unavailable");
+      onError(reason instanceof Error ? reason.message : "官方来源队列暂不可用");
     });
   }, [run?.id]);
 
@@ -51,7 +65,7 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
       await discoverSecSources(run.id, identifier.trim() || undefined);
       await refresh();
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : "SEC discovery failed");
+      onError(reason instanceof Error ? reason.message : "SEC 文件发现失败");
     } finally {
       setQueueBusy(false);
     }
@@ -72,7 +86,7 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
       setTitle("");
       await refresh();
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : "Source suggestion failed");
+      onError(reason instanceof Error ? reason.message : "来源候选登记失败");
     } finally {
       setQueueBusy(false);
     }
@@ -92,7 +106,7 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
       await refresh();
     } catch (reason) {
       await refresh().catch(() => undefined);
-      onError(reason instanceof Error ? reason.message : "Source action failed");
+      onError(reason instanceof Error ? reason.message : "来源操作失败");
     } finally {
       setBusyId("");
     }
@@ -101,51 +115,56 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
   return (
     <section className="source-workspace panel" id="sources">
       <div className="panel-title">
-        <span>Official sources / Review queue</span>
-        <b>{items.length} SUGGESTIONS</b>
+        <BilingualText zh="官方来源 / 审核队列" en="Official sources / Review queue" />
+        <b>{items.length} 条候选<small>Suggestions</small></b>
       </div>
-      {!run && <p className="empty-state">Select a run before discovering official sources.</p>}
+      {!run && <p className="empty-state">请先选择研究任务，再发现官方来源。</p>}
       {run && (
         <>
           <div className="source-tools">
             <div>
-              <span className="tool-label">SEC / EDGAR discovery</span>
+              <BilingualText className="tool-label" zh="SEC / EDGAR 文件发现" en="SEC / EDGAR discovery" />
               <div className="source-tool-row">
                 <input
-                  aria-label="SEC ticker company or CIK"
-                  placeholder="Exact ticker, company, or CIK"
+                  aria-label="SEC 股票代码、公司名或 CIK"
+                  placeholder="准确的股票代码、公司名或 CIK"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
                 />
                 <button disabled={queueBusy} onClick={discover}>
-                  {queueBusy ? "Working…" : "Discover filings"}
+                  <BilingualText
+                    zh={queueBusy ? "正在发现…" : "发现监管文件"}
+                    en={queueBusy ? "Working…" : "Discover filings"}
+                    compact
+                    align="center"
+                  />
                 </button>
               </div>
-              <small>Suggestions remain untrusted until you capture and review them.</small>
+              <small>候选来源在完成捕获与人工审核前，不能作为可信证据。</small>
             </div>
             <form onSubmit={addManual}>
-              <span className="tool-label">Add issuer or regulator URL</span>
+              <BilingualText className="tool-label" zh="添加公司或监管机构网址" en="Add issuer or regulator URL" />
               <div className="manual-source-grid">
                 <input
-                  aria-label="Official source title"
-                  placeholder="Source title"
+                  aria-label="官方来源标题"
+                  placeholder="来源标题"
                   value={title}
                   onChange={(event) => setTitle(event.target.value)}
                 />
                 <input
-                  aria-label="Official source URL"
+                  aria-label="官方来源网址"
                   placeholder="https://…"
                   value={url}
                   onChange={(event) => setUrl(event.target.value)}
                 />
                 <input
-                  aria-label="Issuer domain"
-                  placeholder="Issuer domain (optional)"
+                  aria-label="公司官网域名"
+                  placeholder="公司官网域名（选填）"
                   value={issuerDomain}
                   onChange={(event) => setIssuerDomain(event.target.value)}
                 />
                 <button disabled={queueBusy || !title.trim() || !url.trim()}>
-                  Add to queue
+                  <BilingualText zh="加入队列" en="Add to queue" compact align="center" />
                 </button>
               </div>
             </form>
@@ -153,44 +172,46 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
           <div className="suggestion-list">
             {items.length === 0 && (
               <p className="empty-state">
-                No suggestions yet. Discover SEC filings or add a known official URL.
+                暂无来源候选。你可以发现 SEC 文件，或添加已知的官方网站。
               </p>
             )}
             {items.map((item) => (
               <article className={`suggestion-card ${item.status}`} key={item.id}>
                 <div className="suggestion-meta">
-                  <span>{item.authority}</span>
-                  <span>{item.kind}</span>
-                  <span>{item.status}</span>
+                  <span>{translateUiValue(item.authority)}<small>{humanizeUiValue(item.authority)}</small></span>
+                  <span>{translateUiValue(item.kind)}<small>{humanizeUiValue(item.kind)}</small></span>
+                  <span>{translateUiValue(item.status)}<small>{humanizeUiValue(item.status)}</small></span>
                 </div>
                 <div>
                   <strong>{item.title}</strong>
-                  <p>{item.reason}</p>
+                  <p>
+                    {sourceReasonLabel(item.reason)}
+                    {sourceReasonLabel(item.reason) !== item.reason && <small>{item.reason}</small>}
+                  </p>
                   <small>{item.provider}@{item.provider_version}</small>
                   {item.error && <small className="suggestion-error">{item.error}</small>}
-                  {item.duplicate_of && <small>Duplicate of {item.duplicate_of}</small>}
+                  {item.duplicate_of && <small>与 {item.duplicate_of} 重复 · Duplicate</small>}
                   {Number(item.metadata.duplicate_url_count ?? 0) > 0 && (
                     <small>
-                      Same canonical URL suggested{" "}
-                      {Number(item.metadata.duplicate_url_count)} more time(s)
+                      同一规范网址另被推荐 {Number(item.metadata.duplicate_url_count)} 次
                     </small>
                   )}
                 </div>
                 <div className="suggestion-actions">
-                  <a href={item.url} target="_blank" rel="noreferrer">Inspect ↗</a>
+                  <a href={item.url} target="_blank" rel="noreferrer">查看<small>Inspect ↗</small></a>
                   {item.status === "suggested" && (
                     <>
                       <button
                         disabled={busyId === item.id}
                         onClick={() => act(item, "capture")}
                       >
-                        Capture
+                        捕获<small>Capture</small>
                       </button>
                       <button
                         disabled={busyId === item.id}
                         onClick={() => act(item, "dismiss")}
                       >
-                        Dismiss
+                        忽略<small>Dismiss</small>
                       </button>
                     </>
                   )}
@@ -200,13 +221,13 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
                         disabled={busyId === item.id}
                         onClick={() => act(item, "retry")}
                       >
-                        Retry
+                        重试<small>Retry</small>
                       </button>
                       <button
                         disabled={busyId === item.id}
                         onClick={() => act(item, "dismiss")}
                       >
-                        Dismiss
+                        忽略<small>Dismiss</small>
                       </button>
                     </>
                   )}

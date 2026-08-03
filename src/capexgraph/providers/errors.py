@@ -122,7 +122,12 @@ def redact_provider_secrets(value: object) -> str:
 
     load_project_env()
     text = str(value)
-    for name in ("OPENAI_API_KEY", "CAPEXGRAPH_CODEX_PROXY_KEY"):
+    for name in (
+        "OPENAI_API_KEY",
+        "CAPEXGRAPH_CODEX_PROXY_KEY",
+        "JIN10_MCP_BEARER_TOKEN",
+        "JIN10_WEBSOCKET_SECRET_KEY",
+    ):
         secret = os.getenv(name, "")
         if secret:
             text = text.replace(secret, "[REDACTED]")
@@ -132,7 +137,7 @@ def redact_provider_secrets(value: object) -> str:
         text,
     )
     text = re.sub(
-        r"(?i)((?:api|proxy)[_-]?key\s*[=:]\s*)[^\s,;]+",
+        r"(?i)((?:api|proxy|secret)[_-]?key\s*[=:]\s*)[^\s,;]+",
         r"\1[REDACTED]",
         text,
     )
