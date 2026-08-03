@@ -1585,7 +1585,7 @@ def db_upgrade(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(
-        f"[green]Database ready[/green] {status.path} · schema {status.current_version}"
+        f"[green]Database ready[/green] · schema {status.current_version}\n{status.path}"
     )
 
 
