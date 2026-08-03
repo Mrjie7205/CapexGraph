@@ -21,9 +21,9 @@ starts one level earlier:
 The project is independent from `serenity-bottleneck-hunter`. That skill remains a self-contained,
 low-friction project; CapexGraph is a separate professional research system.
 
-## v0.3 capabilities
+## v0.5.1 capabilities
 
-CapexGraph `0.3.0` is an **alpha research workspace** with:
+CapexGraph `0.5.1` is a local-first **alpha research workspace** with:
 
 - seven-stage Theme and Anchor Scan agent workflows;
 - typed, schema-validated outputs and code-enforced integrity checks;
@@ -46,28 +46,23 @@ CapexGraph `0.3.0` is an **alpha research workspace** with:
   Cockpit;
 - report sections that distinguish reviewed facts, grounded inference, unverified hypotheses, and
   evidence gaps;
+- point-in-time CN/US/KR theme definitions, source lineage, historical membership, recognition
+  versus industrial-exposure separation, and deterministic universe snapshots;
+- EODHD multi-market daily history, Tushare A-share validation, explicit Yahoo/no-key paths,
+  exchange-session, suspension, adjustment, discontinuity, and cross-provider quality checks;
+- deterministic theme momentum, relative strength, breadth, participation, persistence,
+  dispersion, volatility, coverage, and versioned mainline-state assessments;
+- idempotent post-close monitor jobs, append-only state changes, and human-gated linked-research
+  proposals that do not spend model tokens by default;
+- SEC, CNINFO, SSE, SZSE, BSE, OpenDART, and KIND official-source adapters, conservative event
+  mapping, historical SEC shards, OpenDART filing facts, and reviewed disclosure-fact candidates;
+- a Chinese-first Mainline Desk and official-event workspace in the Cockpit; and
 - tests, multi-version CI, Windows bootstrap, and container setup.
 
 It produces research priorities for human review. It does not produce autonomous investment
 recommendations or execute trades.
 
-## v0.5 development preview
-
-The active v0.5 branch adds the first official-disclosure event-calendar vertical:
-
-- immutable `CorporateEventVersion` records with canonical entity, event type, lifecycle state,
-  official/public time, system-observed time, effective/expected dates, and source lineage;
-- SEC EDGAR filing discovery mapped conservatively into financial-report or regulatory-filing
-  events;
-- idempotent discovery plus a new version when guarded capture links the filing to Evidence;
-- current, full-history, date/type/state, and point-in-time event queries;
-- migration 5, `events.json`, run-manifest summaries, CLI, and API paths; and
-- repository-local `.env` loading across SEC, market, model, and ticker adapters, with
-  credential-safe configuration errors.
-
-This is a US-first foundation. It does not yet include CNINFO/SSE/SZSE/BSE, OpenDART/KIND, issuer
-calendars, filing-content event extraction, or event-triggered automated re-evaluation. See
-[the v0.5 execution plan](docs/V0_5_PLAN.md).
+## Live-event gateway
 
 The [v0.5.1 live-event gateway plan](docs/V0_5_1_PLAN.html) defines Jin10 MCP polling and Open
 Platform WebSocket as two equal-priority live information channels. M0-M7 are implemented:
@@ -92,23 +87,26 @@ creating a separate Evidence link. The credentialed WebSocket live soak remains 
 acceptance gate until its Secret-Key is available; it is not reported as a passing or fallback
 path.
 
-## v0.4 development preview
+The MCP channel can run independently. A missing Jin10 WebSocket Secret-Key remains an honest
+external acceptance gate and does not demote MCP or turn it into a fallback.
 
-The active v0.4 branch now contains the first market-data foundation slice:
+## Theme-to-research loop
 
-- provider-neutral daily-history contracts with explicit exchange, currency, timezone, raw close,
-  adjusted close, provider version, retrieval time, and source hash;
-- optional EODHD history for US, Shanghai, Shenzhen, KRX, and KOSDAQ, with Beijing Stock Exchange
-  reported as unsupported rather than returning an empty success;
-- the existing Yahoo adapter as an explicit no-key fallback;
-- deterministic checks for ordering, duplicates, OHLC validity, negative volume, adjusted-close
-  validity, future dates, and staleness;
-- idempotent SQLite bar storage and quality reports through schema migration 4; and
-- CLI, API, run-snapshot, and forward-tracking integration.
+The no-key acceptance path is available from the Cockpit's **主线雷达 / Mainline Desk** or CLI:
 
-Point-in-time theme membership, theme metrics, mainline policy, scheduling, and Cockpit views are
-still pending. See [the v0.4 execution plan](docs/V0_4_PLAN.md) and
-[market-data guide](docs/MARKET_DATA.md).
+```powershell
+capexgraph themes demo
+capexgraph mainline run-all --market CN --as-of 2026-08-03 --provider fixture-market
+```
+
+This loads a frozen three-market memory-semiconductor theme, reconstructs the point-in-time
+universe, calculates deterministic metrics, and records inspectable assessments and proposals.
+For real data, explicitly select EODHD or Tushare and provide only that provider's local
+credential. The bundled policy is deliberately labeled `experimental`; it is useful for research
+and regression testing, but is not a production-approved buy/sell rule.
+
+See [the v0.4 completion record](docs/V0_4_PLAN.md), [market-data guide](docs/MARKET_DATA.md),
+[the v0.5 completion record](docs/V0_5_PLAN.md), and [official-events guide](docs/OFFICIAL_EVENTS.md).
 
 ## Quick start
 
@@ -456,7 +454,8 @@ New contributors and coding agents should start with [AGENTS.md](AGENTS.md),
 [current status](docs/CURRENT_STATUS.md), and the [roadmap](ROADMAP.md).
 
 See [project context](docs/PROJECT_CONTEXT.md), [accepted decisions](docs/DECISIONS.md),
-[v0.4 execution plan](docs/V0_4_PLAN.md),
+[v0.6 next plan](docs/V0_6_PLAN.md), [v0.5 completion record](docs/V0_5_PLAN.md),
+[v0.4 completion record](docs/V0_4_PLAN.md), [official events](docs/OFFICIAL_EVENTS.md),
 [Theme Scan](docs/THEME_SCAN.md), [Anchor Scan](docs/ANCHOR_SCAN.md),
 [live research tools](docs/LIVE_RESEARCH.md), [forward tracking](docs/MONITORING.md),
 [MVP plan](docs/MVP.md), and [architecture](docs/ARCHITECTURE.md).

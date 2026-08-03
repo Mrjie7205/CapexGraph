@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 
 from capexgraph.domain import FinancialFact
 from capexgraph.financials.store import FinancialFactStore
-from capexgraph.providers.filings import FilingFactsProvider, SecCompanyFactsProvider
+from capexgraph.providers.filings import (
+    FilingFactsProvider,
+    OpenDartFinancialFactsProvider,
+    SecCompanyFactsProvider,
+)
 from capexgraph.runtime.artifacts import atomic_write_json
 from capexgraph.runtime.store import runs_dir
 from capexgraph.tools.evidence import CollectedDocument, attach_collected_document
@@ -130,6 +134,15 @@ class FinancialFactService:
             records.append(identity)
         save_run(current)
         return persisted
+
+    @staticmethod
+    def provider(name: str) -> FilingFactsProvider:
+        normalized = name.strip().lower().replace("_", "-")
+        if normalized in {"sec", "sec-companyfacts"}:
+            return SecCompanyFactsProvider()
+        if normalized in {"opendart", "opendart-financial-statements"}:
+            return OpenDartFinancialFactsProvider()
+        raise ValueError("Unknown financial provider. Choose sec or opendart.")
 
     def list(self, run_id: str) -> list[FinancialFact]:
         if load_run(run_id) is None:

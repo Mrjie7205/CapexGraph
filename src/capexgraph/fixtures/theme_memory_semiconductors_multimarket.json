@@ -1,0 +1,183 @@
+{
+  "fixture": {
+    "id": "memory-semiconductors-multimarket-v1",
+    "frozen_at": "2026-08-03T00:00:00Z",
+    "notice": "Synthetic, licensed-shaped history for deterministic tests and demos. Not current constituent data."
+  },
+  "theme": {
+    "theme_id": "memory-semiconductors",
+    "version": 1,
+    "name": "存储半导体",
+    "aliases": ["存储", "Memory Semiconductors", "DRAM", "NAND"],
+    "description": "用于验证跨市场点时主题、市场认知与产业暴露分离的冻结主题。",
+    "markets": ["CN", "US", "KR"],
+    "benchmark_tickers": {
+      "CN": "000300.SH",
+      "US": "SOXX.US",
+      "KR": "KOSPI.KO"
+    },
+    "valid_from": "2024-01-01",
+    "known_at": "2024-01-05T00:00:00Z",
+    "created_at": "2026-08-03T00:00:00Z",
+    "metadata": {
+      "fixture": true,
+      "current_research": false
+    }
+  },
+  "sources": [
+    {
+      "id": "theme-source-memory-cn-concept-fixture",
+      "name": "A股概念历史冻结样例",
+      "kind": "vendor",
+      "provider": "frozen-cn-concept-shaped",
+      "provider_version": "1",
+      "market": "CN",
+      "license": "Synthetic fixture; contains no licensed vendor dataset.",
+      "coverage": "partial",
+      "observed_at": "2024-01-05T00:00:00Z",
+      "metadata": {"fixture": true, "recognition_only": true},
+      "memberships": [
+        {
+          "ticker": "603986.SH",
+          "entity_name": "兆易创新",
+          "exchange": "SSE",
+          "role": "core",
+          "valid_from": "2024-01-01",
+          "known_at": "2024-01-05T00:00:00Z",
+          "recognition_score": 0.95
+        },
+        {
+          "ticker": "605358.SH",
+          "entity_name": "立昂微",
+          "exchange": "SSE",
+          "role": "material",
+          "valid_from": "2024-01-01",
+          "valid_to": "2024-12-31",
+          "known_at": "2024-01-05T00:00:00Z",
+          "recognition_score": 0.55
+        },
+        {
+          "ticker": "688019.SH",
+          "entity_name": "安集科技",
+          "exchange": "SSE STAR",
+          "role": "material",
+          "valid_from": "2024-05-01",
+          "known_at": "2024-04-30T08:00:00Z",
+          "observed_at": "2024-04-30T08:00:00Z",
+          "recognition_score": 0.42
+        },
+        {
+          "ticker": "688126.SH",
+          "entity_name": "沪硅产业",
+          "exchange": "SSE STAR",
+          "role": "material",
+          "valid_from": "2025-01-01",
+          "known_at": "2024-12-30T08:00:00Z",
+          "observed_at": "2024-12-30T08:00:00Z",
+          "recognition_score": 0.38
+        }
+      ]
+    },
+    {
+      "id": "theme-source-memory-us-fund-fixture",
+      "name": "美股基金历史冻结样例",
+      "kind": "etf",
+      "provider": "frozen-sec-nport-shaped",
+      "provider_version": "1",
+      "market": "US",
+      "license": "Synthetic fixture; contains no redistributed fund holdings.",
+      "coverage": "partial",
+      "observed_at": "2024-01-10T00:00:00Z",
+      "metadata": {"fixture": true, "recognition_only": true},
+      "memberships": [
+        {
+          "ticker": "MU.US",
+          "entity_name": "Micron Technology",
+          "exchange": "NASDAQ",
+          "role": "core",
+          "valid_from": "2024-01-01",
+          "known_at": "2024-01-10T00:00:00Z",
+          "membership_weight": 0.45,
+          "recognition_score": 1.0
+        },
+        {
+          "ticker": "AMAT.US",
+          "entity_name": "Applied Materials",
+          "exchange": "NASDAQ",
+          "role": "equipment",
+          "valid_from": "2024-01-01",
+          "known_at": "2024-01-10T00:00:00Z",
+          "membership_weight": 0.30,
+          "recognition_score": 0.72
+        },
+        {
+          "ticker": "LRCX.US",
+          "entity_name": "Lam Research",
+          "exchange": "NASDAQ",
+          "role": "equipment",
+          "valid_from": "2024-07-01",
+          "known_at": "2024-06-28T00:00:00Z",
+          "observed_at": "2024-06-28T00:00:00Z",
+          "membership_weight": 0.25,
+          "recognition_score": 0.70
+        }
+      ]
+    },
+    {
+      "id": "theme-source-memory-kr-index-fixture",
+      "name": "韩国指数历史冻结样例",
+      "kind": "index",
+      "provider": "frozen-krx-shaped",
+      "provider_version": "1",
+      "market": "KR",
+      "license": "Synthetic fixture; contains no redistributed KRX constituent file.",
+      "coverage": "partial",
+      "observed_at": "2024-01-08T00:00:00Z",
+      "metadata": {"fixture": true, "recognition_only": true},
+      "memberships": [
+        {
+          "ticker": "005930.KO",
+          "entity_name": "Samsung Electronics",
+          "exchange": "KRX",
+          "role": "core",
+          "valid_from": "2024-01-01",
+          "known_at": "2024-01-08T00:00:00Z",
+          "recognition_score": 1.0
+        },
+        {
+          "ticker": "000660.KO",
+          "entity_name": "SK hynix",
+          "exchange": "KRX",
+          "role": "core",
+          "valid_from": "2024-01-01",
+          "known_at": "2024-01-08T00:00:00Z",
+          "recognition_score": 1.0
+        }
+      ]
+    },
+    {
+      "id": "theme-source-memory-evidence-fixture",
+      "name": "经审核产业暴露冻结样例",
+      "kind": "evidence_graph",
+      "provider": "frozen-reviewed-evidence-shaped",
+      "provider_version": "1",
+      "market": "CN",
+      "license": "Synthetic evidence-graph fixture.",
+      "coverage": "partial",
+      "observed_at": "2024-06-15T00:00:00Z",
+      "metadata": {"fixture": true, "exposure_only": true},
+      "memberships": [
+        {
+          "ticker": "688019.SH",
+          "entity_name": "安集科技",
+          "exchange": "SSE STAR",
+          "role": "material",
+          "valid_from": "2024-06-01",
+          "known_at": "2024-06-15T00:00:00Z",
+          "recognition_score": 0.0,
+          "exposure_score": 0.90
+        }
+      ]
+    }
+  ]
+}

@@ -600,6 +600,268 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=9,
+        name="point_in_time_theme_registry",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS theme_definitions (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT,
+                known_at TEXT NOT NULL,
+                definition_hash TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, version),
+                UNIQUE(theme_id, definition_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_definitions_point_in_time
+            ON theme_definitions(theme_id, valid_from, valid_to, known_at)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS theme_sources (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                market TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, provider, market, content_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_sources_theme_market
+            ON theme_sources(theme_id, market, observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS theme_memberships (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                ticker TEXT NOT NULL,
+                market TEXT NOT NULL,
+                valid_from TEXT NOT NULL,
+                valid_to TEXT,
+                known_at TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                source_hash TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, source_id, ticker, valid_from, known_at),
+                FOREIGN KEY(source_id) REFERENCES theme_sources(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_memberships_point_in_time
+            ON theme_memberships(theme_id, market, valid_from, valid_to, known_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_memberships_ticker
+            ON theme_memberships(ticker, theme_id, valid_from)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS theme_universe_snapshots (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                definition_id TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                knowledge_cutoff TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                partial INTEGER NOT NULL,
+                generated_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, as_of_date, knowledge_cutoff, content_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_snapshots_date
+            ON theme_universe_snapshots(theme_id, as_of_date DESC, knowledge_cutoff DESC)
+            """,
+        ),
+    ),
+    Migration(
+        version=10,
+        name="mainline_metrics_jobs_and_proposals",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS theme_daily_metrics (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                snapshot_id TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                market TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                coverage_ratio REAL NOT NULL,
+                quality_status TEXT NOT NULL,
+                input_hash TEXT NOT NULL,
+                computed_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, market, as_of_date, provider, input_hash),
+                FOREIGN KEY(snapshot_id)
+                    REFERENCES theme_universe_snapshots(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_metrics_date
+            ON theme_daily_metrics(theme_id, market, as_of_date DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS mainline_policies (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                effective_from TEXT NOT NULL,
+                known_at TEXT NOT NULL,
+                experimental INTEGER NOT NULL,
+                policy_hash TEXT NOT NULL UNIQUE,
+                payload TEXT NOT NULL,
+                UNIQUE(name, version)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_mainline_policies_effective
+            ON mainline_policies(effective_from DESC, known_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS mainline_assessments (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                metric_id TEXT NOT NULL,
+                policy_id TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                state TEXT NOT NULL,
+                score REAL,
+                changed INTEGER NOT NULL,
+                input_hash TEXT NOT NULL,
+                assessed_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, as_of_date, policy_id, input_hash),
+                FOREIGN KEY(metric_id) REFERENCES theme_daily_metrics(id) ON DELETE RESTRICT,
+                FOREIGN KEY(policy_id) REFERENCES mainline_policies(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_mainline_assessments_theme_date
+            ON mainline_assessments(theme_id, as_of_date DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS mainline_state_events (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                assessment_id TEXT NOT NULL UNIQUE,
+                as_of_date TEXT NOT NULL,
+                from_state TEXT,
+                to_state TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                acknowledged_at TEXT,
+                payload TEXT NOT NULL,
+                FOREIGN KEY(assessment_id)
+                    REFERENCES mainline_assessments(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_mainline_events_theme_date
+            ON mainline_state_events(theme_id, as_of_date DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS theme_research_proposals (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                assessment_id TEXT NOT NULL,
+                action TEXT NOT NULL,
+                human_status TEXT NOT NULL,
+                auto_execute INTEGER NOT NULL,
+                run_id TEXT,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, assessment_id, action),
+                FOREIGN KEY(assessment_id)
+                    REFERENCES mainline_assessments(id) ON DELETE RESTRICT,
+                FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_theme_proposals_status
+            ON theme_research_proposals(human_status, created_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS monitor_jobs (
+                id TEXT PRIMARY KEY,
+                theme_id TEXT NOT NULL,
+                market TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                policy_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT,
+                payload TEXT NOT NULL,
+                UNIQUE(theme_id, market, as_of_date, policy_id),
+                FOREIGN KEY(policy_id) REFERENCES mainline_policies(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_monitor_jobs_status_date
+            ON monitor_jobs(status, as_of_date DESC)
+            """,
+        ),
+    ),
+    Migration(
+        version=11,
+        name="cross_provider_market_comparisons",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS market_comparison_reports (
+                id TEXT PRIMARY KEY,
+                ticker TEXT NOT NULL,
+                primary_provider TEXT NOT NULL,
+                reference_provider TEXT NOT NULL,
+                as_of_date TEXT NOT NULL,
+                status TEXT NOT NULL,
+                comparison_hash TEXT NOT NULL UNIQUE,
+                checked_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_market_comparisons_ticker_date
+            ON market_comparison_reports(ticker, as_of_date DESC)
+            """,
+        ),
+    ),
+    Migration(
+        version=12,
+        name="reviewed_disclosure_fact_candidates",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS disclosure_fact_candidates (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                evidence_id TEXT NOT NULL,
+                source_suggestion_id TEXT NOT NULL,
+                metric TEXT NOT NULL,
+                period_end TEXT NOT NULL,
+                value REAL NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                decided_at TEXT,
+                payload TEXT NOT NULL,
+                UNIQUE(run_id, evidence_id, metric, period_end, value),
+                FOREIGN KEY(run_id) REFERENCES runs(id) ON DELETE CASCADE,
+                FOREIGN KEY(source_suggestion_id)
+                    REFERENCES source_suggestions(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_disclosure_fact_candidates_run_status
+            ON disclosure_fact_candidates(run_id, status, created_at DESC)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """

@@ -74,6 +74,40 @@ class DataQualityStatus(StrEnum):
     FAIL = "fail"
 
 
+class ThemeSourceKind(StrEnum):
+    INDEX = "index"
+    ETF = "etf"
+    VENDOR = "vendor"
+    MANUAL = "manual"
+    EVIDENCE_GRAPH = "evidence_graph"
+
+
+class ThemeMembershipRole(StrEnum):
+    CORE = "core"
+    EQUIPMENT = "equipment"
+    MATERIAL = "material"
+    SUPPLIER = "supplier"
+    CUSTOMER = "customer"
+    OTHER = "other"
+
+
+class MainlineState(StrEnum):
+    INSUFFICIENT = "insufficient"
+    WATCH = "watch"
+    EMERGING = "emerging"
+    CONFIRMED = "confirmed"
+    FRAGILE = "fragile"
+    EXITED = "exited"
+
+
+class MonitorJobStatus(StrEnum):
+    RUNNING = "running"
+    SUCCESS = "success"
+    PARTIAL = "partial"
+    BLOCKED = "blocked"
+    FAILED = "failed"
+
+
 class CorporateEventType(StrEnum):
     REGULATORY_FILING = "regulatory_filing"
     FINANCIAL_REPORT = "financial_report"
@@ -95,6 +129,12 @@ class CorporateEventStatus(StrEnum):
     REVISED = "revised"
     OCCURRED = "occurred"
     CANCELLED = "cancelled"
+
+
+class ExtractionCandidateStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    REJECTED = "rejected"
 
 
 class LiveChannel(StrEnum):
@@ -306,6 +346,19 @@ class ProviderCapability(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class OfficialSourceCapability(BaseModel):
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    markets: list[str] = Field(default_factory=list)
+    official_domains: list[str] = Field(default_factory=list)
+    authentication: str = Field(min_length=1)
+    discovery: CoverageLevel
+    original_documents: CoverageLevel
+    history: CoverageLevel
+    license: str = Field(min_length=1)
+    notes: list[str] = Field(default_factory=list)
+
+
 class DataQualityIssue(BaseModel):
     code: str = Field(min_length=1)
     severity: QualitySeverity
@@ -345,6 +398,255 @@ class MarketSyncResult(BaseModel):
     quality: DataQualityResult
     persisted_bars: int = Field(ge=0)
     raw_path: str | None = None
+
+
+class MarketComparisonResult(BaseModel):
+    id: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    primary_provider: str = Field(min_length=1)
+    reference_provider: str = Field(min_length=1)
+    as_of_date: date
+    overlap_count: int = Field(ge=0)
+    primary_only_count: int = Field(ge=0)
+    reference_only_count: int = Field(ge=0)
+    max_close_diff_pct: float | None = Field(default=None, ge=0)
+    median_close_diff_pct: float | None = Field(default=None, ge=0)
+    status: DataQualityStatus
+    issues: list[DataQualityIssue] = Field(default_factory=list)
+    checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    comparison_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class ThemeDefinition(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    version: int = Field(ge=1)
+    name: str = Field(min_length=1)
+    aliases: list[str] = Field(default_factory=list)
+    description: str = ""
+    markets: list[str] = Field(default_factory=list)
+    benchmark_tickers: dict[str, str] = Field(default_factory=dict)
+    valid_from: date
+    valid_to: date | None = None
+    known_at: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    definition_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_definition_time(self) -> ThemeDefinition:
+        if self.known_at.tzinfo is None or self.created_at.tzinfo is None:
+            raise ValueError("theme timestamps must be timezone-aware")
+        self.known_at = self.known_at.astimezone(UTC)
+        self.created_at = self.created_at.astimezone(UTC)
+        if self.valid_to is not None and self.valid_to < self.valid_from:
+            raise ValueError("theme valid_to cannot precede valid_from")
+        return self
+
+
+class ThemeSource(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    kind: ThemeSourceKind
+    name: str = Field(min_length=1)
+    provider: str = Field(min_length=1)
+    provider_version: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    source_url: HttpUrl | None = None
+    license: str = Field(min_length=1)
+    coverage: CoverageLevel = CoverageLevel.PARTIAL
+    observed_at: datetime
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_source_time(self) -> ThemeSource:
+        if self.observed_at.tzinfo is None:
+            raise ValueError("theme source observed_at must be timezone-aware")
+        self.observed_at = self.observed_at.astimezone(UTC)
+        return self
+
+
+class ThemeMembership(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    source_id: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    entity_name: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    exchange: str = Field(min_length=2)
+    role: ThemeMembershipRole = ThemeMembershipRole.CORE
+    valid_from: date
+    valid_to: date | None = None
+    known_at: datetime
+    observed_at: datetime
+    membership_weight: float | None = Field(default=None, ge=0)
+    recognition_score: float = Field(default=0, ge=0, le=1)
+    exposure_score: float | None = Field(default=None, ge=0, le=1)
+    source_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_membership_time(self) -> ThemeMembership:
+        if self.known_at.tzinfo is None or self.observed_at.tzinfo is None:
+            raise ValueError("membership timestamps must be timezone-aware")
+        self.known_at = self.known_at.astimezone(UTC)
+        self.observed_at = self.observed_at.astimezone(UTC)
+        if self.known_at > self.observed_at:
+            raise ValueError("membership cannot be observed before it became knowable")
+        if self.valid_to is not None and self.valid_to < self.valid_from:
+            raise ValueError("membership valid_to cannot precede valid_from")
+        return self
+
+
+class ThemeUniverseMember(BaseModel):
+    ticker: str = Field(min_length=1)
+    entity_name: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    exchange: str = Field(min_length=2)
+    roles: list[ThemeMembershipRole] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    recognition_score: float = Field(ge=0, le=1)
+    exposure_score: float | None = Field(default=None, ge=0, le=1)
+    weight: float | None = Field(default=None, ge=0)
+
+
+class ThemeUniverseSnapshot(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    definition_id: str = Field(min_length=1)
+    as_of_date: date
+    knowledge_cutoff: datetime
+    members: list[ThemeUniverseMember] = Field(default_factory=list)
+    source_ids: list[str] = Field(default_factory=list)
+    partial: bool = False
+    missing_sources: list[str] = Field(default_factory=list)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    content_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_snapshot_time(self) -> ThemeUniverseSnapshot:
+        if self.knowledge_cutoff.tzinfo is None or self.generated_at.tzinfo is None:
+            raise ValueError("snapshot timestamps must be timezone-aware")
+        self.knowledge_cutoff = self.knowledge_cutoff.astimezone(UTC)
+        self.generated_at = self.generated_at.astimezone(UTC)
+        return self
+
+
+class ThemeDailyMetric(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    snapshot_id: str = Field(min_length=1)
+    as_of_date: date
+    market: str = Field(min_length=2)
+    provider: str = Field(min_length=1)
+    benchmark_ticker: str = Field(min_length=1)
+    weighting: str = Field(pattern=r"^(equal|median|source_weight)$")
+    return_20d: float | None = None
+    return_60d: float | None = None
+    benchmark_return_20d: float | None = None
+    relative_strength_20d: float | None = None
+    breadth_above_20d: float | None = Field(default=None, ge=0, le=1)
+    positive_participation_20d: float | None = Field(default=None, ge=0, le=1)
+    dispersion_20d: float | None = Field(default=None, ge=0)
+    annualized_volatility: float | None = Field(default=None, ge=0)
+    persistence_ratio: float | None = Field(default=None, ge=0, le=1)
+    sample_count: int = Field(ge=0)
+    missing_count: int = Field(ge=0)
+    coverage_ratio: float = Field(ge=0, le=1)
+    quality_status: DataQualityStatus
+    issues: list[str] = Field(default_factory=list)
+    member_returns: dict[str, float | None] = Field(default_factory=dict)
+    computed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_metric_time(self) -> ThemeDailyMetric:
+        if self.computed_at.tzinfo is None:
+            raise ValueError("metric computed_at must be timezone-aware")
+        self.computed_at = self.computed_at.astimezone(UTC)
+        return self
+
+
+class MainlinePolicy(BaseModel):
+    id: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    version: int = Field(ge=1)
+    effective_from: date
+    known_at: datetime
+    weights: dict[str, float]
+    thresholds: dict[str, float]
+    min_coverage_ratio: float = Field(ge=0, le=1)
+    min_sample_count: int = Field(ge=1)
+    experimental: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    policy_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def validate_policy(self) -> MainlinePolicy:
+        if self.known_at.tzinfo is None or self.created_at.tzinfo is None:
+            raise ValueError("policy timestamps must be timezone-aware")
+        self.known_at = self.known_at.astimezone(UTC)
+        self.created_at = self.created_at.astimezone(UTC)
+        if not self.weights or sum(self.weights.values()) <= 0:
+            raise ValueError("mainline policy requires positive weights")
+        return self
+
+
+class MainlineAssessment(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    metric_id: str = Field(min_length=1)
+    policy_id: str = Field(min_length=1)
+    as_of_date: date
+    state: MainlineState
+    previous_state: MainlineState | None = None
+    score: float | None = Field(default=None, ge=0, le=100)
+    changed: bool = False
+    reasons: list[str] = Field(default_factory=list)
+    blockers: list[str] = Field(default_factory=list)
+    component_scores: dict[str, float] = Field(default_factory=dict)
+    assessed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class MainlineStateEvent(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    assessment_id: str = Field(min_length=1)
+    as_of_date: date
+    from_state: MainlineState | None = None
+    to_state: MainlineState
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    acknowledged_at: datetime | None = None
+
+
+class ThemeResearchProposal(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    assessment_id: str = Field(min_length=1)
+    action: str = Field(pattern=r"^(theme_scan|reevaluate_candidates)$")
+    human_status: ProposalHumanStatus = ProposalHumanStatus.PENDING
+    auto_execute: bool = False
+    run_id: str | None = None
+    reason: str = Field(min_length=1)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class MonitorJob(BaseModel):
+    id: str = Field(min_length=1)
+    theme_id: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    as_of_date: date
+    policy_id: str = Field(min_length=1)
+    status: MonitorJobStatus
+    steps: dict[str, str] = Field(default_factory=dict)
+    started_at: datetime
+    completed_at: datetime | None = None
+    error: str = ""
+    assessment_id: str | None = None
+    proposal_id: str | None = None
+    artifact_path: str | None = None
 
 
 class CorporateEventVersion(BaseModel):
@@ -941,6 +1243,32 @@ class FinancialFact(BaseModel):
         elif self.formula or self.input_fact_ids:
             raise ValueError("only derived financial facts may declare formula inputs")
         return self
+
+
+class DisclosureFactCandidate(BaseModel):
+    id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    evidence_id: str = Field(min_length=1)
+    source_suggestion_id: str = Field(min_length=1)
+    company: str = Field(min_length=1)
+    ticker: str = Field(min_length=1)
+    market: str = Field(min_length=2)
+    statement: FinancialStatement
+    metric: str = Field(min_length=1)
+    concept: str = Field(min_length=1)
+    period_end: date
+    fiscal_year: int | None = None
+    fiscal_period: str | None = None
+    value: float
+    unit: str = Field(min_length=1)
+    source_locator: str = Field(min_length=1)
+    excerpt: str = Field(min_length=1)
+    confidence: float = Field(ge=0, le=1)
+    status: ExtractionCandidateStatus = ExtractionCandidateStatus.PENDING
+    validation_notes: list[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    decided_at: datetime | None = None
+    fact_id: str | None = None
 
 
 class SupplyChainNode(BaseModel):

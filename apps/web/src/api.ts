@@ -157,6 +157,28 @@ export interface FinancialFact {
   input_fact_ids: string[];
 }
 
+export interface DisclosureFactCandidate {
+  id: string;
+  run_id: string;
+  evidence_id: string;
+  company: string;
+  ticker: string;
+  market: string;
+  statement: string;
+  metric: string;
+  concept: string;
+  period_end: string;
+  fiscal_period?: string;
+  value: number;
+  unit: string;
+  source_locator: string;
+  excerpt: string;
+  confidence: number;
+  status: "pending" | "accepted" | "rejected";
+  validation_notes: string[];
+  fact_id?: string;
+}
+
 export type SourceSuggestionStatus =
   | "suggested"
   | "selected"
@@ -185,6 +207,165 @@ export interface SourceSuggestion {
   duplicate_of?: string;
   error: string;
   metadata: Record<string, unknown>;
+}
+
+export interface CorporateEvent {
+  id: string;
+  event_key: string;
+  version: number;
+  entity_name: string;
+  ticker?: string;
+  market: string;
+  event_type: string;
+  status: string;
+  title: string;
+  announced_date?: string;
+  expected_date?: string;
+  effective_date?: string;
+  known_at: string;
+  observed_at: string;
+  source_suggestion_id?: string;
+  evidence_id?: string;
+  source_url: string;
+  source_hash?: string;
+  provider: string;
+  provider_version: string;
+}
+
+export interface OfficialSourceCapability {
+  provider: string;
+  provider_version: string;
+  markets: string[];
+  official_domains: string[];
+  authentication: string;
+  discovery: string;
+  original_documents: string;
+  history: string;
+  license: string;
+  notes: string[];
+}
+
+export interface ThemeDefinition {
+  id: string;
+  theme_id: string;
+  version: number;
+  name: string;
+  aliases: string[];
+  description: string;
+  markets: string[];
+  benchmark_tickers: Record<string, string>;
+  valid_from: string;
+  valid_to?: string;
+  known_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ThemeSource {
+  id: string;
+  theme_id: string;
+  name: string;
+  kind: "index" | "etf" | "vendor" | "manual" | "evidence_graph";
+  provider: string;
+  provider_version: string;
+  market: string;
+  license: string;
+  coverage: string;
+  observed_at: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ThemeMembership {
+  id: string;
+  theme_id: string;
+  source_id: string;
+  ticker: string;
+  entity_name: string;
+  market: string;
+  exchange: string;
+  role: string;
+  valid_from: string;
+  valid_to?: string;
+  known_at: string;
+  recognition_score: number;
+  exposure_score?: number;
+  membership_weight?: number;
+  evidence_ids: string[];
+}
+
+export interface MainlineMetric {
+  id: string;
+  theme_id: string;
+  as_of_date: string;
+  market: string;
+  provider: string;
+  benchmark_ticker: string;
+  return_20d?: number;
+  return_60d?: number;
+  relative_strength_20d?: number;
+  breadth_above_20d?: number;
+  positive_participation_20d?: number;
+  dispersion_20d?: number;
+  annualized_volatility?: number;
+  persistence_ratio?: number;
+  sample_count: number;
+  missing_count: number;
+  coverage_ratio: number;
+  quality_status: string;
+  issues: string[];
+  member_returns: Record<string, number | undefined>;
+}
+
+export interface MainlineAssessmentRecord {
+  id: string;
+  theme_id: string;
+  metric_id: string;
+  policy_id: string;
+  as_of_date: string;
+  state: string;
+  previous_state?: string;
+  score?: number;
+  changed: boolean;
+  reasons: string[];
+  blockers: string[];
+  component_scores: Record<string, number>;
+}
+
+export interface MainlinePolicy {
+  id: string;
+  name: string;
+  version: number;
+  effective_from: string;
+  weights: Record<string, number>;
+  thresholds: Record<string, number>;
+  min_coverage_ratio: number;
+  min_sample_count: number;
+  experimental: boolean;
+  policy_hash: string;
+}
+
+export interface MonitorJob {
+  id: string;
+  theme_id: string;
+  market: string;
+  as_of_date: string;
+  policy_id: string;
+  status: string;
+  steps: Record<string, string>;
+  error: string;
+  assessment_id?: string;
+  proposal_id?: string;
+}
+
+export interface ThemeResearchProposal {
+  id: string;
+  theme_id: string;
+  assessment_id: string;
+  action: "theme_scan" | "reevaluate_candidates";
+  human_status: "pending" | "accepted" | "rejected";
+  auto_execute: boolean;
+  run_id?: string;
+  reason: string;
+  created_at: string;
 }
 
 export interface Candidate {
@@ -662,6 +843,38 @@ export function extractFinancialFacts(
   });
 }
 
+export function previewReviewedDisclosureFacts(
+  runId: string,
+  evidenceId: string,
+): Promise<DisclosureFactCandidate[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/financials/preview-reviewed`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ evidence_id: evidenceId }),
+  });
+}
+
+export function listDisclosureFactCandidates(
+  runId: string,
+): Promise<DisclosureFactCandidate[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/financials/candidates`);
+}
+
+export function decideDisclosureFactCandidate(
+  runId: string,
+  candidateId: string,
+  accepted: boolean,
+): Promise<DisclosureFactCandidate> {
+  return request(
+    `/api/v1/runs/${encodeURIComponent(runId)}/financials/candidates/${encodeURIComponent(candidateId)}/decision`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accepted }),
+    },
+  );
+}
+
 export function reportUrl(runId: string): string {
   return `/api/v1/runs/${encodeURIComponent(runId)}/report`;
 }
@@ -686,14 +899,123 @@ export function listSourceSuggestions(runId: string): Promise<SourceSuggestion[]
   return request(`/api/v1/runs/${encodeURIComponent(runId)}/sources`);
 }
 
-export function discoverSecSources(
+export function discoverOfficialSources(
   runId: string,
+  provider: "sec" | "cninfo" | "sse" | "szse" | "bse" | "opendart" | "kind",
   identifier?: string,
 ): Promise<SourceSuggestion[]> {
   return request(`/api/v1/runs/${encodeURIComponent(runId)}/sources/discover`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ provider: "sec", identifier: identifier || undefined, limit: 10 }),
+    body: JSON.stringify({ provider, identifier: identifier || undefined, limit: 10 }),
+  });
+}
+
+export function discoverOfficialEvents(
+  runId: string,
+  provider: "sec" | "cninfo" | "sse" | "szse" | "bse" | "opendart" | "kind",
+  identifier?: string,
+): Promise<CorporateEvent[]> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}/events/discover`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ provider, identifier: identifier || undefined, limit: 10 }),
+  });
+}
+
+export function listCorporateEvents(runId: string, history = false): Promise<CorporateEvent[]> {
+  return request(
+    `/api/v1/runs/${encodeURIComponent(runId)}/events?history=${history ? "true" : "false"}`,
+  );
+}
+
+export function listOfficialSourceCapabilities(): Promise<OfficialSourceCapability[]> {
+  return request("/api/v1/official/providers");
+}
+
+export function importMainlineDemo(): Promise<Record<string, unknown>> {
+  return request("/api/v1/themes/fixture", { method: "POST" });
+}
+
+export function listThemes(): Promise<ThemeDefinition[]> {
+  return request("/api/v1/themes");
+}
+
+export function listThemeSources(themeId: string): Promise<ThemeSource[]> {
+  return request(`/api/v1/themes/${encodeURIComponent(themeId)}/sources`);
+}
+
+export function listThemeMemberships(
+  themeId: string,
+  asOf: string,
+  market: string,
+): Promise<ThemeMembership[]> {
+  const query = new URLSearchParams({ as_of: asOf, market }).toString();
+  return request(`/api/v1/themes/${encodeURIComponent(themeId)}/memberships?${query}`);
+}
+
+export function syncMarketHistory(
+  tickers: string[],
+  provider: "eodhd" | "tushare" | "yahoo",
+  days = 400,
+): Promise<Array<Record<string, unknown>>> {
+  return request("/api/v1/market/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tickers, provider, days }),
+  });
+}
+
+export function runMainlineMonitor(input: {
+  theme_id: string;
+  market: string;
+  as_of_date: string;
+  provider: string;
+  weighting?: string;
+}): Promise<MonitorJob> {
+  return request("/api/v1/mainline/run", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ weighting: "equal", ...input }),
+  });
+}
+
+export function listMainlineMetrics(
+  themeId: string,
+  market: string,
+): Promise<MainlineMetric[]> {
+  const query = new URLSearchParams({ theme_id: themeId, market }).toString();
+  return request(`/api/v1/mainline/metrics?${query}`);
+}
+
+export function listMainlineAssessments(
+  themeId: string,
+): Promise<MainlineAssessmentRecord[]> {
+  return request(`/api/v1/mainline/assessments?theme_id=${encodeURIComponent(themeId)}`);
+}
+
+export function listMainlinePolicies(): Promise<MainlinePolicy[]> {
+  return request("/api/v1/mainline/policies");
+}
+
+export function listMainlineJobs(): Promise<MonitorJob[]> {
+  return request("/api/v1/mainline/jobs");
+}
+
+export function listMainlineProposals(
+  themeId: string,
+): Promise<ThemeResearchProposal[]> {
+  return request(`/api/v1/mainline/proposals?theme_id=${encodeURIComponent(themeId)}`);
+}
+
+export function decideMainlineProposal(
+  proposalId: string,
+  accepted: boolean,
+): Promise<ThemeResearchProposal> {
+  return request(`/api/v1/mainline/proposals/${encodeURIComponent(proposalId)}/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accepted }),
   });
 }
 

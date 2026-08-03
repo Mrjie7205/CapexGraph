@@ -13,6 +13,7 @@ def test_cross_session_handoff_files_exist() -> None:
     required = [
         "AGENTS.md",
         "ROADMAP.md",
+        "docs/V0_6_PLAN.md",
         "docs/V0_5_PLAN.md",
         "docs/V0_5_1_PLAN.html",
         "docs/V0_4_PLAN.md",
@@ -24,6 +25,7 @@ def test_cross_session_handoff_files_exist() -> None:
         "docs/LIVE_EVENTS.md",
         "docs/LIVE_OPERATIONS.md",
         "docs/MARKET_DATA.md",
+        "docs/OFFICIAL_EVENTS.md",
         "SECURITY.md",
         "CONTRIBUTING.md",
         ".github/pull_request_template.md",
@@ -54,13 +56,13 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
     assert __version__ == package_version == web_version
     assert f"v{__version__}" in roadmap
     assert f"v{__version__}" in status
-    assert "Catalyst Scan is only a scaffold" in status
+    assert "Consensus history and revision breadth do not exist yet" in status
     assert "M3 does not give the model" not in theme_doc
     assert all(issue in v03_plan for issue in ("#4", "#5", "#6", "#7"))
     assert all(milestone in v04_plan for milestone in ("M0", "M1", "M2", "M3", "M4", "M5"))
     assert all(term in v04_plan for term in ("EODHD", "recognition_score", "exposure_score"))
     assert "Catalyst Scan" in v04_plan and "v0.7" in v04_plan
-    assert "cross-market data foundation and mainline monitoring" in status
+    assert "v0.4 market, themes, and mainline monitoring" in status
     assert all(
         term in v05_plan
         for term in (
@@ -71,7 +73,7 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
             "OpenDART",
         )
     )
-    assert "v0.5" in status and "official disclosure events" in status
+    assert "v0.5" in status and "official disclosures, events, and facts" in status
     assert all(
         term in v051_plan
         for term in (
@@ -81,8 +83,8 @@ def test_handoff_version_and_capability_boundaries_do_not_drift() -> None:
             "MCP 与 WebSocket 同级",
         )
     )
-    assert "MCP is live-verified" in status
-    assert "M0 through M7 are implemented in code" in status
+    assert "Jin10 MCP and Open Platform WebSocket are equal-priority" in status
+    assert "real Jin10 WebSocket live soak remains `WAIT KEY`" in status
     assert all(
         term in market_data
         for term in ("EODHD_API_TOKEN", "adjusted_close", "unsupported", "quality")

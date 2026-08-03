@@ -2,10 +2,12 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   captureSourceSuggestion,
   dismissSourceSuggestion,
-  discoverSecSources,
+  discoverOfficialEvents,
   getRun,
+  listCorporateEvents,
   listSourceSuggestions,
   suggestManualSource,
+  type CorporateEvent,
   type ResearchRun,
   type SourceSuggestion,
 } from "./api";
@@ -32,6 +34,10 @@ function sourceReasonLabel(value: string): string {
 
 export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
   const [items, setItems] = useState<SourceSuggestion[]>([]);
+  const [events, setEvents] = useState<CorporateEvent[]>([]);
+  const [sourceProvider, setSourceProvider] = useState<
+    "sec" | "cninfo" | "sse" | "szse" | "bse" | "opendart" | "kind"
+  >("sec");
   const [identifier, setIdentifier] = useState("");
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
@@ -42,9 +48,15 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
   async function refresh() {
     if (!run) {
       setItems([]);
+      setEvents([]);
       return;
     }
-    setItems(await listSourceSuggestions(run.id));
+    const [suggestions, calendar] = await Promise.all([
+      listSourceSuggestions(run.id),
+      listCorporateEvents(run.id),
+    ]);
+    setItems(suggestions);
+    setEvents(calendar);
   }
 
   useEffect(() => {
@@ -52,6 +64,7 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
     setUrl("");
     setTitle("");
     setIssuerDomain("");
+    setSourceProvider(run?.market === "CN" ? "cninfo" : run?.market === "KR" ? "opendart" : "sec");
     refresh().catch((reason) => {
       onError(reason instanceof Error ? reason.message : "官方来源队列暂不可用");
     });
@@ -62,10 +75,10 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
     setQueueBusy(true);
     onError("");
     try {
-      await discoverSecSources(run.id, identifier.trim() || undefined);
+      await discoverOfficialEvents(run.id, sourceProvider, identifier.trim() || undefined);
       await refresh();
     } catch (reason) {
-      onError(reason instanceof Error ? reason.message : "SEC 文件发现失败");
+      onError(reason instanceof Error ? reason.message : "官方公告发现失败");
     } finally {
       setQueueBusy(false);
     }
@@ -123,18 +136,36 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
         <>
           <div className="source-tools">
             <div>
-              <BilingualText className="tool-label" zh="SEC / EDGAR 文件发现" en="SEC / EDGAR discovery" />
+              <BilingualText className="tool-label" zh="跨市场官方公告发现" en="Cross-market official discovery" />
+              <select
+                aria-label="官方公告来源"
+                className="source-provider-select"
+                value={sourceProvider}
+                onChange={(event) => setSourceProvider(event.target.value as typeof sourceProvider)}
+              >
+                {run.market === "US" && <option value="sec">美国 SEC / EDGAR</option>}
+                {run.market === "CN" && <>
+                  <option value="cninfo">巨潮资讯 CNINFO</option>
+                  <option value="sse">上海证券交易所</option>
+                  <option value="szse">深圳证券交易所</option>
+                  <option value="bse">北京证券交易所</option>
+                </>}
+                {run.market === "KR" && <>
+                  <option value="opendart">韩国 OpenDART</option>
+                  <option value="kind">韩国交易所 KIND</option>
+                </>}
+              </select>
               <div className="source-tool-row">
                 <input
-                  aria-label="SEC 股票代码、公司名或 CIK"
-                  placeholder="准确的股票代码、公司名或 CIK"
+                  aria-label="股票代码、公司名或官方登记号"
+                  placeholder="股票代码、公司名、CIK 或 corp_code"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
                 />
                 <button disabled={queueBusy} onClick={discover}>
                   <BilingualText
                     zh={queueBusy ? "正在发现…" : "发现监管文件"}
-                    en={queueBusy ? "Working…" : "Discover filings"}
+                    en={queueBusy ? "Working…" : "Discover disclosures"}
                     compact
                     align="center"
                   />
@@ -172,7 +203,7 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
           <div className="suggestion-list">
             {items.length === 0 && (
               <p className="empty-state">
-                暂无来源候选。你可以发现 SEC 文件，或添加已知的官方网站。
+                暂无来源候选。你可以发现当前市场的官方公告，或添加已知的官方网站。
               </p>
             )}
             {items.map((item) => (
@@ -232,6 +263,29 @@ export function SourceQueue({ run, onRunUpdated, onError }: SourceQueueProps) {
                     </>
                   )}
                 </div>
+              </article>
+            ))}
+          </div>
+          <div className="event-ledger">
+            <div className="event-ledger-head">
+              <BilingualText zh="官方事件时间线" en="Official event timeline" />
+              <span>{events.length} 个当前版本</span>
+            </div>
+            {events.length === 0 && (
+              <p className="empty-state">捕获官方公告后，规范化事件及其 Evidence 链会显示在这里。</p>
+            )}
+            {events.map((item) => (
+              <article className="event-row" key={item.id}>
+                <time>{item.effective_date ?? item.expected_date ?? item.announced_date ?? "日期待核"}</time>
+                <div>
+                  <strong>{item.title}</strong>
+                  <small>{item.entity_name} · {item.ticker ?? item.market}</small>
+                </div>
+                <span>{translateUiValue(item.event_type)}<small>{item.event_type}</small></span>
+                <span className={item.evidence_id ? "event-linked" : "event-pending"}>
+                  {item.evidence_id ? "证据已连接" : "仅元数据"}
+                  <small>{item.evidence_id ? `Evidence · v${item.version}` : `Metadata · v${item.version}`}</small>
+                </span>
               </article>
             ))}
           </div>

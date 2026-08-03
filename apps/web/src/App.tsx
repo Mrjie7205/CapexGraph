@@ -2,18 +2,22 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
   createRun,
   captureTrackingSnapshot,
+  decideDisclosureFactCandidate,
   evidenceTextUrl,
   executeRun,
   getDecision,
   getRun,
   isProvider,
+  listDisclosureFactCandidates,
   listModelProviders,
   listRuns,
   listTracking,
+  previewReviewedDisclosureFacts,
   reviewEvidence,
   setTrackingStage,
   trackCandidate,
   type DecisionArtifact,
+  type DisclosureFactCandidate,
   type EvidenceMode,
   type ModelProviderStatus,
   type Provider,
@@ -25,6 +29,7 @@ import {
 import { ResearchReadiness } from "./ResearchReadiness";
 import { SourceQueue } from "./SourceQueue";
 import { LiveDesk } from "./LiveDesk";
+import { MainlineDesk } from "./MainlineDesk";
 import { ConnectionCenter } from "./ConnectionCenter";
 import { subscribeSync } from "./sync";
 import {
@@ -128,6 +133,7 @@ function App() {
   const [modelProviders, setModelProviders] = useState<ModelProviderStatus[]>([]);
   const [selected, setSelected] = useState<ResearchRun | null>(null);
   const [decision, setDecision] = useState<DecisionArtifact | null>(null);
+  const [factCandidates, setFactCandidates] = useState<DisclosureFactCandidate[]>([]);
   const [tracking, setTracking] = useState<Scorecard[]>([]);
   const [busy, setBusy] = useState(false);
   const [polling, setPolling] = useState(false);
@@ -187,6 +193,14 @@ function App() {
     if (!selected || selected.status !== "needs_review") return;
     getDecision(selected.id).then(setDecision).catch(() => undefined);
   }, [selected?.id, selected?.status]);
+
+  useEffect(() => {
+    if (!selected) {
+      setFactCandidates([]);
+      return;
+    }
+    listDisclosureFactCandidates(selected.id).then(setFactCandidates).catch(() => setFactCandidates([]));
+  }, [selected?.id]);
 
   async function startRun(run: ResearchRun, resume = false, until?: string) {
     const persistedProvider = run.manifest.model_provider;
@@ -292,6 +306,34 @@ function App() {
     }
   }
 
+  async function previewFacts(evidenceId: string) {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      await previewReviewedDisclosureFacts(selected.id, evidenceId);
+      setFactCandidates(await listDisclosureFactCandidates(selected.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "财务事实候选提取失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decideFactCandidate(candidateId: string, accepted: boolean) {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    try {
+      await decideDisclosureFactCandidate(selected.id, candidateId, accepted);
+      setFactCandidates(await listDisclosureFactCandidates(selected.id));
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "财务事实候选处理失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function addToTracking(nodeId: string) {
     if (!selected) return;
     setBusy(true);
@@ -358,6 +400,7 @@ function App() {
         </a>
         <nav aria-label="主导航">
           <a className="active" href="#live"><BilingualText zh="实时台" en="Live Desk" compact align="center" /></a>
+          <a href="#mainline"><BilingualText zh="主线" en="Mainline" compact align="center" /></a>
           <a href="#runs"><BilingualText zh="研究" en="Runs" compact align="center" /></a>
           <a href="#sources"><BilingualText zh="来源" en="Sources" compact align="center" /></a>
           <a href="#graph"><BilingualText zh="关系图" en="Graph" compact align="center" /></a>
@@ -441,6 +484,8 @@ function App() {
       </section>
 
       <LiveDesk onOpenConnections={() => setConnectionsOpen(true)} />
+
+      <MainlineDesk onError={setError} />
 
       <section className="workbench" id="runs">
         <article className="pipeline panel">
@@ -534,11 +579,39 @@ function App() {
                   <button onClick={() => review(item.id, true)}>批准<small>Approve</small></button>
                   <button onClick={() => review(item.id, false)}>拒绝<small>Reject</small></button>
                 </>}
+                {item.status === "reviewed" && item.local_path?.startsWith("sources/") && (
+                  <button disabled={busy} onClick={() => previewFacts(item.id)}>
+                    提取财务候选<small>Preview facts</small>
+                  </button>
+                )}
               </div>
             </div>
           ))}
           {selected && selected.evidence.length === 0 && <p className="empty-state">请先捕获官方来源；也可使用部分模式带缺口执行，仅生成低置信研究线索。</p>}
           {!selected && <p className="empty-state">请选择研究任务以查看证据台账。</p>}
+          {selected && factCandidates.length > 0 && (
+            <div className="fact-candidate-ledger">
+              <div className="event-ledger-head">
+                <BilingualText zh="财务事实候选 / 人工确认" en="Financial fact candidates / Human review" />
+                <span>{factCandidates.filter((item) => item.status === "pending").length} 条待确认</span>
+              </div>
+              {factCandidates.map((item) => (
+                <article className="fact-candidate-row" key={item.id}>
+                  <div>
+                    <strong>{item.metric}</strong>
+                    <small>{item.ticker} · {item.period_end} · {item.source_locator}</small>
+                  </div>
+                  <span>{new Intl.NumberFormat("zh-CN", { maximumFractionDigits: 2 }).format(item.value)} {item.unit}</span>
+                  <p>{item.excerpt}</p>
+                  <i>{translateUiValue(item.status)}</i>
+                  {item.status === "pending" && <div>
+                    <button disabled={busy} onClick={() => decideFactCandidate(item.id, true)}>确认</button>
+                    <button disabled={busy} onClick={() => decideFactCandidate(item.id, false)}>拒绝</button>
+                  </div>}
+                </article>
+              ))}
+            </div>
+          )}
         </article>
 
         <article className="radar panel" id="radar">

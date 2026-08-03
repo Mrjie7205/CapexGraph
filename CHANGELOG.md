@@ -4,6 +4,28 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- No unreleased changes.
+
+## 0.5.1 — 2026-08-03
+
+- completed point-in-time theme definitions, source lineage, historical membership, universe
+  snapshots, and recognition-versus-industrial-exposure separation across CN/US/KR fixtures;
+- completed deterministic mainline metrics, versioned experimental policy, append-only state
+  changes, idempotent batch jobs, official-event triggers, and human-gated research proposals;
+- added Tushare A-share history/validation, exchange-session, suspension, adjustment and extreme-
+  return checks, plus persisted cross-provider comparisons alongside EODHD/Yahoo/fixture paths;
+- added the Chinese-first Mainline Desk with provider, source, coverage, quality, metric, state,
+  job, and proposal controls;
+- completed SEC historical shard loading, CNINFO/SSE/SZSE/BSE and OpenDART/KIND official-source
+  adapters, cross-market conservative event mapping, and provider capability reporting;
+- added OpenDART official financial facts and deterministic reviewed-disclosure fact candidates
+  that require explicit human acceptance before entering immutable financial history;
+- integrated official discovery, event timelines, Evidence review, fact decisions, and event-
+  triggered mainline proposals into CLI, API, and the Cockpit;
+- added schema migrations 9 through 12 without rewriting prior runs, Evidence, market data,
+  corporate events, or live signals;
+- consolidated Python and Web package versions at `0.5.1`, documented the completed pre-v0.6
+  baseline, and added the point-in-time consensus-revision execution plan; and
 - closed the local v0.5.1 acceptance gap with cross-tab connection/monitor synchronization,
   visibility and 30-second canonical-ledger refresh, formal/fixture/mixed provenance labels,
   filtered totals, load-more pagination, score/theme/entity/alert filters, batched event-page

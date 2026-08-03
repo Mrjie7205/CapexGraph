@@ -24,7 +24,8 @@ from capexgraph.domain import (
     RunStatus,
 )
 from capexgraph.events import EventCalendarService
-from capexgraph.financials import FinancialFactService
+from capexgraph.financials import FinancialFactService, ReviewedDisclosureFactService
+from capexgraph.fixtures import seed_frozen_market_fixture
 from capexgraph.live import (
     FrozenClock,
     LiveGatewayRuntime,
@@ -42,7 +43,12 @@ from capexgraph.market import (
     build_market_provider,
     provider_capabilities,
 )
+from capexgraph.monitoring import MainlineService, MainlineStore
 from capexgraph.providers import ModelSettings, ProviderName
+from capexgraph.providers.sources import (
+    build_source_provider,
+    official_source_capabilities,
+)
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import (
@@ -55,6 +61,11 @@ from capexgraph.runtime import (
 )
 from capexgraph.runtime.store import state_db_path
 from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
+from capexgraph.themes import (
+    ThemeRegistryService,
+    import_theme_json,
+    load_frozen_theme_fixture,
+)
 from capexgraph.tools import (
     EvidencePack,
     EvidenceSourceRequest,
@@ -83,6 +94,14 @@ live_app = typer.Typer(
 )
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
 events_app = typer.Typer(help="Discover and inspect corporate events.", no_args_is_help=True)
+themes_app = typer.Typer(
+    help="Import and inspect point-in-time theme universes.",
+    no_args_is_help=True,
+)
+mainline_app = typer.Typer(
+    help="Calculate deterministic theme state and research proposals.",
+    no_args_is_help=True,
+)
 tracking_app = typer.Typer(
     help="Track candidates and evaluate forward evidence.", no_args_is_help=True
 )
@@ -102,6 +121,8 @@ app.add_typer(model_app, name="model")
 app.add_typer(live_app, name="live")
 app.add_typer(financials_app, name="financials")
 app.add_typer(events_app, name="events")
+app.add_typer(themes_app, name="themes")
+app.add_typer(mainline_app, name="mainline")
 app.add_typer(tracking_app, name="tracking")
 app.add_typer(report_app, name="report")
 app.add_typer(sources_app, name="sources")
@@ -490,6 +511,13 @@ def _event_as_of(value: str | None) -> datetime | None:
 @sources_app.command("discover")
 def sources_discover(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            help="sec, cninfo, sse, szse, bse, opendart, or kind",
+        ),
+    ] = "sec",
     identifier: Annotated[
         str | None,
         typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
@@ -500,10 +528,12 @@ def sources_discover(
     ] = None,
     limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
 ) -> None:
-    """Discover recent official SEC filings as suggestions."""
+    """Discover official filings or announcements as review suggestions."""
     try:
+        active_provider = build_source_provider(provider)
         items = SourceDiscoveryService().discover(
             run_id,
+            provider=active_provider,
             identifier=identifier,
             forms=form or (),
             limit=limit,
@@ -517,6 +547,13 @@ def sources_discover(
 @events_app.command("sync")
 def events_sync(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    provider: Annotated[
+        str,
+        typer.Option(
+            "--provider",
+            help="sec, cninfo, sse, szse, bse, opendart, or kind",
+        ),
+    ] = "sec",
     identifier: Annotated[
         str | None,
         typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
@@ -527,10 +564,12 @@ def events_sync(
     ] = None,
     limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
 ) -> None:
-    """Discover official SEC filings and append event-calendar versions."""
+    """Discover official disclosures and append event-calendar versions."""
     try:
-        items = EventCalendarService().discover_sec_filings(
+        active_provider = build_source_provider(provider)
+        items = EventCalendarService().discover_official(
             run_id,
+            provider=active_provider,
             identifier=identifier,
             forms=form or (),
             limit=limit,
@@ -539,6 +578,27 @@ def events_sync(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_events(items)
+
+
+@events_app.command("providers")
+def events_providers() -> None:
+    """Show official-source coverage and required local configuration."""
+
+    table = Table(title="CapexGraph official-source providers")
+    table.add_column("Provider")
+    table.add_column("Markets")
+    table.add_column("Discovery")
+    table.add_column("History")
+    table.add_column("Authentication")
+    for item in official_source_capabilities():
+        table.add_row(
+            item.provider,
+            ", ".join(item.markets),
+            item.discovery.value,
+            item.history.value,
+            item.authentication,
+        )
+    console.print(table)
 
 
 @events_app.command("refresh")
@@ -678,6 +738,197 @@ def sources_dismiss(
     _show_source_suggestions([item])
 
 
+@themes_app.command("demo")
+def themes_demo() -> None:
+    """Import the synthetic CN/US/KR theme and market-history fixture."""
+    fixture = load_frozen_theme_fixture()
+    definition = ThemeRegistryService().persist_import(fixture)
+    market = seed_frozen_market_fixture()
+    console.print_json(
+        data={
+            "definition": definition.model_dump(mode="json"),
+            "source_count": len(fixture.sources),
+            "membership_count": len(fixture.memberships),
+            "market": market,
+            "notice": "Synthetic frozen history; not current constituent data.",
+        }
+    )
+
+
+@themes_app.command("import-json")
+def themes_import_json(
+    path: Annotated[Path, typer.Argument(exists=True, dir_okay=False)],
+) -> None:
+    """Import a local point-in-time theme JSON file without copying it into Git."""
+    try:
+        imported = import_theme_json(path.read_bytes())
+        definition = ThemeRegistryService().persist_import(imported)
+    except (OSError, KeyError, TypeError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(
+        data={
+            "definition": definition.model_dump(mode="json"),
+            "source_count": len(imported.sources),
+            "membership_count": len(imported.memberships),
+        }
+    )
+
+
+@themes_app.command("list")
+def themes_list() -> None:
+    """List current versioned theme definitions."""
+    table = Table(title="CapexGraph point-in-time themes")
+    table.add_column("ID")
+    table.add_column("Name")
+    table.add_column("Version")
+    table.add_column("Markets")
+    table.add_column("Known at")
+    for item in ThemeRegistryService().list_definitions():
+        table.add_row(
+            item.theme_id,
+            item.name,
+            str(item.version),
+            ",".join(item.markets),
+            item.known_at.isoformat(),
+        )
+    console.print(table)
+
+
+@themes_app.command("snapshot")
+def themes_snapshot(
+    theme_id: Annotated[str, typer.Argument(help="Stable theme ID")],
+    as_of: Annotated[str, typer.Option("--as-of", help="Historical date YYYY-MM-DD")],
+    market: Annotated[str | None, typer.Option("--market")] = None,
+    knowledge_cutoff: Annotated[
+        str | None,
+        typer.Option("--knowledge-cutoff", help="ISO observed-time cutoff"),
+    ] = None,
+) -> None:
+    """Reconstruct a universe using only membership knowable at the cutoff."""
+    try:
+        snapshot = ThemeRegistryService().snapshot(
+            theme_id,
+            as_of_date=date.fromisoformat(as_of),
+            knowledge_cutoff=_event_as_of(knowledge_cutoff),
+            market=market.upper() if market else None,
+        )
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=snapshot.model_dump(mode="json"))
+
+
+@mainline_app.command("policy")
+def mainline_policy() -> None:
+    """Create or inspect the versioned conservative experimental policy."""
+    policy = MainlineService().ensure_default_policy()
+    console.print_json(data=policy.model_dump(mode="json"))
+
+
+@mainline_app.command("run")
+def mainline_run(
+    theme_id: Annotated[str, typer.Argument(help="Stable theme ID")],
+    market: Annotated[str, typer.Option("--market", "-m")],
+    as_of: Annotated[str, typer.Option("--as-of", help="Market date YYYY-MM-DD")],
+    provider: Annotated[str, typer.Option("--provider")],
+    policy_id: Annotated[str | None, typer.Option("--policy-id")] = None,
+    weighting: Annotated[
+        str,
+        typer.Option("--weighting", help="equal, median, or source_weight"),
+    ] = "equal",
+) -> None:
+    """Run one idempotent no-model-cost mainline assessment."""
+    try:
+        job = MainlineService().run_daily(
+            theme_id,
+            market=market,
+            as_of_date=date.fromisoformat(as_of),
+            provider=provider,
+            policy_id=policy_id,
+            weighting=weighting,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=job.model_dump(mode="json"))
+
+
+@mainline_app.command("status")
+def mainline_status(
+    theme_id: Annotated[str | None, typer.Option("--theme-id")] = None,
+) -> None:
+    """Inspect latest deterministic assessments and job state."""
+    store = MainlineStore()
+    console.print_json(
+        data={
+            "jobs": [item.model_dump(mode="json") for item in store.list_jobs(limit=50)],
+            "assessments": [
+                item.model_dump(mode="json")
+                for item in store.list_assessments(theme_id, limit=50)
+            ],
+        }
+    )
+
+
+@mainline_app.command("run-all")
+def mainline_run_all(
+    market: Annotated[str, typer.Option("--market", "-m")],
+    as_of: Annotated[str, typer.Option("--as-of", help="Market date YYYY-MM-DD")],
+    provider: Annotated[str, typer.Option("--provider")],
+    theme_id: Annotated[
+        list[str] | None,
+        typer.Option("--theme-id", help="Optional repeatable theme filter"),
+    ] = None,
+    weighting: Annotated[
+        str,
+        typer.Option("--weighting", help="equal, median, or source_weight"),
+    ] = "equal",
+) -> None:
+    """Run every eligible theme for one market date; failures remain isolated."""
+
+    try:
+        jobs = MainlineService().run_batch(
+            market=market,
+            as_of_date=date.fromisoformat(as_of),
+            provider=provider,
+            theme_ids=theme_id,
+            weighting=weighting,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=[item.model_dump(mode="json") for item in jobs])
+    if any(item.status.value == "failed" for item in jobs):
+        raise typer.Exit(1)
+
+
+@mainline_app.command("proposals")
+def mainline_proposals(
+    theme_id: Annotated[str | None, typer.Option("--theme-id")] = None,
+) -> None:
+    """List human-gated research proposals; this command never executes a model."""
+    items = MainlineStore().list_proposals(theme_id, limit=100)
+    console.print_json(data=[item.model_dump(mode="json") for item in items])
+
+
+@mainline_app.command("decide")
+def mainline_decide(
+    proposal_id: Annotated[str, typer.Argument(help="Proposal ID")],
+    reject: Annotated[bool, typer.Option("--reject")] = False,
+) -> None:
+    """Accept or reject a proposal without automatically launching research."""
+    try:
+        proposal = MainlineService().decide_proposal(
+            proposal_id,
+            accepted=not reject,
+        )
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=proposal.model_dump(mode="json"))
+
+
 @ticker_app.command("resolve")
 def ticker_resolve(query: Annotated[str, typer.Argument(help="Ticker, name, or alias")]) -> None:
     """Resolve a canonical, registry-backed ticker identity."""
@@ -695,7 +946,7 @@ def market_snapshot(
     ticker: Annotated[str, typer.Argument(help="Ticker or registered company name")],
     provider: Annotated[
         str | None,
-        typer.Option("--provider", help="Market provider: eodhd or yahoo"),
+        typer.Option("--provider", help="Market provider: eodhd, tushare, or yahoo"),
     ] = None,
     days: Annotated[int, typer.Option("--days", min=1, max=20000)] = 400,
 ) -> None:
@@ -718,7 +969,7 @@ def market_sync(
     tickers: Annotated[list[str], typer.Argument(help="One or more canonical tickers")],
     provider: Annotated[
         str | None,
-        typer.Option("--provider", help="Market provider: eodhd or yahoo"),
+        typer.Option("--provider", help="Market provider: eodhd, tushare, or yahoo"),
     ] = None,
     days: Annotated[int, typer.Option("--days", min=1, max=20000)] = 400,
 ) -> None:
@@ -730,6 +981,29 @@ def market_sync(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print_json(data=[item.model_dump(mode="json") for item in results])
+
+
+@market_app.command("compare")
+def market_compare(
+    ticker: Annotated[str, typer.Argument(help="Ticker or registered company name")],
+    primary: Annotated[str, typer.Option("--primary")],
+    reference: Annotated[str, typer.Option("--reference")],
+    as_of: Annotated[str, typer.Option("--as-of")],
+    tolerance_pct: Annotated[float, typer.Option("--tolerance-pct")] = 0.02,
+) -> None:
+    """Compare persisted shared-session closes from two explicit providers."""
+    try:
+        result = MarketDataService().compare(
+            ticker,
+            primary_provider=primary,
+            reference_provider=reference,
+            as_of_date=date.fromisoformat(as_of),
+            tolerance_pct=tolerance_pct,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=result.model_dump(mode="json"))
 
 
 @market_app.command("providers")
@@ -1032,14 +1306,23 @@ def financials_import(
 @financials_app.command("extract")
 def financials_extract(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    provider: Annotated[
+        str,
+        typer.Option("--provider", help="sec or opendart"),
+    ] = "sec",
     identifier: Annotated[
         str | None,
         typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
     ] = None,
 ) -> None:
-    """Capture SEC Company Facts and persist versioned, source-linked facts."""
+    """Capture official filing facts and persist source-linked facts."""
     try:
-        facts = FinancialFactService().extract(run_id, identifier=identifier)
+        service = FinancialFactService()
+        facts = service.extract(
+            run_id,
+            identifier=identifier,
+            provider=service.provider(provider),
+        )
     except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
@@ -1072,6 +1355,55 @@ def financials_list(
             fact.source_locator,
         )
     console.print(table)
+
+
+@financials_app.command("preview-reviewed")
+def financials_preview_reviewed(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    evidence_id: Annotated[str, typer.Argument(help="Reviewed official Evidence ID")],
+) -> None:
+    """Preview deterministic fact candidates from reviewed official text."""
+
+    try:
+        items = ReviewedDisclosureFactService().preview(run_id, evidence_id)
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=[item.model_dump(mode="json") for item in items])
+
+
+@financials_app.command("candidates")
+def financials_candidates(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+) -> None:
+    """List pending and decided disclosure-fact candidates."""
+
+    console.print_json(
+        data=[
+            item.model_dump(mode="json")
+            for item in ReviewedDisclosureFactService().store.list(run_id)
+        ]
+    )
+
+
+@financials_app.command("decide")
+def financials_decide(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    candidate_id: Annotated[str, typer.Argument(help="Candidate ID")],
+    accept: Annotated[bool, typer.Option("--accept/--reject")],
+) -> None:
+    """Accept or reject one reviewed disclosure-fact candidate."""
+
+    try:
+        item = ReviewedDisclosureFactService().decide(
+            run_id,
+            candidate_id,
+            accepted=accept,
+        )
+    except (KeyError, ValueError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=item.model_dump(mode="json"))
 
 
 @tracking_app.command("add")
@@ -1253,7 +1585,7 @@ def db_upgrade(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print(
-        f"[green]Database ready[/green] {status.path} · schema {status.current_version}"
+        f"[green]Database ready[/green] · schema {status.current_version}\n{status.path}"
     )
 
 

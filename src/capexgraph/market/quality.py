@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import statistics
 from collections import Counter
 from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
@@ -9,6 +12,7 @@ from capexgraph.domain import (
     DataQualityResult,
     DataQualityStatus,
     MarketBar,
+    MarketComparisonResult,
     QualitySeverity,
 )
 
@@ -32,6 +36,8 @@ def evaluate_market_quality(
     *,
     as_of: date | None = None,
     stale_after_days: int = 7,
+    expected_sessions: Sequence[date] = (),
+    suspended_dates: Sequence[date] = (),
 ) -> DataQualityResult:
     """Run deterministic structural checks before bars enter the shared store."""
 
@@ -123,6 +129,54 @@ def evaluate_market_quality(
             )
         )
 
+    if expected_sessions:
+        actual_dates = set(dates)
+        suspended = set(suspended_dates)
+        missing_sessions = sorted(
+            item
+            for item in expected_sessions
+            if item <= effective_as_of and item not in actual_dates and item not in suspended
+        )
+        if missing_sessions:
+            issues.append(
+                _issue(
+                    "missing_trading_sessions",
+                    QualitySeverity.WARNING,
+                    "Expected exchange sessions are missing and are not marked as suspensions.",
+                    missing_sessions,
+                )
+            )
+
+    adjustment_dates: list[date] = []
+    extreme_adjusted_dates: list[date] = []
+    ordered = sorted(bars, key=lambda item: item.date)
+    for previous, current in zip(ordered, ordered[1:], strict=False):
+        raw_return = current.close / previous.close - 1
+        if previous.adjusted_close and current.adjusted_close:
+            adjusted_return = current.adjusted_close / previous.adjusted_close - 1
+            if abs(raw_return) >= 0.30 and abs(adjusted_return) <= 0.10:
+                adjustment_dates.append(current.date)
+            if abs(adjusted_return) >= 0.50:
+                extreme_adjusted_dates.append(current.date)
+    if adjustment_dates:
+        issues.append(
+            _issue(
+                "corporate_action_adjustment_detected",
+                QualitySeverity.WARNING,
+                "Raw and adjusted returns diverge sharply; inspect split/dividend semantics.",
+                adjustment_dates,
+            )
+        )
+    if extreme_adjusted_dates:
+        issues.append(
+            _issue(
+                "extreme_adjusted_return",
+                QualitySeverity.WARNING,
+                "Adjusted history contains an extreme one-session return.",
+                extreme_adjusted_dates,
+            )
+        )
+
     latest = max(dates)
     if latest < effective_as_of - timedelta(days=max(stale_after_days, 1)):
         issues.append(
@@ -150,4 +204,92 @@ def evaluate_market_quality(
         first_date=min(dates),
         latest_date=latest,
         issues=issues,
+    )
+
+
+def compare_market_histories(
+    ticker: str,
+    primary_provider: str,
+    primary: Sequence[MarketBar],
+    reference_provider: str,
+    reference: Sequence[MarketBar],
+    *,
+    as_of_date: date,
+    tolerance_pct: float = 0.02,
+    minimum_overlap: int = 20,
+) -> MarketComparisonResult:
+    """Compare shared-session raw closes without treating either source as infallible."""
+
+    primary_by_date = {item.date: item for item in primary if item.date <= as_of_date}
+    reference_by_date = {item.date: item for item in reference if item.date <= as_of_date}
+    overlap = sorted(set(primary_by_date) & set(reference_by_date))
+    differences = [
+        abs(primary_by_date[item].close / reference_by_date[item].close - 1)
+        for item in overlap
+        if reference_by_date[item].close > 0
+    ]
+    issues: list[DataQualityIssue] = []
+    if len(overlap) < minimum_overlap:
+        issues.append(
+            _issue(
+                "insufficient_reference_overlap",
+                QualitySeverity.WARNING if overlap else QualitySeverity.ERROR,
+                f"Only {len(overlap)} shared sessions are available for comparison.",
+            )
+        )
+    max_difference = max(differences) if differences else None
+    median_difference = statistics.median(differences) if differences else None
+    outlier_dates = [
+        item
+        for item in overlap
+        if reference_by_date[item].close > 0
+        and abs(primary_by_date[item].close / reference_by_date[item].close - 1)
+        > tolerance_pct
+    ]
+    if outlier_dates:
+        severity = (
+            QualitySeverity.ERROR
+            if median_difference is not None and median_difference > tolerance_pct
+            else QualitySeverity.WARNING
+        )
+        issues.append(
+            _issue(
+                "reference_close_difference",
+                severity,
+                f"Shared-session raw closes differ by more than {tolerance_pct:.2%}.",
+                outlier_dates,
+            )
+        )
+    if any(item.severity == QualitySeverity.ERROR for item in issues):
+        status = DataQualityStatus.FAIL
+    elif issues:
+        status = DataQualityStatus.WARN
+    else:
+        status = DataQualityStatus.PASS
+    semantic = {
+        "ticker": ticker,
+        "primary_provider": primary_provider,
+        "reference_provider": reference_provider,
+        "as_of_date": as_of_date,
+        "primary": [item.model_dump(mode="json") for item in primary],
+        "reference": [item.model_dump(mode="json") for item in reference],
+        "tolerance_pct": tolerance_pct,
+    }
+    comparison_hash = hashlib.sha256(
+        json.dumps(semantic, sort_keys=True, default=str).encode()
+    ).hexdigest()
+    return MarketComparisonResult(
+        id=f"market-comparison-{comparison_hash[:24]}",
+        ticker=ticker,
+        primary_provider=primary_provider,
+        reference_provider=reference_provider,
+        as_of_date=as_of_date,
+        overlap_count=len(overlap),
+        primary_only_count=len(set(primary_by_date) - set(reference_by_date)),
+        reference_only_count=len(set(reference_by_date) - set(primary_by_date)),
+        max_close_diff_pct=max_difference,
+        median_close_diff_pct=median_difference,
+        status=status,
+        issues=issues,
+        comparison_hash=comparison_hash,
     )

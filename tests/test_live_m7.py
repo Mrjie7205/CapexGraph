@@ -82,7 +82,7 @@ def test_migration_8_adds_research_bridge_tables(tmp_path: Path) -> None:
             ).fetchall()
         }
         version = connection.execute("PRAGMA user_version").fetchone()[0]
-    assert version == 8
+    assert version >= 8
     assert {
         "live_verification_tasks",
         "live_evidence_links",

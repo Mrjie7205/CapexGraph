@@ -86,3 +86,12 @@ capexgraph live soak --mode providers --cycles 30 --interval 10
 Until `JIN10_WEBSOCKET_SECRET_KEY` is available and that soak passes, WebSocket stays
 contract-tested but not live-accepted. This does not demote MCP to a fallback and does not reopen
 the completed local v0.5.1 gate.
+
+## 2026-08-03 consolidated release addendum
+
+The live-gateway acceptance above remains valid and its WebSocket external gate is unchanged.
+CapexGraph 0.5.1 now also consolidates the completed v0.4 market/theme/mainline and v0.5 official-
+event work through schema 12. The consolidated local gate passed Ruff, 140 Python tests, the
+React/Vite production build, a 0.5.1 wheel content check, and desktop/375px Mainline Desk browser
+QA. The bundled mainline policy remains visibly experimental; this addendum does not promote it to
+a production investment rule or claim a credentialed WebSocket connection.

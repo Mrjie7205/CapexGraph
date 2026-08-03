@@ -113,8 +113,10 @@ capexgraph financials import <run-id> .\financial_metrics.csv
 
 When `source_evidence_id` is present, the import fails unless that evidence exists in the same run.
 
-Automatic extraction currently supports SEC Company Facts only. A-share exchange filings and
-non-US taxonomies require a future provider adapter.
+Automatic structured extraction supports SEC Company Facts and a conservative OpenDART account
+subset. Reviewed regulator/issuer Evidence can also produce deterministic fact candidates that
+require explicit human acceptance. A-share disclosures without reliable structured fields remain
+candidate-only rather than being guessed into facts.
 
 SEC asks automated clients to send an identifying User-Agent. Configure
 `CAPEXGRAPH_SEC_USER_AGENT` in the repository-local `.env` with your application/name and a real
@@ -158,9 +160,9 @@ capexgraph events list <run-id> --type financial_report
 captured the record. `--as-of` applies the system-observed cutoff so a later backfill cannot alter
 what an earlier run knew.
 
-SEC discovery currently covers recent compact submission history only. Older submission files,
-issuer calendars, content-level event extraction, China official announcements, and Korean
-OpenDART/KIND sources remain v0.5 work.
+SEC discovery lazily loads bounded historical submission shards. CNINFO/SSE/SZSE/BSE and
+OpenDART/KIND official discovery adapters are also available. Issuer calendars still use the
+guarded manual issuer-source path, and content-level interpretation remains conservative.
 
 ## Evidence modes and execution
 

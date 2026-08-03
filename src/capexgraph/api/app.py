@@ -30,6 +30,7 @@ from capexgraph.domain import (
     CorporateEventStatus,
     CorporateEventType,
     CorporateEventVersion,
+    DisclosureFactCandidate,
     Evidence,
     EvidenceKind,
     EvidenceMode,
@@ -48,8 +49,14 @@ from capexgraph.domain import (
     LiveUserAction,
     LiveVerificationTask,
     LiveVerificationTaskStatus,
+    MainlineAssessment,
+    MainlinePolicy,
+    MainlineStateEvent,
+    MarketComparisonResult,
     MarketSnapshot,
     MarketSyncResult,
+    MonitorJob,
+    OfficialSourceCapability,
     ProviderCapability,
     ResearchAction,
     ResearchRun,
@@ -58,10 +65,17 @@ from capexgraph.domain import (
     SourceSuggestion,
     SourceSuggestionStatus,
     StepCheckpoint,
+    ThemeDailyMetric,
+    ThemeDefinition,
+    ThemeMembership,
+    ThemeResearchProposal,
+    ThemeSource,
+    ThemeUniverseSnapshot,
     TickerIdentity,
 )
 from capexgraph.events import EventCalendarService
-from capexgraph.financials import FinancialFactService
+from capexgraph.financials import FinancialFactService, ReviewedDisclosureFactService
+from capexgraph.fixtures import seed_frozen_market_fixture
 from capexgraph.live import (
     LiveImpactAnalyzer,
     LiveResearchBridge,
@@ -77,11 +91,16 @@ from capexgraph.market import (
     build_market_provider,
     provider_capabilities,
 )
+from capexgraph.monitoring import MainlineService, MainlineStore
 from capexgraph.providers import (
     ModelSettings,
     ProviderName,
     create_research_model,
     redact_provider_secrets,
+)
+from capexgraph.providers.sources import (
+    build_source_provider,
+    official_source_capabilities,
 )
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
@@ -90,6 +109,12 @@ from capexgraph.research.model_runtime import select_run_provider
 from capexgraph.runtime import RunStore
 from capexgraph.runtime.store import runs_dir
 from capexgraph.sources import SourceCaptureError, SourceDiscoveryService
+from capexgraph.themes import (
+    ThemeRegistryService,
+    ThemeRegistryStore,
+    import_theme_json,
+    load_frozen_theme_fixture,
+)
 from capexgraph.tools import (
     EvidenceSourceRequest,
     TickerResolver,
@@ -158,7 +183,10 @@ class EvidenceReviewRequest(BaseModel):
 
 
 class SourceDiscoverRequest(BaseModel):
-    provider: str = Field(default="sec", pattern=r"^sec$")
+    provider: str = Field(
+        default="sec",
+        pattern=r"^(sec|cninfo|sse|szse|bse|opendart|kind)$",
+    )
     identifier: str | None = Field(default=None, max_length=200)
     forms: list[str] = Field(default_factory=list, max_length=20)
     limit: int = Field(default=10, ge=1, le=100)
@@ -176,14 +204,60 @@ class SourceSuggestRequest(BaseModel):
 
 class MarketCaptureRequest(BaseModel):
     ticker: str = Field(min_length=1, max_length=80)
-    provider: str | None = Field(default=None, pattern=r"^(eodhd|yahoo|yahoo-chart)$")
+    provider: str | None = Field(
+        default=None,
+        pattern=r"^(eodhd|tushare|yahoo|yahoo-chart)$",
+    )
     days: int = Field(default=400, ge=1, le=20000)
 
 
 class MarketSyncRequest(BaseModel):
     tickers: list[str] = Field(min_length=1, max_length=500)
-    provider: str | None = Field(default=None, pattern=r"^(eodhd|yahoo|yahoo-chart)$")
+    provider: str | None = Field(
+        default=None,
+        pattern=r"^(eodhd|tushare|yahoo|yahoo-chart)$",
+    )
     days: int = Field(default=400, ge=1, le=20000)
+
+
+class MarketCompareRequest(BaseModel):
+    ticker: str = Field(min_length=1, max_length=80)
+    primary_provider: str = Field(min_length=1, max_length=80)
+    reference_provider: str = Field(min_length=1, max_length=80)
+    as_of_date: date
+    tolerance_pct: float = Field(default=0.02, gt=0, le=1)
+    minimum_overlap: int = Field(default=20, ge=1, le=5000)
+
+
+class ThemeImportRequest(BaseModel):
+    document: dict[str, object]
+
+
+class ThemeSnapshotRequest(BaseModel):
+    as_of_date: date
+    knowledge_cutoff: datetime | None = None
+    market: str | None = Field(default=None, min_length=2, max_length=12)
+
+
+class MainlineRunRequest(BaseModel):
+    theme_id: str = Field(min_length=1, max_length=120)
+    market: str = Field(min_length=2, max_length=12)
+    as_of_date: date
+    provider: str = Field(min_length=1, max_length=80)
+    policy_id: str | None = Field(default=None, max_length=120)
+    weighting: str = Field(default="equal", pattern=r"^(equal|median|source_weight)$")
+
+
+class MainlineBatchRequest(BaseModel):
+    market: str = Field(min_length=2, max_length=12)
+    as_of_date: date
+    provider: str = Field(min_length=1, max_length=80)
+    theme_ids: list[str] = Field(default_factory=list, max_length=500)
+    weighting: str = Field(default="equal", pattern=r"^(equal|median|source_weight)$")
+
+
+class ProposalDecisionRequest(BaseModel):
+    accepted: bool
 
 
 class FinancialMetricsRequest(BaseModel):
@@ -192,6 +266,11 @@ class FinancialMetricsRequest(BaseModel):
 
 class FinancialExtractRequest(BaseModel):
     identifier: str | None = Field(default=None, min_length=1, max_length=200)
+    provider: str = Field(default="sec", pattern=r"^(sec|opendart)$")
+
+
+class DisclosurePreviewRequest(BaseModel):
+    evidence_id: str = Field(min_length=1, max_length=200)
 
 
 class TrackCandidateRequest(BaseModel):
@@ -504,8 +583,10 @@ def discover_run_sources(
     request: SourceDiscoverRequest,
 ) -> list[SourceSuggestion]:
     try:
+        provider = build_source_provider(request.provider)
         return SourceDiscoveryService().discover(
             run_id,
+            provider=provider,
             identifier=request.identifier,
             forms=request.forms,
             limit=request.limit,
@@ -525,8 +606,10 @@ def discover_run_events(
     request: SourceDiscoverRequest,
 ) -> list[CorporateEventVersion]:
     try:
-        return EventCalendarService().discover_sec_filings(
+        provider = build_source_provider(request.provider)
+        return EventCalendarService().discover_official(
             run_id,
+            provider=provider,
             identifier=request.identifier,
             forms=request.forms,
             limit=request.limit,
@@ -535,6 +618,16 @@ def discover_run_events(
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (ValueError, RuntimeError, httpx.HTTPError) as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/official/providers",
+    response_model=list[OfficialSourceCapability],
+)
+def list_official_source_providers() -> list[OfficialSourceCapability]:
+    """Expose official-source coverage and auth requirements without secrets."""
+
+    return official_source_capabilities()
 
 
 @app.post(
@@ -788,6 +881,242 @@ def sync_market_history(request: MarketSyncRequest) -> list[MarketSyncResult]:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
 
+@app.post("/api/v1/market/compare", response_model=MarketComparisonResult)
+def compare_market_history(request: MarketCompareRequest) -> MarketComparisonResult:
+    try:
+        return MarketDataService().compare(
+            request.ticker,
+            primary_provider=request.primary_provider,
+            reference_provider=request.reference_provider,
+            as_of_date=request.as_of_date,
+            tolerance_pct=request.tolerance_pct,
+            minimum_overlap=request.minimum_overlap,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get("/api/v1/market/comparisons", response_model=list[MarketComparisonResult])
+def list_market_comparisons(
+    ticker: Annotated[str | None, Query(max_length=80)] = None,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 200,
+) -> list[MarketComparisonResult]:
+    return MarketDataService().store.list_comparisons(
+        ticker.upper() if ticker else None,
+        limit=limit,
+    )
+
+
+@app.post("/api/v1/themes/fixture")
+def import_frozen_theme_fixture() -> dict[str, object]:
+    service = ThemeRegistryService()
+    result = load_frozen_theme_fixture()
+    definition = service.persist_import(result)
+    market = seed_frozen_market_fixture()
+    return {
+        "definition": definition.model_dump(mode="json"),
+        "source_count": len(result.sources),
+        "membership_count": len(result.memberships),
+        "market": market,
+        "notice": "Synthetic frozen history; not current constituent data.",
+    }
+
+
+@app.post("/api/v1/themes/import")
+def import_theme_document(request: ThemeImportRequest) -> dict[str, object]:
+    try:
+        result = import_theme_json(request.document)
+        definition = ThemeRegistryService().persist_import(result)
+    except (KeyError, TypeError, ValueError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return {
+        "definition": definition.model_dump(mode="json"),
+        "source_count": len(result.sources),
+        "membership_count": len(result.memberships),
+    }
+
+
+@app.get("/api/v1/themes", response_model=list[ThemeDefinition])
+def list_themes() -> list[ThemeDefinition]:
+    return ThemeRegistryService().list_definitions()
+
+
+@app.get("/api/v1/themes/{theme_id}/sources", response_model=list[ThemeSource])
+def list_theme_sources(theme_id: str) -> list[ThemeSource]:
+    return ThemeRegistryService().list_sources(theme_id)
+
+
+@app.get(
+    "/api/v1/themes/{theme_id}/memberships",
+    response_model=list[ThemeMembership],
+)
+def list_theme_memberships(
+    theme_id: str,
+    as_of_date: Annotated[date, Query(alias="as_of")],
+    knowledge_cutoff: Annotated[datetime | None, Query()] = None,
+    market: Annotated[str | None, Query(max_length=12)] = None,
+) -> list[ThemeMembership]:
+    try:
+        return ThemeRegistryService().list_memberships(
+            theme_id,
+            as_of_date=as_of_date,
+            knowledge_cutoff=knowledge_cutoff,
+            market=market.upper() if market else None,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/themes/{theme_id}/snapshots",
+    response_model=ThemeUniverseSnapshot,
+)
+def create_theme_snapshot(
+    theme_id: str,
+    request: ThemeSnapshotRequest,
+) -> ThemeUniverseSnapshot:
+    try:
+        return ThemeRegistryService().snapshot(
+            theme_id,
+            as_of_date=request.as_of_date,
+            knowledge_cutoff=request.knowledge_cutoff,
+            market=request.market,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/themes/{theme_id}/snapshots",
+    response_model=list[ThemeUniverseSnapshot],
+)
+def list_theme_snapshots(
+    theme_id: str,
+    as_of_date: Annotated[date | None, Query(alias="as_of")] = None,
+) -> list[ThemeUniverseSnapshot]:
+    return ThemeRegistryStore().list_snapshots(theme_id, as_of_date=as_of_date)
+
+
+@app.post("/api/v1/mainline/policies/default", response_model=MainlinePolicy)
+def create_default_mainline_policy() -> MainlinePolicy:
+    return MainlineService().ensure_default_policy()
+
+
+@app.get("/api/v1/mainline/policies", response_model=list[MainlinePolicy])
+def list_mainline_policies() -> list[MainlinePolicy]:
+    return MainlineStore().list_policies()
+
+
+@app.post("/api/v1/mainline/run", response_model=MonitorJob)
+def run_mainline_monitor(request: MainlineRunRequest) -> MonitorJob:
+    try:
+        return MainlineService().run_daily(
+            request.theme_id,
+            market=request.market,
+            as_of_date=request.as_of_date,
+            provider=request.provider,
+            policy_id=request.policy_id,
+            weighting=request.weighting,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.post("/api/v1/mainline/run-all", response_model=list[MonitorJob])
+def run_all_mainline_monitors(request: MainlineBatchRequest) -> list[MonitorJob]:
+    return MainlineService().run_batch(
+        market=request.market,
+        as_of_date=request.as_of_date,
+        provider=request.provider,
+        theme_ids=request.theme_ids or None,
+        weighting=request.weighting,
+    )
+
+
+@app.get(
+    "/api/v1/mainline/assessments",
+    response_model=list[MainlineAssessment],
+)
+def list_mainline_assessments(
+    theme_id: Annotated[str | None, Query(max_length=120)] = None,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+) -> list[MainlineAssessment]:
+    return MainlineStore().list_assessments(theme_id, limit=limit)
+
+
+@app.get("/api/v1/mainline/metrics", response_model=list[ThemeDailyMetric])
+def list_mainline_metrics(
+    theme_id: Annotated[str, Query(min_length=1, max_length=120)],
+    market: Annotated[str | None, Query(max_length=12)] = None,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 200,
+) -> list[ThemeDailyMetric]:
+    return MainlineStore().list_metrics(
+        theme_id,
+        market=market.upper() if market else None,
+        limit=limit,
+    )
+
+
+@app.get("/api/v1/mainline/events", response_model=list[MainlineStateEvent])
+def list_mainline_events(
+    theme_id: Annotated[str | None, Query(max_length=120)] = None,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+) -> list[MainlineStateEvent]:
+    return MainlineStore().list_state_events(theme_id, limit=limit)
+
+
+@app.post(
+    "/api/v1/mainline/events/{event_id}/acknowledge",
+    response_model=MainlineStateEvent,
+)
+def acknowledge_mainline_event(event_id: str) -> MainlineStateEvent:
+    try:
+        return MainlineStore().acknowledge_state_event(event_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.get("/api/v1/mainline/jobs", response_model=list[MonitorJob])
+def list_mainline_jobs(
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+) -> list[MonitorJob]:
+    return MainlineStore().list_jobs(limit=limit)
+
+
+@app.get(
+    "/api/v1/mainline/proposals",
+    response_model=list[ThemeResearchProposal],
+)
+def list_mainline_proposals(
+    theme_id: Annotated[str | None, Query(max_length=120)] = None,
+    limit: Annotated[int, Query(ge=1, le=5000)] = 500,
+) -> list[ThemeResearchProposal]:
+    return MainlineStore().list_proposals(theme_id, limit=limit)
+
+
+@app.post(
+    "/api/v1/mainline/proposals/{proposal_id}/decision",
+    response_model=ThemeResearchProposal,
+)
+def decide_mainline_proposal(
+    proposal_id: str,
+    request: ProposalDecisionRequest,
+) -> ThemeResearchProposal:
+    try:
+        return MainlineService().decide_proposal(
+            proposal_id,
+            accepted=request.accepted,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
 @app.post("/api/v1/runs/{run_id}/financials", response_model=list[FinancialMetric])
 def attach_run_financials(
     run_id: str,
@@ -807,7 +1136,12 @@ def extract_run_financial_facts(
     request: FinancialExtractRequest,
 ) -> list[FinancialFact]:
     try:
-        return FinancialFactService().extract(run_id, identifier=request.identifier)
+        service = FinancialFactService()
+        return service.extract(
+            run_id,
+            identifier=request.identifier,
+            provider=service.provider(request.provider),
+        )
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
     except (ValueError, RuntimeError, httpx.HTTPError) as error:
@@ -820,6 +1154,55 @@ def list_run_financial_facts(run_id: str) -> list[FinancialFact]:
         return FinancialFactService().list(run_id)
     except KeyError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/financials/preview-reviewed",
+    response_model=list[DisclosureFactCandidate],
+)
+def preview_reviewed_disclosure_facts(
+    run_id: str,
+    request: DisclosurePreviewRequest,
+) -> list[DisclosureFactCandidate]:
+    try:
+        return ReviewedDisclosureFactService().preview(run_id, request.evidence_id)
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+
+
+@app.get(
+    "/api/v1/runs/{run_id}/financials/candidates",
+    response_model=list[DisclosureFactCandidate],
+)
+def list_reviewed_disclosure_fact_candidates(
+    run_id: str,
+) -> list[DisclosureFactCandidate]:
+    if load_run(run_id) is None:
+        raise HTTPException(status_code=404, detail="Research run not found")
+    return ReviewedDisclosureFactService().store.list(run_id)
+
+
+@app.post(
+    "/api/v1/runs/{run_id}/financials/candidates/{candidate_id}/decision",
+    response_model=DisclosureFactCandidate,
+)
+def decide_reviewed_disclosure_fact_candidate(
+    run_id: str,
+    candidate_id: str,
+    request: ProposalDecisionRequest,
+) -> DisclosureFactCandidate:
+    try:
+        return ReviewedDisclosureFactService().decide(
+            run_id,
+            candidate_id,
+            accepted=request.accepted,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
 
 
 @app.get("/api/v1/tickers/resolve", response_model=TickerIdentity)
