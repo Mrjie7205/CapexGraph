@@ -5,8 +5,15 @@ services:
       - "8000:8000"
     environment:
       CAPEXGRAPH_RUNS_DIR: /workspace/runs
+      CAPEXGRAPH_OPENAI_MODEL: ${CAPEXGRAPH_OPENAI_MODEL:-}
       CAPEXGRAPH_MODEL: ${CAPEXGRAPH_MODEL:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # For an explicit container-to-host setup, use http://host.docker.internal:8317/v1
+      # and opt in to the non-loopback proxy boundary.
+      CAPEXGRAPH_CODEX_BASE_URL: ${CAPEXGRAPH_CODEX_BASE_URL:-}
+      CAPEXGRAPH_CODEX_PROXY_KEY: ${CAPEXGRAPH_CODEX_PROXY_KEY:-}
+      CAPEXGRAPH_CODEX_MODEL: ${CAPEXGRAPH_CODEX_MODEL:-}
+      CAPEXGRAPH_ALLOW_REMOTE_CODEX_PROXY: ${CAPEXGRAPH_ALLOW_REMOTE_CODEX_PROXY:-0}
     volumes:
       - capexgraph-runs:/workspace/runs
     restart: unless-stopped

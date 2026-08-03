@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from capexgraph.domain import RunMode, RunStatus, StepStatus
+from capexgraph.providers import ProviderConfigurationError
 from capexgraph.runtime import RunStore, WorkflowExecutor
 from capexgraph.workflows import create_run
 
@@ -41,6 +42,33 @@ def test_executor_retries_a_transient_failure(tmp_path, monkeypatch) -> None:
     assert census.status == StepStatus.COMPLETED
     assert census.attempts == 2
     assert calls == 2
+
+
+def test_executor_does_not_retry_non_retryable_provider_failure(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.THEME, "provider contract", "US")
+    calls = 0
+
+    def invalid_configuration(_run, _step):
+        nonlocal calls
+        calls += 1
+        raise ProviderConfigurationError(
+            "Provider setup failed: missing local proxy model.",
+            provider="codex_subscription",
+        )
+
+    failed = WorkflowExecutor(
+        handlers={"intake": invalid_configuration},
+        max_attempts=3,
+    ).execute(run.id)
+
+    assert failed.status == RunStatus.FAILED
+    assert failed.pipeline[0].attempts == 1
+    assert calls == 1
+    assert failed.manifest["model_provider_failures"][0]["category"] == "configuration"
 
 
 def test_resume_skips_completed_checkpoints(tmp_path, monkeypatch) -> None:

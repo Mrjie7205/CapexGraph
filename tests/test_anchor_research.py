@@ -18,6 +18,7 @@ def test_golden_anchor_scan_is_evidence_bound(tmp_path, monkeypatch) -> None:
 
     assert completed.status == RunStatus.NEEDS_REVIEW
     assert completed.manifest["anchor_node_id"] == "company-gigadevice"
+    assert completed.manifest["model_usage"]["calls"] == 7
     assert len(completed.nodes) == 4
     assert len(completed.edges) == 3
     assert len(completed.candidates) == 3

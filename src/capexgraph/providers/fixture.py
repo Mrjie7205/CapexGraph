@@ -42,6 +42,14 @@ class FixtureResearchModel:
         fixture_path = files("capexgraph.fixtures").joinpath(filename)
         self._payload = json.loads(fixture_path.read_text(encoding="utf-8"))
         self.model_name = self._payload["fixture"]["id"]
+        self.execution_context = {
+            "api_surface": "local_fixture",
+            "transport": "bundled_fixture",
+            "auth_mode": "none",
+            "billing_mode": "none",
+            "endpoint_scope": "local",
+        }
+        self.call_count = 0
 
     def generate(
         self,
@@ -51,6 +59,7 @@ class FixtureResearchModel:
         user_prompt: str,
     ) -> StructuredOutput:
         del system_prompt, user_prompt
+        self.call_count += 1
         raw_output = self._payload["outputs"].get(output_model.__name__)
         if raw_output is None:
             raise KeyError(f"Fixture has no output for {output_model.__name__}")

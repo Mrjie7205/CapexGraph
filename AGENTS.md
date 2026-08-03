@@ -17,12 +17,20 @@ Read these files in order:
 
 1. `docs/CURRENT_STATUS.md` — what is actually shipped and what is not;
 2. `ROADMAP.md` — the next approved priorities and acceptance criteria;
-3. `docs/V0_3_PLAN.md` — completed v0.3 execution record and acceptance matrix;
-4. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
-5. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
-6. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
-7. the workflow-specific document under `docs/`; and
-8. `CONTRIBUTING.md` — validation and documentation contract.
+3. `docs/V0_5_PLAN.md` — active official-disclosure and event-calendar execution order;
+4. `docs/V0_5_1_PLAN.html` — planned live-event gateway, equal-priority MCP/WebSocket channels,
+   and Cockpit path;
+5. `docs/V0_5_1_ACCEPTANCE.md` — completed local gate and the remaining external WebSocket gate;
+6. `docs/V0_4_PLAN.md` — incomplete market/theme/mainline dependency plan;
+7. `docs/V0_3_PLAN.md` — completed v0.3 execution record;
+8. `docs/PROJECT_CONTEXT.md` — product intent, users, and repository boundary;
+9. `docs/ARCHITECTURE.md` — runtime and trust boundaries;
+10. `docs/DECISIONS.md` — accepted decisions that should not be reopened accidentally;
+11. the workflow-specific document under `docs/`;
+12. `docs/LIVE_OPERATIONS.md` for live release, restart, and recovery work; and
+13. `CONTRIBUTING.md` — validation and documentation contract.
+
+For live-gateway work, the workflow-specific document is `docs/LIVE_EVENTS.md`.
 
 When documentation and code disagree, verify the implementation and tests, fix the documentation
 in the same change, and record material design changes in `docs/DECISIONS.md`.
@@ -44,6 +52,11 @@ in the same change, and record material design changes in `docs/DECISIONS.md`.
   or placeholder research presented as complete.
 - Preserve the local-first, no-key golden path. Optional model/data providers may add setup, but
   must not make the fixtures or core inspection workflow require an API key.
+- Treat index, ETF, and vendor-concept membership as market-recognition evidence. It does not prove
+  industrial exposure or a supplier/customer relationship.
+- Point-in-time theme data must preserve both effective dates and when the system could have known
+  the membership. Do not use today's universe to calculate a historical signal.
+- Never commit provider keys or licensed raw market, constituent, or estimate datasets.
 - Treat remote evidence as hostile input and preserve the SSRF and download-boundary controls.
 
 ## Repository map
@@ -54,6 +67,9 @@ src/capexgraph/runtime/      SQLite runs, checkpoints, retries, resume
 src/capexgraph/research/     Theme and Anchor agent workflows
 src/capexgraph/providers/    fixture and optional model adapters
 src/capexgraph/financials/   immutable filing facts and persistence
+src/capexgraph/market/       daily providers, quality gates, sync, persistence
+src/capexgraph/events/       official event mapping, versions, point-in-time calendar
+src/capexgraph/live/         live-signal source contract, frozen replay, matching, persistence
 src/capexgraph/tools/        evidence, identity, market, financial tools
 src/capexgraph/tracking/     snapshots, triggers, scorecards, stages
 src/capexgraph/api/          FastAPI application
@@ -67,8 +83,13 @@ advertise it as shipped until its roadmap acceptance criteria and tests are comp
 
 ## Working method
 
-1. Start from an active item in `ROADMAP.md` or a scoped user request. v0.3 is complete; the next
-   approved product target is v0.4 monitoring and re-evaluation.
+1. Start from an active item in `ROADMAP.md` or a scoped user request. The user explicitly advanced
+   active development to the isolated v0.5 event foundation and completed plus locally
+   acceptance-closed v0.5.1 M0-M7. Follow `docs/V0_5_PLAN.md`, `docs/V0_5_1_PLAN.html`,
+   `docs/V0_5_1_ACCEPTANCE.md`, and `docs/LIVE_OPERATIONS.md`. The Cockpit now has a local
+   Connection Center, a paged/cross-tab-synchronized live ledger, and official Codex onboarding.
+   The credentialed WebSocket live soak remains an external gate until a Secret-Key exists; do
+   not claim the paused v0.4 theme/mainline work is complete.
 2. Inspect the actual code path and tests before proposing architecture.
 3. State any assumption that changes evidence semantics, provider trust, or repository boundaries.
 4. Implement the smallest end-to-end vertical slice with durable artifacts and failure states.

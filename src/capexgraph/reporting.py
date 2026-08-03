@@ -149,6 +149,8 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
         f"<td>{html.escape(str(item.get('name', '—')))}</td>"
         f"<td>{html.escape(str(item.get('version', '—')))}</td>"
         f"<td>{html.escape(str(item.get('model', '—')))}</td>"
+        f"<td>{html.escape(str(item.get('transport', '—')))}</td>"
+        f"<td>{html.escape(str(item.get('billing_mode', '—')))}</td>"
         "</tr>"
         for label, items in (
             ("Model", [provider_details]),
@@ -159,9 +161,9 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
         if isinstance(item, dict)
     )
     provider_rows = provider_rows or (
-        "<tr><td colspan='4'>尚未记录Provider。</td></tr>"
+        "<tr><td colspan='6'>尚未记录Provider。</td></tr>"
         if chinese
-        else "<tr><td colspan='4'>No providers recorded.</td></tr>"
+        else "<tr><td colspan='6'>No providers recorded.</td></tr>"
     )
     coverage_gaps = "".join(f"<li>{html.escape(gap)}</li>" for gap in coverage.gaps) or (
         "<li>当前未检测到覆盖缺口。</li>"
@@ -321,7 +323,7 @@ def render_run_report(run_id: str, output_path: Path | None = None) -> Path:
 <body><main>
   <header><div><div class="kicker">CapexGraph / {html.escape(mode_label)}</div><h1>{html.escape(run.subject)}</h1></div><div class="meta">{'运行' if chinese else 'RUN'} {html.escape(run.id)}<br>{'研究日期' if chinese else 'AS OF'} {run.as_of_date}<br>{'状态' if chinese else 'STATUS'} {html.escape(localized(run.status.value, STATUS_ZH))}</div></header>
   <div class="summary"><p>{html.escape(decision.get('summary', summary_fallback))}</p><ul><li>{len(run.nodes)} {'个节点' if chinese else 'nodes'} / {len(run.edges)} {'条关系' if chinese else 'edges'}</li><li>{len(run.evidence)} {'项证据' if chinese else 'evidence items'}</li><li>{len(run.candidates)} {'个研究对象' if chinese else 'candidates'}</li><li>{html.escape(financial_note)}</li></ul></div>
-  <section><h2>00 / {'Provider与证据覆盖' if chinese else 'Providers and evidence coverage'}</h2><div class="trust-grid"><div class="coverage-card"><span>{'覆盖状态' if chinese else 'Coverage status'}</span><strong>{html.escape(coverage.status)}</strong><p>{coverage.reviewed} {'项已审核' if chinese else 'reviewed'} · {coverage.pending_reviews} {'项待审核' if chinese else 'pending review'}</p><ul>{coverage_gaps}</ul></div><table><thead><tr><th>{'类别' if chinese else 'Role'}</th><th>Provider</th><th>{'版本' if chinese else 'Version'}</th><th>Model</th></tr></thead><tbody>{provider_rows}</tbody></table></div></section>
+  <section><h2>00 / {'Provider与证据覆盖' if chinese else 'Providers and evidence coverage'}</h2><div class="trust-grid"><div class="coverage-card"><span>{'覆盖状态' if chinese else 'Coverage status'}</span><strong>{html.escape(coverage.status)}</strong><p>{coverage.reviewed} {'项已审核' if chinese else 'reviewed'} · {coverage.pending_reviews} {'项待审核' if chinese else 'pending review'}</p><ul>{coverage_gaps}</ul></div><table><thead><tr><th>{'类别' if chinese else 'Role'}</th><th>Provider</th><th>{'版本' if chinese else 'Version'}</th><th>Model</th><th>Transport</th><th>Billing</th></tr></thead><tbody>{provider_rows}</tbody></table></div></section>
   <section><h2>01 / {'有证据支撑的关系图' if chinese else 'Grounded relationship map'}</h2><table><thead><tr><th>{'来源节点' if chinese else 'Source'}</th><th>{'关系' if chinese else 'Relation'}</th><th>{'目标节点' if chinese else 'Target'}</th><th>{'产品或能力' if chinese else 'Product'}</th><th>{'置信度' if chinese else 'Confidence'}</th><th>{'证据数' if chinese else 'Sources'}</th></tr></thead><tbody>{edge_rows}</tbody></table></section>
   <section><h2>02 / {'研究队列' if chinese else 'Research queue'}</h2><div class="candidates">{candidate_cards}</div></section>
   <section><h2>03 / {'证据台账' if chinese else 'Evidence ledger'}</h2><ul class="sources">{source_items}</ul></section>

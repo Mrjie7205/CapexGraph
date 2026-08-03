@@ -2,15 +2,22 @@ from __future__ import annotations
 
 import csv
 import os
+import re
 from importlib.resources import files
 from pathlib import Path
 
+from capexgraph.config import load_project_env
 from capexgraph.domain import TickerIdentity
 
 
 def canonical_ticker(value: str) -> str:
     ticker = value.strip().upper()
-    replacements = {".SS": ".SH", ".SHG": ".SH", ".SHE": ".SZ"}
+    replacements = {
+        ".SS": ".SH",
+        ".SHG": ".SH",
+        ".SHE": ".SZ",
+        ".KS": ".KO",
+    }
     for old, new in replacements.items():
         if ticker.endswith(old):
             ticker = f"{ticker[:-len(old)]}{new}"
@@ -48,6 +55,7 @@ class TickerResolver:
     """Resolve canonical ticker identities without letting a model invent company names."""
 
     def __init__(self, extra_registry: Path | None = None) -> None:
+        load_project_env()
         bundled = files("capexgraph.fixtures").joinpath("ticker_registry.csv")
         identities = _read_registry(Path(str(bundled)))
         configured = extra_registry or (
@@ -78,5 +86,29 @@ class TickerResolver:
                 market="CN",
                 exchange=exchange,
                 currency="CNY",
+            )
+        if ticker.endswith((".KO", ".KQ")) and ticker[:-3].isdigit():
+            return TickerIdentity(
+                ticker=ticker,
+                name=ticker,
+                market="KR",
+                exchange="KRX" if ticker.endswith(".KO") else "KOSDAQ",
+                currency="KRW",
+            )
+        if ticker.endswith(".US") and re.fullmatch(r"[A-Z][A-Z0-9.-]{0,15}\.US", ticker):
+            return TickerIdentity(
+                ticker=ticker,
+                name=ticker,
+                market="US",
+                exchange="US",
+                currency="USD",
+            )
+        if re.fullmatch(r"[A-Z][A-Z0-9.-]{0,15}", ticker):
+            return TickerIdentity(
+                ticker=ticker,
+                name=ticker,
+                market="US",
+                exchange="US",
+                currency="USD",
             )
         raise KeyError(f"Ticker identity not found: {query}")

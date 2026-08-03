@@ -10,6 +10,7 @@ StructuredOutput = TypeVar("StructuredOutput", bound=BaseModel)
 
 class ProviderName(StrEnum):
     FIXTURE = "fixture"
+    CODEX_SUBSCRIPTION = "codex_subscription"
     OPENAI = "openai"
 
 
@@ -23,6 +24,8 @@ class ResearchModel(Protocol):
     provider_version: str
     model_name: str
     evidence_policy: EvidencePolicy
+    execution_context: dict[str, str]
+    call_count: int
 
     def generate(
         self,

@@ -13,6 +13,11 @@ from capexgraph.domain import (
     StepCheckpoint,
     StepStatus,
 )
+from capexgraph.providers import (
+    ResearchProviderError,
+    provider_failure_record,
+    redact_provider_secrets,
+)
 from capexgraph.runtime.artifacts import atomic_write_json, atomic_write_text
 from capexgraph.runtime.store import RunStore, runs_dir
 
@@ -89,11 +94,16 @@ class WorkflowExecutor:
                     output = handler(run, step) or {}
                 except Exception as error:  # noqa: BLE001 - errors become checkpoint state
                     step.status = StepStatus.FAILED
-                    step.error = f"{type(error).__name__}: {error}"
+                    safe_error = redact_provider_secrets(error)
+                    step.error = f"{type(error).__name__}: {safe_error}"
                     step.message = "Step execution failed"
+                    if isinstance(error, ResearchProviderError):
+                        failures = run.manifest.setdefault("model_provider_failures", [])
+                        failures.append(provider_failure_record(error=error, stage=step.key))
                     self._checkpoint(run, step, error=step.error)
                     self._persist(run)
-                    if attempts_this_execution >= self.max_attempts:
+                    should_retry = not isinstance(error, ResearchProviderError) or error.retryable
+                    if not should_retry or attempts_this_execution >= self.max_attempts:
                         run.status = RunStatus.FAILED
                         return self._persist(run)
                     step.status = StepStatus.PENDING

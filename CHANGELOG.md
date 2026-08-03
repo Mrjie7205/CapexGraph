@@ -4,6 +4,108 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
+- closed the local v0.5.1 acceptance gap with cross-tab connection/monitor synchronization,
+  visibility and 30-second canonical-ledger refresh, formal/fixture/mixed provenance labels,
+  filtered totals, load-more pagination, score/theme/entity/alert filters, batched event-page
+  assembly, credential-isolated tests, and a durable acceptance record; the independent
+  credentialed WebSocket soak remains `WAIT KEY`;
+- made Chinese the primary Cockpit operating language across navigation, research creation,
+  workflow and evidence states, source/readiness tools, Live Desk, Connection Center, settings,
+  and Research Bridge; retained compact English sublabels for audit vocabulary, localized
+  deterministic signal explanations, improved 390px typography, and changed the bridge Market
+  field to the same bounded CN/US/KR selector used by the main composer;
+- made the official local Codex CLI the default `codex_subscription` transport, with official
+  app-server account/login/model discovery, ephemeral read-only schema-bound `codex exec`, and no
+  OpenAI Platform API key; recursively normalized Pydantic schemas for strict structured output,
+  disabled plugin/catalog loading in the bounded subprocess, and retained CLIProxyAPI as an
+  explicit compatibility transport;
+- added a productized Connection Center for verify-before-save Jin10 MCP setup, independent
+  WebSocket credential setup, official Codex ChatGPT login/model selection, one-way secret entry,
+  redacted status, runtime refresh, and explicit disconnect;
+- changed the research composer Market field to a bounded CN/US/KR dropdown and made the SSE
+  stream emit an immediate readiness event so Live Desk no longer waits for the first heartbeat;
+- added three explicit, non-fallback model channels: frozen fixtures, a Codex subscription
+  adapter, and the separately billed official OpenAI API;
+- isolated model names and credentials per channel, enforced loopback-by-default proxy URLs,
+  retained strict Responses/Pydantic parsing, disabled nested SDK retries, and categorized
+  credential-safe provider failures;
+- locked provider and model identity after execution starts, persisted transport/billing provenance
+  plus model-call counts, and exposed redacted model readiness through CLI, API, Cockpit, and
+  portable reports;
+- approved and documented the v0.5.1 live-event gateway plan, including a frozen no-key event feed,
+  equal-priority Jin10 MCP and Open Platform WebSocket channels, MCP-first real-data delivery with
+  WebSocket co-development, cross-channel observation matching, deterministic filtering, optional
+  AI impact analysis, Cockpit Live Desk flows, and explicit signal-versus-Evidence boundaries;
+- implemented the v0.5.1 M0/M1 foundation with typed live observations, append-only signal
+  versions, retention and verification states, per-channel checkpoints, redacted dead letters,
+  human-gated action proposals, and additive schema migration 6;
+- added a common live-source protocol, deterministic service/store, frozen synthetic MCP/WebSocket
+  feeds with independent cursors and health, matched/divergent examples, and no-key `live demo` /
+  `live status` CLI paths without claiming a real Jin10 connection;
+- completed v0.5.1 M2 with a strict Streamable HTTP MCP client, standard negotiation, tool/resource
+  discovery, structuredContent-only parsing, latest-page flash polling, calendar normalization,
+  Beijing-day call budgets, 30/120/300 adaptive cadence, and credential-safe status;
+- completed M3 with official Jin10 flash/calendar/quote WebSocket envelopes, Secret-Key auth,
+  subscription, heartbeat, jittered reconnect, HTML sanitization, licensed-picture omission, and
+  health/checkpoints independent from MCP; live smoke remains explicitly gated by the missing
+  Secret-Key;
+- completed M4 with deterministic relevance/urgency/importance/novelty and injection rules,
+  editable entity/theme mappings, single canonical alerts, and overlap/channel-only/divergence plus
+  P50/P95 delivery metrics;
+- completed M5 with a no-key rules baseline and an explicit selective typed-model path that
+  persists provider/model/prompt/call/failure lineage without silently presenting a failed model
+  call as model output;
+- added schema migration 7 for rule assessments, analysis records, alert delivery states,
+  backend-owned Live Desk settings, and auditable user actions;
+- completed M6 with the live supervisor, `live providers|poll|monitor`, the `/api/v1/live`
+  status/events/coverage/settings/actions/SSE surface, and a responsive Live Desk with independent
+  channel chips, no-key replay, filters, lineage, impact analysis, coverage audit, explicit browser
+  notifications, and Watch/Verify/Dismiss/Mute actions;
+- completed M7 with confirmed official-source verification tasks, regulator/issuer source gates,
+  guarded capture and retry, human approve/reject, unchanged-hash enforcement, separate reviewed
+  Evidence links, and append-only verification-state signal versions;
+- added immutable live-context snapshots and integrity checks, existing-run attachment,
+  parent-preserving child re-evaluation, dedicated mutation endpoints, and a combined
+  observation/signal/analysis/action/bridge audit timeline;
+- added additive schema migration 8 for verification tasks, live Evidence links, run-context links,
+  audit entries, and soak reports without rewriting existing research history;
+- added isolated duplicate/failure/recovery soak tests, `live soak`, `live doctor`, credential-safe
+  diagnostics, WebSocket/MCP credentialed-gate semantics, and the live operations/recovery runbook;
+- extended Live Desk with the responsive Research Bridge, four-stage evidence firewall, official
+  source capture/review controls, linked-run operations, audit history, release-gate status, and
+  explicit confirmations for every research mutation;
+- started the v0.5 official-event foundation with typed event taxonomy, lifecycle state,
+  source-public/system-observed timestamps, effective/expected dates, and canonical entities;
+- added append-only migration 5, semantic idempotency, immutable event versions, current/history
+  views, and point-in-time queries;
+- upgraded SEC submission discovery with acceptance timestamps, item metadata, and XBRL flags;
+- mapped SEC periodic reports conservatively into financial-report events and other forms into
+  regulatory-filing events without inferring document contents;
+- linked successful guarded source capture by appending a new evidence-backed event version, and
+  exposed the calendar through CLI, API, run manifests, and portable `events.json`;
+- kept successful evidence capture authoritative if the downstream event projection fails, while
+  recording a durable event-calendar error for explicit refresh;
+- centralized repository `.env` loading across SEC, market, model, and ticker adapters, and made
+  SEC 403 failures explain the required real-contact User-Agent configuration;
+- started the v0.4 market-data foundation with provider-neutral bar, capability, quality, and sync
+  contracts;
+- added a credential-safe EODHD daily-history adapter for US, Shanghai, Shenzhen, KRX, and KOSDAQ,
+  while preserving Yahoo as an explicit no-key fallback and reporting Beijing Stock Exchange as
+  unsupported;
+- preserved raw OHLC separately from adjusted close, added deterministic structural/staleness
+  checks, and blocked failed data before normalized persistence;
+- added schema migration 4, idempotent daily bars, hashed quality reports, ignored local raw
+  responses, and overlapping incremental sync;
+- connected provider selection and quality-checked history to CLI, API, run market snapshots, and
+  forward tracking without exposing tokens; and
+- approved and documented the v0.4 execution plan for EODHD-backed US/CN/KR daily history,
+  market-specific quality gates, point-in-time theme membership, deterministic theme metrics,
+  versioned mainline policy, scheduled monitoring, and linked re-evaluation;
+- separated ETF/index/vendor recognition from evidence-backed industrial exposure and required
+  effective/known time boundaries for historical theme universes; and
+- reordered future milestones so cross-market official disclosures/events precede point-in-time
+  consensus revisions, with Catalyst and Cockpit productization following afterward.
+
 ## 0.3.0 — 2026-07-27
 
 - added a repository-owned cross-session handoff contract: agent guide, forward roadmap, project

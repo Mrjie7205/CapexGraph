@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
+from capexgraph.market import MarketDataProvider, MarketDataService, build_market_provider
 from capexgraph.tools.identity import TickerResolver, canonical_ticker
-from capexgraph.tools.market import MarketDataProvider, YahooChartProvider
 from capexgraph.tracking.models import (
     Scorecard,
     TrackedCandidate,
@@ -25,10 +25,11 @@ class TrackingService:
         benchmark_ticker: str,
         provider: MarketDataProvider,
     ) -> tuple[date, float, float]:
-        primary = provider.fetch_history(ticker)
-        benchmark = provider.fetch_history(benchmark_ticker)
-        primary_by_date = {bar.date: bar.close for bar in primary}
-        benchmark_by_date = {bar.date: bar.close for bar in benchmark}
+        market = MarketDataService(provider=provider)
+        primary = market.sync(ticker).bar_set.bars
+        benchmark = market.sync(benchmark_ticker).bar_set.bars
+        primary_by_date = {bar.date: bar.return_close for bar in primary}
+        benchmark_by_date = {bar.date: bar.return_close for bar in benchmark}
         common_dates = sorted(set(primary_by_date) & set(benchmark_by_date))
         if not common_dates:
             raise ValueError("Ticker and benchmark have no common market date")
@@ -62,7 +63,7 @@ class TrackingService:
             raise ValueError("Candidate and benchmark baseline prices must be supplied together")
         source = "manual"
         if call_price is None and capture_live:
-            active_provider = provider or YahooChartProvider()
+            active_provider = provider or build_market_provider()
             call_date, call_price, call_benchmark_price = self._pair_prices(
                 identity.ticker,
                 benchmark,
@@ -151,7 +152,7 @@ class TrackingService:
         tracked = self.store.get_candidate(tracked_id)
         if tracked is None:
             raise KeyError(f"Tracked candidate not found: {tracked_id}")
-        active_provider = provider or YahooChartProvider()
+        active_provider = provider or build_market_provider()
         as_of, price, benchmark_price = self._pair_prices(
             tracked.ticker,
             tracked.benchmark_ticker,

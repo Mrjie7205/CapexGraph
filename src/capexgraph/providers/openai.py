@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-import os
 from typing import Any
 
 from capexgraph.providers.base import EvidencePolicy, StructuredOutput
+from capexgraph.providers.config import ModelSettings
+from capexgraph.providers.errors import ProviderConfigurationError
+from capexgraph.providers.responses import generate_responses_output
 
 
 class OpenAIResearchModel:
@@ -12,6 +14,13 @@ class OpenAIResearchModel:
     provider_name = "openai"
     provider_version = "1"
     evidence_policy = EvidencePolicy.UNVERIFIED_MODEL
+    execution_context = {
+        "api_surface": "responses",
+        "transport": "openai_official_api",
+        "auth_mode": "api_key",
+        "billing_mode": "openai_api",
+        "endpoint_scope": "api.openai.com",
+    }
 
     def __init__(
         self,
@@ -20,19 +29,31 @@ class OpenAIResearchModel:
         api_key: str | None = None,
         client: Any | None = None,
     ) -> None:
-        self.model_name = (model or os.getenv("CAPEXGRAPH_MODEL", "")).strip()
+        settings = ModelSettings.from_environment()
+        self.model_name = (model or settings.openai_model or "").strip()
         if not self.model_name:
-            raise ValueError("Set CAPEXGRAPH_MODEL when using the OpenAI provider")
+            raise ProviderConfigurationError(
+                "Set CAPEXGRAPH_OPENAI_MODEL when using the OpenAI provider.",
+                provider=self.provider_name,
+            )
 
         if client is None:
+            resolved_api_key = api_key or settings.openai_api_key
+            if not resolved_api_key:
+                raise ProviderConfigurationError(
+                    "Set OPENAI_API_KEY when using the OpenAI provider.",
+                    provider=self.provider_name,
+                )
             try:
                 from openai import OpenAI
             except ImportError as error:
-                raise RuntimeError(
-                    'Install the optional OpenAI adapter with: pip install -e ".[openai]"'
+                raise ProviderConfigurationError(
+                    'Install the optional OpenAI adapter with: pip install -e ".[openai]"',
+                    provider=self.provider_name,
                 ) from error
-            client = OpenAI(api_key=api_key or os.getenv("OPENAI_API_KEY"))
+            client = OpenAI(api_key=resolved_api_key, max_retries=0)
         self._client = client
+        self.call_count = 0
 
     def generate(
         self,
@@ -41,18 +62,12 @@ class OpenAIResearchModel:
         system_prompt: str,
         user_prompt: str,
     ) -> StructuredOutput:
-        response = self._client.responses.parse(
-            model=self.model_name,
-            input=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            text_format=output_model,
+        self.call_count += 1
+        return generate_responses_output(
+            self._client,
+            provider_name=self.provider_name,
+            model_name=self.model_name,
+            output_model=output_model,
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
         )
-        parsed = getattr(response, "output_parsed", None)
-        if parsed is None:
-            refusal = getattr(response, "output_text", "")
-            raise RuntimeError(f"OpenAI returned no parsed output: {refusal or 'empty response'}")
-        if isinstance(parsed, output_model):
-            return parsed
-        return output_model.model_validate(parsed)

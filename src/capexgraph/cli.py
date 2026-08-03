@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import sys
-from datetime import date
+import time as time_module
+from datetime import UTC, date, datetime, time
 from pathlib import Path
 from typing import Annotated
 
@@ -12,9 +13,36 @@ from rich.panel import Panel
 from rich.table import Table
 
 from capexgraph import __version__
-from capexgraph.domain import EvidenceKind, EvidenceMode, ResearchRun, RunMode, RunStatus
+from capexgraph.domain import (
+    CorporateEventStatus,
+    CorporateEventType,
+    CorporateEventVersion,
+    EvidenceKind,
+    EvidenceMode,
+    ResearchRun,
+    RunMode,
+    RunStatus,
+)
+from capexgraph.events import EventCalendarService
 from capexgraph.financials import FinancialFactService
-from capexgraph.providers import ProviderName
+from capexgraph.live import (
+    FrozenClock,
+    LiveGatewayRuntime,
+    LiveSignalService,
+    LiveSignalStore,
+    LiveSoakRunner,
+    build_live_diagnostics,
+    calculate_live_coverage,
+    get_live_runtime,
+    load_frozen_dual_channel_feeds,
+)
+from capexgraph.market import (
+    MarketDataService,
+    MarketSettings,
+    build_market_provider,
+    provider_capabilities,
+)
+from capexgraph.providers import ModelSettings, ProviderName
 from capexgraph.reporting import render_run_report
 from capexgraph.research import build_executor_for_run
 from capexgraph.runtime import (
@@ -48,7 +76,13 @@ app = typer.Typer(
 evidence_app = typer.Typer(help="Capture and review research evidence.", no_args_is_help=True)
 ticker_app = typer.Typer(help="Resolve deterministic ticker identities.", no_args_is_help=True)
 market_app = typer.Typer(help="Capture and inspect market snapshots.", no_args_is_help=True)
+model_app = typer.Typer(help="Inspect structured model channels.", no_args_is_help=True)
+live_app = typer.Typer(
+    help="Replay and inspect provider-neutral live-signal streams.",
+    no_args_is_help=True,
+)
 financials_app = typer.Typer(help="Import evidence-linked financial facts.", no_args_is_help=True)
+events_app = typer.Typer(help="Discover and inspect corporate events.", no_args_is_help=True)
 tracking_app = typer.Typer(
     help="Track candidates and evaluate forward evidence.", no_args_is_help=True
 )
@@ -64,7 +98,10 @@ db_app = typer.Typer(
 app.add_typer(evidence_app, name="evidence")
 app.add_typer(ticker_app, name="ticker")
 app.add_typer(market_app, name="market")
+app.add_typer(model_app, name="model")
+app.add_typer(live_app, name="live")
 app.add_typer(financials_app, name="financials")
+app.add_typer(events_app, name="events")
 app.add_typer(tracking_app, name="tracking")
 app.add_typer(report_app, name="report")
 app.add_typer(sources_app, name="sources")
@@ -104,7 +141,8 @@ def _create(
 ) -> None:
     if mode in {RunMode.THEME, RunMode.ANCHOR} and execute and provider is None:
         raise typer.BadParameter(
-            f"{mode.value.title()} Scan execution requires --provider fixture or --provider openai"
+            f"{mode.value.title()} Scan execution requires --provider "
+            "fixture, codex_subscription, or openai"
         )
     try:
         as_of_date = date.fromisoformat(as_of) if as_of else None
@@ -121,6 +159,8 @@ def _create(
             console.print(f"[red]{error}[/red]")
             raise typer.Exit(1) from error
     _show_run(run, "CapexGraph run created")
+    if execute and run.status == RunStatus.FAILED:
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -137,7 +177,10 @@ def theme(
     execute: Annotated[bool, typer.Option("--execute", "-x")] = False,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Structured research provider: fixture or openai"),
+        typer.Option(
+            "--provider",
+            help="Structured research provider: fixture, codex_subscription, or openai",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode,
@@ -156,7 +199,10 @@ def anchor(
     execute: Annotated[bool, typer.Option("--execute", "-x")] = False,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Structured research provider: fixture or openai"),
+        typer.Option(
+            "--provider",
+            help="Structured research provider: fixture, codex_subscription, or openai",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode,
@@ -213,7 +259,10 @@ def run_command(
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
+        typer.Option(
+            "--provider",
+            help="Provider selection; locked after the first execution attempt",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode | None,
@@ -248,7 +297,10 @@ def resume(
     attempts: Annotated[int, typer.Option("--attempts", min=1, max=10)] = 2,
     provider: Annotated[
         ProviderName | None,
-        typer.Option("--provider", help="Provider override for a Theme or Anchor Scan"),
+        typer.Option(
+            "--provider",
+            help="Provider selection; locked after the first execution attempt",
+        ),
     ] = None,
     evidence_mode: Annotated[
         EvidenceMode | None,
@@ -396,6 +448,45 @@ def _show_source_suggestions(items) -> None:
     console.print(table)
 
 
+def _show_events(items: list[CorporateEventVersion]) -> None:
+    table = Table(title="CapexGraph corporate event calendar")
+    table.add_column("Date")
+    table.add_column("Ticker")
+    table.add_column("Type")
+    table.add_column("State")
+    table.add_column("Version")
+    table.add_column("Title")
+    table.add_column("Evidence")
+    for item in items:
+        event_date = (
+            item.effective_date
+            or item.expected_date
+            or item.occurred_date
+            or item.announced_date
+        )
+        table.add_row(
+            event_date.isoformat() if event_date else "unknown",
+            item.ticker or item.entity_id,
+            item.event_type.value,
+            item.status.value,
+            str(item.version),
+            item.title,
+            item.evidence_id or "suggestion",
+        )
+    console.print(table)
+
+
+def _event_as_of(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    if len(value) == 10:
+        return datetime.combine(date.fromisoformat(value), time.max, UTC)
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("--as-of must include a timezone")
+    return parsed
+
+
 @sources_app.command("discover")
 def sources_discover(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
@@ -421,6 +512,87 @@ def sources_discover(
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     _show_source_suggestions(items)
+
+
+@events_app.command("sync")
+def events_sync(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    identifier: Annotated[
+        str | None,
+        typer.Option("--identifier", "-i", help="Exact SEC ticker, company name, or CIK"),
+    ] = None,
+    form: Annotated[
+        list[str] | None,
+        typer.Option("--form", help="SEC form to include; repeat for multiple forms"),
+    ] = None,
+    limit: Annotated[int, typer.Option("--limit", min=1, max=100)] = 10,
+) -> None:
+    """Discover official SEC filings and append event-calendar versions."""
+    try:
+        items = EventCalendarService().discover_sec_filings(
+            run_id,
+            identifier=identifier,
+            forms=form or (),
+            limit=limit,
+        )
+    except (KeyError, ValueError, RuntimeError, httpx.HTTPError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_events(items)
+
+
+@events_app.command("refresh")
+def events_refresh(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+) -> None:
+    """Rebuild event versions from the run's durable source queue."""
+    try:
+        items = EventCalendarService().refresh_from_sources(run_id)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_events(items)
+
+
+@events_app.command("list")
+def events_list(
+    run_id: Annotated[str, typer.Argument(help="Research run ID")],
+    history: Annotated[
+        bool,
+        typer.Option("--history", help="Show every immutable version"),
+    ] = False,
+    as_of: Annotated[
+        str | None,
+        typer.Option("--as-of", help="System-observed cutoff date or ISO datetime"),
+    ] = None,
+    ticker: Annotated[str | None, typer.Option("--ticker")] = None,
+    event_type: Annotated[
+        CorporateEventType | None,
+        typer.Option("--type"),
+    ] = None,
+    status: Annotated[
+        CorporateEventStatus | None,
+        typer.Option("--status"),
+    ] = None,
+    date_from: Annotated[str | None, typer.Option("--from")] = None,
+    date_to: Annotated[str | None, typer.Option("--to")] = None,
+) -> None:
+    """Inspect latest events or the append-only version history."""
+    try:
+        items = EventCalendarService().list(
+            run_id,
+            as_of=_event_as_of(as_of),
+            latest_only=not history,
+            ticker=ticker.upper() if ticker else None,
+            event_type=event_type,
+            status=status,
+            date_from=date.fromisoformat(date_from) if date_from else None,
+            date_to=date.fromisoformat(date_to) if date_to else None,
+        )
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    _show_events(items)
 
 
 @sources_app.command("add")
@@ -521,14 +693,326 @@ def ticker_resolve(query: Annotated[str, typer.Argument(help="Ticker, name, or a
 def market_snapshot(
     run_id: Annotated[str, typer.Argument(help="Research run ID")],
     ticker: Annotated[str, typer.Argument(help="Ticker or registered company name")],
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
+    days: Annotated[int, typer.Option("--days", min=1, max=20000)] = 400,
 ) -> None:
-    """Fetch adjusted daily history and attach a market snapshot to a run."""
+    """Fetch quality-checked daily history and attach a snapshot to a run."""
     try:
-        snapshot = capture_market_snapshot(run_id, ticker)
+        snapshot = capture_market_snapshot(
+            run_id,
+            ticker,
+            provider=build_market_provider(provider),
+            days=days,
+        )
     except (KeyError, ValueError, RuntimeError) as error:
         console.print(f"[red]{error}[/red]")
         raise typer.Exit(1) from error
     console.print_json(data=snapshot.model_dump(mode="json"))
+
+
+@market_app.command("sync")
+def market_sync(
+    tickers: Annotated[list[str], typer.Argument(help="One or more canonical tickers")],
+    provider: Annotated[
+        str | None,
+        typer.Option("--provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
+    days: Annotated[int, typer.Option("--days", min=1, max=20000)] = 400,
+) -> None:
+    """Incrementally sync normalized bars and persist their quality report."""
+    try:
+        service = MarketDataService(provider=build_market_provider(provider))
+        results = service.sync_many(tickers, days=days)
+    except (KeyError, ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=[item.model_dump(mode="json") for item in results])
+
+
+@market_app.command("providers")
+def market_providers() -> None:
+    """Show provider coverage and credential presence without revealing secrets."""
+    settings = MarketSettings.from_environment()
+    console.print_json(
+        data={
+            "configuration": settings.public_status(),
+            "capabilities": [
+                capability.model_dump(mode="json")
+                for capability in provider_capabilities()
+            ],
+        }
+    )
+
+
+@model_app.command("providers")
+def model_providers(
+    probe_codex: Annotated[
+        bool,
+        typer.Option(
+            "--probe-codex",
+            help="Check the configured local proxy through GET /v1/models",
+        ),
+    ] = False,
+) -> None:
+    """Show model-channel configuration without revealing secrets."""
+
+    console.print_json(
+        data={
+            "providers": ModelSettings.from_environment().provider_status(
+                probe_codex=probe_codex
+            )
+        }
+    )
+
+
+@live_app.command("demo")
+def live_demo(
+    until: Annotated[
+        str | None,
+        typer.Option(
+            "--until",
+            help="Replay observations available by this timezone-aware ISO timestamp",
+        ),
+    ] = None,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Replay the synthetic MCP/WebSocket dual-channel fixture without keys."""
+
+    clock = None
+    if until is not None:
+        try:
+            parsed = datetime.fromisoformat(until.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise typer.BadParameter("--until must be an ISO timestamp") from error
+        if parsed.tzinfo is None:
+            raise typer.BadParameter("--until must include a timezone")
+        clock = FrozenClock(parsed)
+    store = LiveSignalStore(path)
+    service = LiveSignalService(store)
+    feeds = load_frozen_dual_channel_feeds(clock=clock)
+    results = [service.poll_source(feed) for feed in feeds]
+    console.print_json(
+        data={
+            "fixture": "jin10-dual-channel-synthetic-v1",
+            "notice": "Synthetic replay only; not current market data.",
+            "channels": [
+                {
+                    "channel": result.batch.descriptor.channel.value,
+                    "observations": len(result.batch.observations),
+                    "created_versions": result.created_versions,
+                    "cursor": result.batch.checkpoint.cursor,
+                    "health": result.batch.checkpoint.health.value,
+                }
+                for result in results
+            ],
+            "signals": [
+                signal.model_dump(mode="json")
+                for signal in store.list_signals(latest_only=True)
+            ],
+        }
+    )
+
+
+@live_app.command("status")
+def live_status(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Show persisted channel checkpoints and canonical live signals."""
+
+    store = LiveSignalStore(path)
+    console.print_json(
+        data={
+            "checkpoints": [
+                item.model_dump(mode="json") for item in store.list_checkpoints()
+            ],
+            "signals": [
+                item.model_dump(mode="json")
+                for item in store.list_signals(latest_only=True)
+            ],
+            "dead_letters": [
+                item.model_dump(mode="json") for item in store.list_dead_letters()
+            ],
+            "coverage": calculate_live_coverage(
+                store.list_signals(),
+                store.list_observations(limit=5000),
+            ).model_dump(mode="json"),
+            "alerts": [
+                item.model_dump(mode="json") for item in store.list_alerts(limit=200)
+            ],
+        }
+    )
+
+
+@live_app.command("providers")
+def live_providers() -> None:
+    """Show both live channels without revealing provider credentials."""
+
+    console.print_json(data=get_live_runtime().status())
+
+
+@live_app.command("poll")
+def live_poll(
+    stream: Annotated[
+        str,
+        typer.Option("--stream", help="MCP stream: flash or calendar"),
+    ] = "flash",
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run one real MCP head poll and persist normalized signals."""
+
+    try:
+        result = LiveGatewayRuntime(path).poll_once(stream)
+    except (ValueError, RuntimeError) as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(
+        data={
+            "stream": stream,
+            "observations": len(result.batch.observations),
+            "created_versions": result.created_versions,
+            "duplicates": result.duplicate_observations,
+            "checkpoint": result.batch.checkpoint.model_dump(mode="json"),
+        }
+    )
+
+
+@live_app.command("monitor")
+def live_monitor(
+    cycles: Annotated[
+        int,
+        typer.Option(
+            "--cycles",
+            min=0,
+            help="0 keeps the gateway running until interrupted; positive values run test cycles.",
+        ),
+    ] = 0,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", min=0, max=3600),
+    ] = 1,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run equal-priority MCP/WebSocket monitoring with independent health."""
+
+    runtime = LiveGatewayRuntime(path)
+    if cycles:
+        snapshots: list[dict[str, object]] = []
+        for index in range(cycles):
+            for stream in ("flash", "calendar"):
+                try:
+                    result = runtime.poll_once(stream)
+                    snapshots.append(
+                        {
+                            "cycle": index + 1,
+                            "channel": "mcp",
+                            "stream": stream,
+                            "health": result.batch.checkpoint.health.value,
+                            "observations": len(result.batch.observations),
+                        }
+                    )
+                except RuntimeError as error:
+                    snapshots.append(
+                        {
+                            "cycle": index + 1,
+                            "channel": "mcp",
+                            "stream": stream,
+                            "health": "degraded",
+                            "error": f"{type(error).__name__}: poll failed",
+                        }
+                    )
+            if interval and index + 1 < cycles:
+                time_module.sleep(interval)
+        console.print_json(data={"cycles": cycles, "results": snapshots})
+        return
+    runtime.start()
+    console.print("Live gateway started. Press Ctrl+C to stop.")
+    try:
+        while runtime.running:
+            time_module.sleep(1)
+    except KeyboardInterrupt:
+        runtime.stop()
+        console.print("Live gateway stopped.")
+
+
+@live_app.command("soak")
+def live_soak(
+    mode: Annotated[
+        str,
+        typer.Option("--mode", help="fixture or providers"),
+    ] = "fixture",
+    cycles: Annotated[
+        int,
+        typer.Option("--cycles", min=1, max=10000),
+    ] = 6,
+    failure_every: Annotated[
+        int,
+        typer.Option(
+            "--failure-every",
+            min=0,
+            help="Fixture-only: inject an alternating single-channel failure every N cycles.",
+        ),
+    ] = 3,
+    interval: Annotated[
+        float,
+        typer.Option("--interval", min=0, max=3600),
+    ] = 10,
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Run a bounded live release gate and persist its report."""
+
+    runner = LiveSoakRunner(path)
+    try:
+        if mode == "fixture":
+            report = runner.run_fixture(
+                cycles=cycles,
+                failure_every=failure_every,
+            )
+        elif mode == "providers":
+            report = runner.run_providers(
+                cycles=cycles,
+                interval_seconds=interval,
+            )
+        else:
+            raise typer.BadParameter("--mode must be fixture or providers")
+    except ValueError as error:
+        console.print(f"[red]{error}[/red]")
+        raise typer.Exit(1) from error
+    console.print_json(data=report.model_dump(mode="json"))
+    if not report.passed:
+        raise typer.Exit(1)
+
+
+@live_app.command("doctor")
+def live_doctor(
+    path: Annotated[
+        Path | None,
+        typer.Option("--path", help="Database path; defaults to the active workspace"),
+    ] = None,
+) -> None:
+    """Check local schema, channel health, queue state, and the latest soak gate."""
+
+    report = build_live_diagnostics(path)
+    console.print_json(data=report)
+    if not report["ready"]:
+        raise typer.Exit(1)
 
 
 @financials_app.command("import")
@@ -601,6 +1085,10 @@ def tracking_add(
     ] = None,
     as_of: Annotated[str | None, typer.Option("--as-of")] = None,
     no_live: Annotated[bool, typer.Option("--no-live")] = False,
+    market_provider: Annotated[
+        str | None,
+        typer.Option("--market-provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
 ) -> None:
     """Add one run candidate to forward tracking."""
     try:
@@ -611,6 +1099,7 @@ def tracking_add(
             call_date=date.fromisoformat(as_of) if as_of else None,
             call_price=price,
             call_benchmark_price=benchmark_price,
+            provider=build_market_provider(market_provider) if not no_live else None,
             capture_live=not no_live,
         )
     except (KeyError, ValueError, RuntimeError) as error:
@@ -628,12 +1117,19 @@ def tracking_snapshot(
     ] = None,
     as_of: Annotated[str | None, typer.Option("--as-of")] = None,
     live: Annotated[bool, typer.Option("--live")] = False,
+    market_provider: Annotated[
+        str | None,
+        typer.Option("--market-provider", help="Market provider: eodhd or yahoo"),
+    ] = None,
 ) -> None:
     """Capture a live or manual candidate/benchmark price pair."""
     service = TrackingService()
     try:
         if live:
-            snapshot = service.capture_live_snapshot(tracked_id)
+            snapshot = service.capture_live_snapshot(
+                tracked_id,
+                provider=build_market_provider(market_provider),
+            )
         else:
             if price is None or benchmark_price is None:
                 raise ValueError("Manual snapshot requires --price and --benchmark-price")

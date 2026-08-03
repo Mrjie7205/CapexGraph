@@ -6,14 +6,9 @@ from capexgraph.research.theme import build_theme_handlers
 
 
 def build_executor_for_run(run, *, provider=None, max_attempts=2):
-    selected = provider or run.manifest.get("model_provider")
     if run.mode.value == "anchor":
-        if not selected:
-            raise ValueError(
-                "Anchor Scan execution requires --provider fixture or --provider openai"
-            )
-        return build_anchor_executor(run, provider=str(selected), max_attempts=max_attempts)
-    return build_theme_executor(run, provider=selected, max_attempts=max_attempts)
+        return build_anchor_executor(run, provider=provider, max_attempts=max_attempts)
+    return build_theme_executor(run, provider=provider, max_attempts=max_attempts)
 
 
 __all__ = ["build_anchor_handlers", "build_executor_for_run", "build_theme_handlers"]

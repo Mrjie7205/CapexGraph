@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 
+from capexgraph.config import load_project_env
 from capexgraph.domain import (
     Evidence,
     EvidenceKind,
@@ -26,6 +27,7 @@ from capexgraph.providers.filings.base import (
 from capexgraph.providers.sources.sec import (
     COMPANY_TICKERS_URL,
     DEFAULT_SEC_USER_AGENT,
+    raise_for_sec_status,
 )
 from capexgraph.runtime.artifacts import atomic_write_bytes, atomic_write_text
 from capexgraph.runtime.store import runs_dir
@@ -129,6 +131,7 @@ class SecCompanyFactsProvider:
         user_agent: str | None = None,
         max_bytes: int = MAX_COMPANY_FACTS_BYTES,
     ) -> None:
+        load_project_env()
         self.client = client or httpx.Client(timeout=30, follow_redirects=True)
         self.user_agent = (
             user_agent or os.getenv("CAPEXGRAPH_SEC_USER_AGENT") or DEFAULT_SEC_USER_AGENT
@@ -145,7 +148,7 @@ class SecCompanyFactsProvider:
 
     def _get_json(self, url: str) -> tuple[dict[str, Any], bytes]:
         response = self.client.get(url, headers=self.headers)
-        response.raise_for_status()
+        raise_for_sec_status(response)
         raw = response.content
         if len(raw) > self.max_bytes:
             raise ValueError(f"SEC Company Facts response exceeds {self.max_bytes} bytes")

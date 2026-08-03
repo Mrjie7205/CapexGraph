@@ -41,14 +41,30 @@ capexgraph demo-alphabet-q2
 The Alphabet fixture deliberately stops at evidence-backed infrastructure layers. It does not
 convert product mentions or aggregate capital expenditure into named supplier relationships.
 
-### OpenAI
+### Codex subscription
+
+`--provider codex_subscription` uses the same strict Pydantic contract through the official local
+Codex CLI. It requires an installed Codex CLI and a ChatGPT login, but no OpenAI Platform API key.
+Connection Center can start the official browser login and select a model available to the
+account. CapexGraph runs an ephemeral, read-only, schema-bound `codex exec`, never receives OAuth
+tokens, and never falls back to the official API channel when subscription execution fails.
+
+```powershell
+capexgraph model providers --probe-codex
+capexgraph theme "AI数据中心电力" --provider codex_subscription --execute
+```
+
+CLIProxyAPI remains an explicit `CAPEXGRAPH_CODEX_TRANSPORT=proxy` compatibility path for existing
+local installations; it is no longer the default.
+
+### OpenAI API
 
 `--provider openai` uses `client.responses.parse` with each stage's Pydantic output model. Install the optional dependency and configure both variables:
 
 ```powershell
 python -m pip install -e ".[openai]"
 $env:OPENAI_API_KEY = "..."
-$env:CAPEXGRAPH_MODEL = "your-model"
+$env:CAPEXGRAPH_OPENAI_MODEL = "your-model"
 ```
 
 The OpenAI adapter does not search or fetch sources on its own. Model-proposed evidence remains a
@@ -62,6 +78,11 @@ coverage. Every stage receives bounded extracted text from captured/reviewed sou
 versioned financial facts; the prompt does not receive only titles or URLs. `partial` mode can
 continue with explicit low-confidence gaps. `strict` mode checkpoints a failure until at least one
 reviewed, hash-valid source exists and blocks unsupported medium/high relationship proposals.
+
+The selected provider and model are locked when execution starts. Resume may retry the same
+channel, but switching a partially executed run to another authentication or billing channel is
+rejected; create a new run instead. Provider failures record a safe category and retryability, and
+run manifests retain model-call counts without storing credentials.
 
 See `docs/LIVE_RESEARCH.md` for the capture and review contract.
 

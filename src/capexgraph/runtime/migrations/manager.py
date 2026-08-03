@@ -189,6 +189,417 @@ MIGRATIONS: tuple[Migration, ...] = (
             """,
         ),
     ),
+    Migration(
+        version=4,
+        name="cross_market_daily_history",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS market_bars (
+                ticker TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                trade_date TEXT NOT NULL,
+                market TEXT NOT NULL,
+                exchange TEXT NOT NULL,
+                currency TEXT NOT NULL,
+                timezone TEXT NOT NULL,
+                open REAL NOT NULL,
+                high REAL NOT NULL,
+                low REAL NOT NULL,
+                close REAL NOT NULL,
+                adjusted_close REAL,
+                volume REAL,
+                raw_hash TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                PRIMARY KEY (ticker, provider, trade_date)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_market_bars_ticker_date
+            ON market_bars(ticker, trade_date DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS market_quality_reports (
+                ticker TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                raw_hash TEXT NOT NULL,
+                checked_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                first_date TEXT,
+                latest_date TEXT,
+                bar_count INTEGER NOT NULL,
+                source_url TEXT,
+                provider_version TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                PRIMARY KEY (ticker, provider, raw_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_market_quality_ticker_checked
+            ON market_quality_reports(ticker, checked_at DESC)
+            """,
+        ),
+    ),
+    Migration(
+        version=5,
+        name="versioned_corporate_event_calendar",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS corporate_event_versions (
+                id TEXT PRIMARY KEY,
+                run_id TEXT NOT NULL,
+                event_key TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                version_hash TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                ticker TEXT,
+                market TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                announced_date TEXT,
+                expected_date TEXT,
+                effective_date TEXT,
+                known_at TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                source_suggestion_id TEXT,
+                evidence_id TEXT,
+                payload TEXT NOT NULL,
+                UNIQUE (run_id, event_key, version),
+                UNIQUE (run_id, event_key, version_hash),
+                FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_corporate_events_run_known
+            ON corporate_event_versions(run_id, known_at, observed_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_corporate_events_ticker_effective
+            ON corporate_event_versions(ticker, effective_date DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_corporate_events_type_status
+            ON corporate_event_versions(event_type, status)
+            """,
+        ),
+    ),
+    Migration(
+        version=6,
+        name="live_signal_gateway_foundation",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_observations (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                provider_version TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                external_id TEXT NOT NULL,
+                event_key TEXT NOT NULL,
+                category TEXT NOT NULL,
+                published_at TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                retention_class TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (provider, channel, external_id, content_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_observations_event_key
+            ON live_signal_observations(event_key, observed_at)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_observations_channel_observed
+            ON live_signal_observations(provider, channel, observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_versions (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                version_hash TEXT NOT NULL,
+                category TEXT NOT NULL,
+                published_at TEXT NOT NULL,
+                first_observed_at TEXT NOT NULL,
+                last_observed_at TEXT NOT NULL,
+                match_status TEXT NOT NULL,
+                verification_state TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (signal_key, version),
+                UNIQUE (signal_key, version_hash)
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_signals_last_observed
+            ON live_signal_versions(last_observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_observation_links (
+                signal_version_id TEXT NOT NULL,
+                observation_id TEXT NOT NULL,
+                PRIMARY KEY (signal_version_id, observation_id),
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE,
+                FOREIGN KEY (observation_id)
+                    REFERENCES live_signal_observations(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_signal_links_observation
+            ON live_signal_observation_links(observation_id, signal_version_id)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_provider_checkpoints (
+                provider TEXT NOT NULL,
+                provider_version TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                cursor TEXT NOT NULL DEFAULT '',
+                last_external_id TEXT,
+                last_published_at TEXT,
+                last_observed_at TEXT,
+                health TEXT NOT NULL,
+                calls_used INTEGER NOT NULL DEFAULT 0,
+                call_budget INTEGER,
+                budget_date TEXT,
+                updated_at TEXT NOT NULL,
+                error TEXT NOT NULL DEFAULT '',
+                payload TEXT NOT NULL,
+                PRIMARY KEY (provider, channel, stream)
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_dead_letters (
+                id TEXT PRIMARY KEY,
+                provider TEXT NOT NULL,
+                channel TEXT NOT NULL,
+                stream TEXT NOT NULL,
+                observed_at TEXT NOT NULL,
+                payload_hash TEXT NOT NULL,
+                error TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_dead_letters_observed
+            ON live_dead_letters(observed_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS research_action_proposals (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                analysis_version INTEGER NOT NULL,
+                human_status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (signal_key, analysis_version)
+            )
+            """,
+        ),
+    ),
+    Migration(
+        version=7,
+        name="live_desk_rules_analysis_and_alerts",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS live_rule_assessments (
+                id TEXT PRIMARY KEY,
+                signal_version_id TEXT NOT NULL UNIQUE,
+                signal_key TEXT NOT NULL,
+                ruleset_version TEXT NOT NULL,
+                total_score REAL NOT NULL,
+                should_alert INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_assessments_score
+            ON live_rule_assessments(should_alert, total_score DESC, created_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_signal_analyses (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                signal_version_id TEXT NOT NULL,
+                analysis_version INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                proposal_id TEXT,
+                model_provider TEXT,
+                model TEXT,
+                prompt_hash TEXT,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE (signal_key, analysis_version),
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE,
+                FOREIGN KEY (proposal_id)
+                    REFERENCES research_action_proposals(id) ON DELETE SET NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_analyses_signal_created
+            ON live_signal_analyses(signal_key, created_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_alert_deliveries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                signal_key TEXT NOT NULL UNIQUE,
+                signal_version_id TEXT NOT NULL,
+                state TEXT NOT NULL,
+                score REAL NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE CASCADE
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_alerts_state_id
+            ON live_alert_deliveries(state, id DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_settings (
+                id TEXT PRIMARY KEY,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_user_actions (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                action TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_actions_signal_created
+            ON live_user_actions(signal_key, created_at DESC)
+            """,
+        ),
+    ),
+    Migration(
+        version=8,
+        name="live_research_bridge_audit_and_soak",
+        statements=(
+            """
+            CREATE TABLE IF NOT EXISTS live_verification_tasks (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                signal_version_id TEXT NOT NULL,
+                run_id TEXT,
+                status TEXT NOT NULL,
+                source_suggestion_id TEXT,
+                evidence_id TEXT,
+                evidence_link_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE RESTRICT,
+                FOREIGN KEY (run_id)
+                    REFERENCES runs(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_verification_signal_status
+            ON live_verification_tasks(signal_key, status, updated_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_verification_run
+            ON live_verification_tasks(run_id, updated_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_evidence_links (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                signal_version_id TEXT NOT NULL,
+                verification_task_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                evidence_id TEXT NOT NULL,
+                source_hash TEXT NOT NULL,
+                link_hash TEXT NOT NULL UNIQUE,
+                linked_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(signal_key, run_id, evidence_id),
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE RESTRICT,
+                FOREIGN KEY (verification_task_id)
+                    REFERENCES live_verification_tasks(id) ON DELETE RESTRICT,
+                FOREIGN KEY (run_id)
+                    REFERENCES runs(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_evidence_links_signal
+            ON live_evidence_links(signal_key, linked_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_run_context_links (
+                id TEXT PRIMARY KEY,
+                signal_key TEXT NOT NULL,
+                signal_version_id TEXT NOT NULL,
+                run_id TEXT NOT NULL,
+                parent_run_id TEXT,
+                context_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                UNIQUE(signal_key, run_id, context_hash),
+                FOREIGN KEY (signal_version_id)
+                    REFERENCES live_signal_versions(id) ON DELETE RESTRICT,
+                FOREIGN KEY (run_id)
+                    REFERENCES runs(id) ON DELETE RESTRICT,
+                FOREIGN KEY (parent_run_id)
+                    REFERENCES runs(id) ON DELETE RESTRICT
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_run_context_run
+            ON live_run_context_links(run_id, created_at DESC)
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_run_context_signal
+            ON live_run_context_links(signal_key, created_at DESC)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_audit_entries (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                signal_key TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                object_type TEXT NOT NULL,
+                object_id TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                occurred_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_audit_signal_id
+            ON live_audit_entries(signal_key, id)
+            """,
+            """
+            CREATE TABLE IF NOT EXISTS live_soak_reports (
+                id TEXT PRIMARY KEY,
+                mode TEXT NOT NULL,
+                passed INTEGER NOT NULL,
+                started_at TEXT NOT NULL,
+                completed_at TEXT NOT NULL,
+                payload TEXT NOT NULL
+            )
+            """,
+            """
+            CREATE INDEX IF NOT EXISTS idx_live_soak_completed
+            ON live_soak_reports(completed_at DESC)
+            """,
+        ),
+    ),
 )
 
 MIGRATION_TABLE = """
