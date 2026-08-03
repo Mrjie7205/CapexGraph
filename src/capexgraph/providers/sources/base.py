@@ -12,6 +12,20 @@ REGULATOR_DOMAINS = frozenset(
         "sec.gov",
         "www.sec.gov",
         "data.sec.gov",
+        "cninfo.com.cn",
+        "www.cninfo.com.cn",
+        "static.cninfo.com.cn",
+        "sse.com.cn",
+        "www.sse.com.cn",
+        "query.sse.com.cn",
+        "szse.cn",
+        "www.szse.cn",
+        "disc.static.szse.cn",
+        "bse.cn",
+        "www.bse.cn",
+        "opendart.fss.or.kr",
+        "dart.fss.or.kr",
+        "kind.krx.co.kr",
     }
 )
 TRACKING_QUERY_PREFIXES = ("utm_",)

@@ -20,6 +20,7 @@ from capexgraph.providers.sources.base import (
 
 COMPANY_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
+SUBMISSIONS_SHARD_URL = "https://data.sec.gov/submissions/{name}"
 DEFAULT_FORMS = ("10-K", "10-Q", "8-K", "20-F", "6-K")
 DEFAULT_SEC_USER_AGENT = (
     "CapexGraph research github.com/Mrjie7205/CapexGraph "
@@ -101,75 +102,115 @@ class SecEdgarSourceProvider:
             raise ValueError("SEC submissions payload has no recent filings")
 
         allowed_forms = {item.upper() for item in (forms or DEFAULT_FORMS)}
-        accessions = recent.get("accessionNumber", [])
-        form_values = recent.get("form", [])
-        filing_dates = recent.get("filingDate", [])
-        report_dates = recent.get("reportDate", [])
-        primary_documents = recent.get("primaryDocument", [])
-        acceptance_datetimes = recent.get("acceptanceDateTime", [])
-        items = recent.get("items", [])
-        is_xbrl = recent.get("isXBRL", [])
-        is_inline_xbrl = recent.get("isInlineXBRL", [])
-        primary_descriptions = recent.get("primaryDocDescription", [])
-        count = min(
-            len(accessions),
-            len(form_values),
-            len(filing_dates),
-            len(report_dates),
-            len(primary_documents),
-        )
+        shard_files = payload.get("filings", {}).get("files", [])
+        shard_names = [
+            str(shard["name"])
+            for shard in shard_files
+            if isinstance(shard_files, list)
+            and isinstance(shard, dict)
+            and shard.get("name")
+        ]
+
         suggestions: list[SourceSuggestion] = []
-        for index in range(count):
-            form = str(form_values[index]).upper()
-            if form not in allowed_forms:
-                continue
-            accession = str(accessions[index])
-            accession_path = accession.replace("-", "")
-            primary_document = str(primary_documents[index]).lstrip("/")
-            if not accession_path or not primary_document:
-                continue
-            url = canonicalize_source_url(
-                "https://www.sec.gov/Archives/edgar/data/"
-                f"{int(cik)}/{accession_path}/{primary_document}"
+        seen_accessions: set[str] = set()
+        requested = max(1, min(limit, 100))
+        for position in range(len(shard_names) + 1):
+            filing_set = (
+                recent
+                if position == 0
+                else self._get_json(
+                    SUBMISSIONS_SHARD_URL.format(name=shard_names[position - 1])
+                )
             )
-            filing_date = str(filing_dates[index])
-            suggestion = SourceSuggestion(
-                id=source_suggestion_id(run.id, url, prefix="sec"),
-                run_id=run.id,
-                title=f"{company_name} {form} filed {filing_date}",
-                url=url,
-                canonical_url=url,
-                kind=EvidenceKind.FILING,
-                publisher="U.S. Securities and Exchange Commission",
-                authority=SourceAuthority.REGULATOR,
-                reason=f"Official EDGAR {form} filing discovered for {ticker} / CIK {cik}.",
-                provider=self.provider_name,
-                provider_version=self.provider_version,
-                status=SourceSuggestionStatus.SUGGESTED,
-                published_at=filing_date,
-                metadata={
-                    "cik": cik,
-                    "ticker": ticker,
-                    "company_name": company_name,
-                    "form": form,
-                    "filing_date": filing_date,
-                    "report_date": str(report_dates[index]),
-                    "acceptance_datetime": _sequence_value(acceptance_datetimes, index),
-                    "accession": accession,
-                    "primary_document": primary_document,
-                    "primary_document_description": _sequence_value(
-                        primary_descriptions,
-                        index,
-                    ),
-                    "items": _sequence_value(items, index),
-                    "is_xbrl": _sequence_value(is_xbrl, index),
-                    "is_inline_xbrl": _sequence_value(is_inline_xbrl, index),
-                },
-            )
-            suggestions.append(suggestion)
-            if len(suggestions) >= max(1, min(limit, 100)):
-                break
+            for record in _filing_records(filing_set):
+                form = str(record["form"]).upper()
+                accession = str(record["accession"])
+                if form not in allowed_forms or accession in seen_accessions:
+                    continue
+                accession_path = accession.replace("-", "")
+                primary_document = str(record["primary_document"]).lstrip("/")
+                if not accession_path or not primary_document:
+                    continue
+                url = canonicalize_source_url(
+                    "https://www.sec.gov/Archives/edgar/data/"
+                    f"{int(cik)}/{accession_path}/{primary_document}"
+                )
+                filing_date = str(record["filing_date"])
+                suggestions.append(
+                    SourceSuggestion(
+                        id=source_suggestion_id(run.id, url, prefix="sec"),
+                        run_id=run.id,
+                        title=f"{company_name} {form} filed {filing_date}",
+                        url=url,
+                        canonical_url=url,
+                        kind=EvidenceKind.FILING,
+                        publisher="U.S. Securities and Exchange Commission",
+                        authority=SourceAuthority.REGULATOR,
+                        reason=(
+                            f"Official EDGAR {form} filing discovered for "
+                            f"{ticker} / CIK {cik}."
+                        ),
+                        provider=self.provider_name,
+                        provider_version=self.provider_version,
+                        status=SourceSuggestionStatus.SUGGESTED,
+                        published_at=filing_date,
+                        metadata={
+                            "cik": cik,
+                            "ticker": ticker,
+                            "company_name": company_name,
+                            "form": form,
+                            "filing_date": filing_date,
+                            "report_date": str(record["report_date"]),
+                            "acceptance_datetime": record["acceptance_datetime"],
+                            "accession": accession,
+                            "primary_document": primary_document,
+                            "primary_document_description": record["description"],
+                            "items": record["items"],
+                            "is_xbrl": record["is_xbrl"],
+                            "is_inline_xbrl": record["is_inline_xbrl"],
+                        },
+                    )
+                )
+                seen_accessions.add(accession)
+                if len(suggestions) >= requested:
+                    return suggestions
         return suggestions
+
+
+def _filing_records(values: dict) -> list[dict[str, object]]:
+    accessions = values.get("accessionNumber", [])
+    form_values = values.get("form", [])
+    filing_dates = values.get("filingDate", [])
+    report_dates = values.get("reportDate", [])
+    primary_documents = values.get("primaryDocument", [])
+    count = min(
+        len(accessions),
+        len(form_values),
+        len(filing_dates),
+        len(report_dates),
+        len(primary_documents),
+    )
+    return [
+        {
+            "accession": accessions[index],
+            "form": form_values[index],
+            "filing_date": filing_dates[index],
+            "report_date": report_dates[index],
+            "primary_document": primary_documents[index],
+            "acceptance_datetime": _sequence_value(
+                values.get("acceptanceDateTime", []), index
+            ),
+            "description": _sequence_value(
+                values.get("primaryDocDescription", []), index
+            ),
+            "items": _sequence_value(values.get("items", []), index),
+            "is_xbrl": _sequence_value(values.get("isXBRL", []), index),
+            "is_inline_xbrl": _sequence_value(
+                values.get("isInlineXBRL", []), index
+            ),
+        }
+        for index in range(count)
+    ]
 
 
 def _sequence_value(values, index: int):

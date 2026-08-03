@@ -84,7 +84,7 @@ Canonical URLs and content hashes are deduplicated independently.
 
 ### Live signal gateway
 
-The in-development v0.5.1 gateway is deliberately separate from both official events and
+The v0.5.1 gateway is deliberately separate from both official events and
 Evidence. Each provider delivery becomes a `SignalObservation` with its own channel, external ID,
 published/observed timestamps, content hash, and retention class. `LiveSignalService` preserves
 those observations and appends a `LiveSignalVersion` when a second channel, revision, or content
@@ -149,6 +149,19 @@ signal, analysis, and action entries form the event timeline. `LiveSoakRunner` e
 replay, one-channel failure isolation, and recovery in an isolated temporary database, then
 persists only its bounded report.
 
+### Point-in-time themes and mainline monitoring
+
+`ThemeDefinition`, `ThemeSource`, and `ThemeMembership` form a bitemporal registry. Valid dates
+describe when membership applies; known dates describe when CapexGraph could have used it.
+`ThemeUniverseSnapshot` freezes the selected membership and its input hashes for one market date.
+Recognition sources and Evidence-backed industrial exposure are separate typed fields.
+
+`MainlineService` calculates deterministic market metrics from that snapshot and persists the
+inputs before applying a versioned `MainlinePolicy`. Assessments and state transitions are
+append-only. `run_batch` isolates failures and is safe to invoke from an external scheduler;
+duplicate theme/market/date/policy jobs are idempotent. State changes and official events may create
+human-gated `ThemeResearchProposal` rows, but they do not run a model or mutate research by default.
+
 ### Corporate event calendar
 
 `CorporateEventVersion` is the durable v0.5 event contract. It separates the source-public
@@ -161,11 +174,12 @@ same stable `event_key`. Current views select the latest version available by th
 observation cutoff. A document backfilled today therefore cannot appear in what an earlier run
 actually knew.
 
-The first mapper consumes SEC source suggestions. Periodic-report forms are labeled
-`financial_report`; other forms stay `regulatory_filing` until captured content supports a more
-specific event. Discovery remains separate from Evidence. When guarded capture succeeds, the event
-calendar appends an evidence-linked version rather than upgrading the discovery row in place.
-`events.json` is the portable current/history projection; the database remains authoritative.
+Official source adapters cover SEC, CNINFO, SSE, SZSE, BSE, OpenDART, and KIND. Periodic-report
+forms/titles are labeled `financial_report`; generic filings stay `regulatory_filing` until
+captured content supports a more specific event. Discovery remains separate from Evidence. When
+guarded capture succeeds, the event calendar appends an evidence-linked version rather than
+upgrading the discovery row in place. `events.json` is the portable current/history projection;
+the database remains authoritative.
 
 Before live research, a deterministic context builder measures evidence coverage, verifies captured
 hashes, loads bounded extracted source text, and loads bounded financial facts. The same context is
@@ -175,11 +189,16 @@ unsupported medium/high relationship proposals.
 
 ### Filing facts
 
-`FilingFactsProvider` separates official filing-data retrieval from normalization. The first
-adapter captures SEC Company Facts JSON as Evidence and emits immutable `FinancialFact` objects.
+`FilingFactsProvider` separates official filing-data retrieval from normalization. SEC Company
+Facts and a conservative OpenDART account subset capture official responses as Evidence and emit
+immutable `FinancialFact` objects.
 Fact identities include period, accession, and value lineage. Restatements are appended, missing
 metrics are explicit nulls, and derived free cash flow stores a formula and input fact IDs. SQLite
 supports queryability; `financials/facts.json` preserves portability and exact JSON locators.
+
+For unstructured regulator/issuer disclosures, deterministic extraction creates
+`DisclosureFactCandidate` rows only from hash-verified reviewed Evidence and parseable report
+periods. Human acceptance creates the immutable fact; rejection remains durable audit state.
 
 ### Evidence trust boundary
 
@@ -211,7 +230,7 @@ Only migrations marked safe for startup may run automatically; explicit upgrade,
 and verified restore are available through the CLI. A failed migration rolls back only its own
 transaction and never stamps a version that did not complete.
 
-The in-development schema version 4 adds normalized cross-market daily bars and hashed,
+Schema version 4 adds normalized cross-market daily bars and hashed,
 idempotent quality reports. It does not rewrite v0.3 run, checkpoint, tracking, source, or financial-fact
 records.
 
@@ -231,13 +250,21 @@ immutable run-context links, bridge audit entries, and soak reports. It is addit
 rewrite prior observations, signals, Evidence, events, runs, financial/market facts, or tracking
 history.
 
+Schema version 9 adds point-in-time theme definitions, sources, memberships, and universe
+snapshots. Version 10 adds daily theme metrics, policies, assessments, state events, monitor jobs,
+and human-gated proposals. Version 11 adds cross-provider market comparison results. Version 12
+adds reviewed disclosure-fact candidates. All remain additive and preserve earlier records.
+
 ### Applications
 
-- FastAPI exposes runs, evidence review, official events, artifacts, market sync/status, tracking,
-  HTML reports, live gateway/SSE, Research Bridge, audit, diagnostics, and soak-report surfaces.
-- React/Vite provides the Research Cockpit, responsive Live Desk/Research Bridge, and stage board.
-- CLI supports local, batch, tracking, portable-report, synthetic replay, real MCP polling, and
-  the equal-priority live supervisor plus deterministic soak and local diagnostics.
+- FastAPI exposes runs, evidence review, official events/fact candidates, themes, mainline jobs,
+  market sync/comparison, tracking, HTML reports, live gateway/SSE, Research Bridge, audit,
+  diagnostics, and soak-report surfaces.
+- React/Vite provides the Chinese-first Research Cockpit, Mainline Desk, official source/event
+  queue, responsive Live Desk/Research Bridge, and stage board.
+- CLI supports research, theme imports, mainline batch monitoring, official events/facts, market
+  comparison, tracking, portable reports, synthetic replay, real MCP polling, and the equal-
+  priority live supervisor plus deterministic soak and local diagnostics.
 
 ## Runtime lifecycle
 

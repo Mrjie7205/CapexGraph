@@ -10,8 +10,11 @@ from capexgraph.domain import (
     CorporateEventStatus,
     CorporateEventType,
     CorporateEventVersion,
+    ProposalHumanStatus,
     SourceSuggestion,
+    ThemeResearchProposal,
 )
+from capexgraph.events.disclosures import OfficialDisclosureEventMapper
 from capexgraph.events.sec import SecFilingEventMapper
 from capexgraph.events.store import EventCalendarStore
 from capexgraph.providers.sources import SourceDiscoveryProvider
@@ -28,12 +31,14 @@ class EventCalendarService:
         store: EventCalendarStore | None = None,
         source_store: SourceSuggestionStore | None = None,
         sec_mapper: SecFilingEventMapper | None = None,
+        disclosure_mapper: OfficialDisclosureEventMapper | None = None,
     ) -> None:
         self.store = store or EventCalendarStore(
             source_store.db_path if source_store is not None else None
         )
         self.source_store = source_store or SourceSuggestionStore(self.store.db_path)
         self.sec_mapper = sec_mapper or SecFilingEventMapper()
+        self.disclosure_mapper = disclosure_mapper or OfficialDisclosureEventMapper()
 
     @staticmethod
     def _run(run_id: str):
@@ -80,14 +85,87 @@ class EventCalendarService:
         suggestions: list[SourceSuggestion],
     ) -> list[CorporateEventVersion]:
         self._run(run_id)
-        events = [
-            self._persist_draft(self.sec_mapper.map(suggestion))
-            for suggestion in suggestions
-            if suggestion.run_id == run_id and self.sec_mapper.supports(suggestion)
-        ]
+        events: list[CorporateEventVersion] = []
+        for suggestion in suggestions:
+            if suggestion.run_id != run_id:
+                continue
+            mapper = next(
+                (
+                    item
+                    for item in (self.sec_mapper, self.disclosure_mapper)
+                    if item.supports(suggestion)
+                ),
+                None,
+            )
+            if mapper is not None:
+                events.append(self._persist_draft(mapper.map(suggestion)))
         if events:
+            self._propose_linked_research(events)
             self._write_artifact(run_id)
         return events
+
+    def _propose_linked_research(
+        self,
+        events: list[CorporateEventVersion],
+    ) -> list[ThemeResearchProposal]:
+        """Link official events to known theme members without executing a model."""
+
+        from capexgraph.monitoring.store import MainlineStore
+        from capexgraph.themes.store import ThemeRegistryStore
+
+        theme_store = ThemeRegistryStore(self.store.db_path)
+        mainline_store = MainlineStore(self.store.db_path)
+        definitions = theme_store.list_definitions(latest_only=True)
+        created: list[ThemeResearchProposal] = []
+        for event in events:
+            if not event.ticker:
+                continue
+            event_date = (
+                event.effective_date
+                or event.expected_date
+                or event.announced_date
+                or event.observed_at.date()
+            )
+            for definition in definitions:
+                memberships = theme_store.list_memberships(
+                    definition.theme_id,
+                    as_of_date=event_date,
+                    knowledge_cutoff=event.observed_at,
+                    market=event.market,
+                )
+                if not any(item.ticker == event.ticker for item in memberships):
+                    continue
+                assessment = mainline_store.latest_assessment(definition.theme_id)
+                if assessment is None:
+                    continue
+                existing = next(
+                    (
+                        item
+                        for item in mainline_store.list_proposals(definition.theme_id)
+                        if item.assessment_id == assessment.id
+                        and item.action == "reevaluate_candidates"
+                    ),
+                    None,
+                )
+                if existing is not None:
+                    continue
+                digest = hashlib.sha256(
+                    f"{definition.theme_id}:{assessment.id}:{event.id}".encode()
+                ).hexdigest()[:24]
+                proposal = ThemeResearchProposal(
+                    id=f"theme-proposal-{digest}",
+                    theme_id=definition.theme_id,
+                    assessment_id=assessment.id,
+                    action="reevaluate_candidates",
+                    human_status=ProposalHumanStatus.PENDING,
+                    auto_execute=False,
+                    reason=(
+                        f"Official event {event.id} ({event.title}) affects known member "
+                        f"{event.ticker}; explicit confirmation is required before re-evaluation."
+                    ),
+                )
+                created.append(mainline_store.save_proposal(proposal))
+        return created
 
     def refresh_from_sources(self, run_id: str) -> list[CorporateEventVersion]:
         self._run(run_id)
@@ -101,6 +179,26 @@ class EventCalendarService:
         run_id: str,
         *,
         provider: SourceDiscoveryProvider | None = None,
+        identifier: str | None = None,
+        forms: Sequence[str] = (),
+        limit: int = 10,
+    ) -> list[CorporateEventVersion]:
+        from capexgraph.sources.service import SourceDiscoveryService
+
+        suggestions = SourceDiscoveryService(store=self.source_store).discover(
+            run_id,
+            provider=provider,
+            identifier=identifier,
+            forms=forms,
+            limit=limit,
+        )
+        return self.ingest_suggestions(run_id, suggestions)
+
+    def discover_official(
+        self,
+        run_id: str,
+        *,
+        provider: SourceDiscoveryProvider,
         identifier: str | None = None,
         forms: Sequence[str] = (),
         limit: int = 10,

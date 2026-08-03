@@ -353,3 +353,61 @@ uses MCP and WebSocket observations.
 Cross-tab messages are coordination signals only. They contain a topic, random message ID, tab ID,
 and timestamp; no provider credential, market payload, or research artifact may enter
 BroadcastChannel or the localStorage notification fallback.
+
+## D024 — v0.4 and v0.5 consolidate into the v0.5.1 pre-v0.6 baseline
+
+- **Status:** accepted
+- **Date:** 2026-08-03
+
+The previously parallel market/theme/mainline, official-event, and live-gateway branches are one
+local-first release boundary. Schema migrations remain additive and ordered through version 12;
+there is no parallel database, identity registry, or second Cockpit. v0.6 builds on these contracts
+instead of reopening them.
+
+Release completion does not erase external operational gates. A provider implementation can ship
+with truthful `not_configured`, `partial`, or `WAIT KEY` state when a real credential or entitlement
+is unavailable. Frozen tests prove behavior, not live-provider availability.
+
+## D025 — Mainline automation is deterministic, externally scheduled, and experimental by default
+
+- **Status:** accepted
+- **Date:** 2026-08-03
+
+`mainline run-all` is the stable local scheduling boundary. It calculates and persists inputs,
+metrics, quality, policy version, assessment, state transition, and job status without model cost.
+CapexGraph does not install or own an operating-system scheduler; Windows Task Scheduler, cron, or
+another operator-owned runner invokes the command after each market close.
+
+The first conservative policy is intentionally marked `experimental`. Technical completion means
+the classification is reproducible and auditable, not that its thresholds have been approved as a
+production investment rule. Promotion requires an explicit product decision and a new effective
+policy version; old assessments are never reinterpreted.
+
+## D026 — Official metadata, reviewed Evidence, and financial facts remain separate layers
+
+- **Status:** accepted
+- **Date:** 2026-08-03
+
+SEC, CNINFO, SSE, SZSE, BSE, OpenDART, and KIND discovery may create conservative event metadata.
+It cannot by itself create a verified operating fact. A fact parsed from regulator or issuer text
+must originate from a hash-verified, human-reviewed Evidence item, enter a durable candidate state,
+and receive an explicit accept decision before becoming immutable `FinancialFact`.
+
+Official structured APIs such as SEC Company Facts and OpenDART accounts retain their own response
+hash, provider version, period, unit, and locator lineage. Unstructured extraction remains bounded
+to deterministic allowlisted patterns and parseable report periods; a model cannot fill missing
+numbers or approve candidates.
+
+## D027 — v0.6 consensus history requires historical entitlement, not current-value backfill
+
+- **Status:** accepted
+- **Date:** 2026-08-03
+
+Consensus revisions are point-in-time data. A provider that exposes only today's consensus may
+support a current dashboard but cannot satisfy the v0.6 historical-revision contract. Every
+adapter must declare historical depth, entitlement, permitted persistence, redistribution limits,
+market/metric coverage, and timestamps before implementation.
+
+The public repository may include only synthetic licensed-shaped fixtures. Theme aggregates must
+show contributors, coverage, weighting, stale values, and normalization failures. Official actuals
+remain Evidence-linked facts, and models cannot synthesize missing analyst estimates.

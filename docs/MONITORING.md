@@ -1,4 +1,57 @@
-# Forward tracking
+# Monitoring
+
+## Mainline monitor
+
+The v0.4 monitor evaluates themes from the membership that was both valid and known at the requested
+date. It computes returns, benchmark-relative strength, breadth, participation, dispersion,
+volatility, persistence, and coverage before applying one versioned deterministic policy.
+
+Load and run the frozen three-market acceptance path without credentials:
+
+```powershell
+capexgraph themes demo
+capexgraph mainline policy
+capexgraph mainline run-all --market CN --as-of 2026-08-03 --provider fixture-market
+capexgraph mainline status
+capexgraph mainline proposals
+```
+
+For a single theme/market:
+
+```powershell
+capexgraph mainline run memory-semiconductors --market CN --as-of 2026-08-03 --provider eodhd
+```
+
+Use `--provider tushare` for an A-share specialist path after configuring `TUSHARE_API_TOKEN`.
+Provider selection is explicit and never silently falls back.
+
+`run-all` is the stable scheduler entry point. It is idempotent for the same theme, market,
+as-of date, and policy. Failures are isolated per theme/market and remain visible as durable jobs.
+The default monitor never calls a model. A state change or official event can create a proposal,
+but a user must accept it before any linked research action.
+
+Example Windows Task Scheduler action after each market close:
+
+```text
+Program: C:\path\to\CapexGraph\.venv\Scripts\capexgraph.exe
+Arguments: mainline run-all --market CN --as-of TODAY --provider eodhd
+Start in: C:\path\to\CapexGraph
+```
+
+Use a wrapper to replace `TODAY` with the local ISO date and run separate tasks after CN, KR, and
+US closes. On cron-capable systems the same CLI command can be scheduled normally. CapexGraph does
+not install a system scheduler or keep a cloud worker alive; scheduling ownership remains explicit
+and local-first.
+
+The bundled policy `mainline-conservative-2026-08-03` is `experimental`. The state is a research
+classification, not an order or recommendation. Policy thresholds must be promoted through a
+recorded product decision before becoming production defaults.
+
+The Cockpit's **主线雷达 / Mainline Desk** exposes the same workflow: load the demo or choose a
+theme, select CN/US/KR and a provider, synchronize history, run the assessment, inspect quality and
+coverage, then accept or reject any proposal.
+
+## Forward tracking
 
 Tracking turns a research candidate into a dated, falsifiable call record. CapexGraph stores the
 candidate price and benchmark price on the same market date, then calculates subsequent return,

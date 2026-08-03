@@ -1,8 +1,8 @@
 # Live event gateway
 
 This guide covers the implemented v0.5.1 M0-M7 path. It is a local, single-user market-signal
-workspace. It does not place trades, treat aggregator content as Evidence, or complete the missing
-v0.4 mainline policy.
+workspace. It does not place trades or treat aggregator content as Evidence. It remains separate
+from the completed v0.4 mainline engine, whose default policy is still explicitly experimental.
 
 ## Three executable paths
 

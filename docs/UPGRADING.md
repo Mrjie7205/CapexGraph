@@ -24,7 +24,7 @@ The v0.3.0 schema reaches version 3:
 All three are additive and safe for startup. The legacy-upgrade test verifies that the original
 run, checkpoint, tracked candidate, snapshot, and trigger-event counts remain unchanged.
 
-The in-development v0.4 schema adds version 4:
+The v0.4 schema adds version 4:
 
 4. normalized daily `market_bars` and hashed `market_quality_reports`.
 
@@ -74,6 +74,18 @@ re-evaluation is a new run referencing its parent; the migration does not retrof
 runs. Provider credentials remain environment-only and are never stored in bridge/audit/soak
 payloads.
 
+The consolidated v0.5.1 release adds versions 9 through 12:
+
+9. point-in-time theme definitions, sources, memberships, and universe snapshots;
+10. daily theme metrics, versioned mainline policies/assessments/state events, monitor jobs, and
+    human-gated research proposals;
+11. persisted cross-provider market comparison results; and
+12. deterministic disclosure-fact candidates pending explicit human acceptance or rejection.
+
+All four migrations are additive. They do not rewrite earlier runs, Evidence, financial facts,
+market bars, corporate events, or live signals. A v0.3, v0.4, v0.5, or v0.5.1-development database
+can advance to schema 12 through the same ordered checksum-verified registry.
+
 Safe additive migrations may run automatically when the API, CLI, or Web-backed store first opens
 the database. A future migration that is not safe for startup will stop with an explicit instruction
 to run `capexgraph db upgrade`.
@@ -93,7 +105,7 @@ the target atomically, verifies it again, and applies any currently registered m
 Use `--path` on any database command when operating on a workspace other than
 `CAPEXGRAPH_STATE_DB` or `runs/capexgraph.db`.
 
-After upgrading to schema 8, run the isolated release and integrity gates:
+After upgrading to schema 12, run the isolated release and integrity gates:
 
 ```powershell
 capexgraph live soak --mode fixture --cycles 6 --failure-every 3

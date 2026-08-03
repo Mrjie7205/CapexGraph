@@ -3,13 +3,13 @@ from __future__ import annotations
 import hashlib
 from datetime import UTC, date, datetime, timedelta
 
-from capexgraph.domain import MarketBarSet, MarketSyncResult
+from capexgraph.domain import MarketBarSet, MarketComparisonResult, MarketSyncResult
 from capexgraph.market.providers import (
     MarketDataProvider,
     MarketProviderError,
     build_market_provider,
 )
-from capexgraph.market.quality import evaluate_market_quality
+from capexgraph.market.quality import compare_market_histories, evaluate_market_quality
 from capexgraph.market.store import MarketDataStore
 from capexgraph.runtime.artifacts import atomic_write_bytes
 from capexgraph.runtime.store import runs_dir
@@ -102,6 +102,8 @@ class MarketDataService:
         batch_quality = evaluate_market_quality(
             fetched.bar_set.bars,
             as_of=effective_end,
+            expected_sessions=fetched.expected_sessions,
+            suspended_dates=fetched.suspended_dates,
         )
         self.store.save_quality(fetched.bar_set, batch_quality)
         if batch_quality.blocks_persistence:
@@ -118,7 +120,12 @@ class MarketDataService:
             start_date=target_start,
             end_date=effective_end,
         )
-        merged_quality = evaluate_market_quality(merged_bars, as_of=effective_end)
+        merged_quality = evaluate_market_quality(
+            merged_bars,
+            as_of=effective_end,
+            expected_sessions=fetched.expected_sessions,
+            suspended_dates=fetched.suspended_dates,
+        )
         merged_set = fetched.bar_set.model_copy(update={"bars": merged_bars})
         self.store.save_quality(merged_set, merged_quality)
         if merged_quality.blocks_persistence:
@@ -142,3 +149,36 @@ class MarketDataService:
         end_date: date | None = None,
     ) -> list[MarketSyncResult]:
         return [self.sync(ticker, days=days, end_date=end_date) for ticker in tickers]
+
+    def compare(
+        self,
+        ticker: str,
+        *,
+        primary_provider: str,
+        reference_provider: str,
+        as_of_date: date,
+        tolerance_pct: float = 0.02,
+        minimum_overlap: int = 20,
+    ) -> MarketComparisonResult:
+        identity = TickerResolver().resolve(ticker)
+        primary = self.store.list_bars(
+            identity.ticker,
+            provider=primary_provider,
+            end_date=as_of_date,
+        )
+        reference = self.store.list_bars(
+            identity.ticker,
+            provider=reference_provider,
+            end_date=as_of_date,
+        )
+        result = compare_market_histories(
+            identity.ticker,
+            primary_provider,
+            primary,
+            reference_provider,
+            reference,
+            as_of_date=as_of_date,
+            tolerance_pct=tolerance_pct,
+            minimum_overlap=minimum_overlap,
+        )
+        return self.store.save_comparison(result)

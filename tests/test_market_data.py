@@ -23,11 +23,14 @@ from capexgraph.market import (
     MarketProviderConfigurationError,
     MarketProviderError,
     MarketSettings,
+    TushareDailyProvider,
     UnsupportedMarketError,
     YahooChartProvider,
     build_market_provider,
+    compare_market_histories,
     eodhd_symbol,
     evaluate_market_quality,
+    tushare_symbol,
 )
 from capexgraph.tools.identity import TickerResolver
 from capexgraph.tools.market import calculate_market_snapshot, capture_market_snapshot
@@ -59,6 +62,10 @@ def test_cross_market_identity_and_eodhd_mapping() -> None:
     assert eodhd_symbol("000660.KO") == "000660.KO"
     with pytest.raises(UnsupportedMarketError, match="Beijing Stock Exchange"):
         eodhd_symbol("920001.BJ")
+    assert tushare_symbol("688019.SH") == "688019.SH"
+    assert tushare_symbol("920001.BJ") == "920001.BJ"
+    with pytest.raises(UnsupportedMarketError, match="restricted to A-share"):
+        tushare_symbol("AAPL")
 
 
 def test_eodhd_parses_raw_and_adjusted_prices_without_leaking_token() -> None:
@@ -140,6 +147,71 @@ def test_provider_selection_is_explicit_and_keeps_no_key_fallback() -> None:
         build_market_provider(
             settings=MarketSettings(provider="eodhd", eodhd_api_token=None)
         )
+    with pytest.raises(MarketProviderConfigurationError, match="TUSHARE_API_TOKEN"):
+        build_market_provider(settings=MarketSettings(provider="tushare"))
+
+
+def test_tushare_parses_daily_and_adjustment_factor_without_leaking_token() -> None:
+    token = "tushare-secret"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        assert payload["token"] == token
+        if payload["api_name"] == "daily":
+            return httpx.Response(
+                200,
+                json={
+                    "code": 0,
+                    "data": {
+                        "fields": [
+                            "ts_code",
+                            "trade_date",
+                            "open",
+                            "high",
+                            "low",
+                            "close",
+                            "vol",
+                        ],
+                        "items": [
+                            ["688019.SH", "20260728", 310, 315, 305, 312, 12000],
+                            ["688019.SH", "20260727", 300, 310, 295, 305, 10000],
+                        ],
+                    },
+                },
+                request=request,
+            )
+        return httpx.Response(
+            200,
+            json={
+                "code": 0,
+                "data": {
+                    "fields": ["ts_code", "trade_date", "adj_factor"],
+                    "items": [
+                        ["688019.SH", "20260728", 2.0],
+                        ["688019.SH", "20260727", 1.9],
+                    ],
+                },
+            },
+            request=request,
+        )
+
+    provider = TushareDailyProvider(
+        token,
+        client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = provider.fetch_history(
+        "688019.SH",
+        start_date=date(2026, 7, 27),
+        end_date=date(2026, 7, 28),
+    )
+
+    assert [item.date for item in result.bar_set.bars] == [
+        date(2026, 7, 27),
+        date(2026, 7, 28),
+    ]
+    assert result.bar_set.bars[0].adjusted_close == pytest.approx(305 * 1.9 / 2.0)
+    assert token not in str(result.bar_set.source_url)
+    assert token not in result.raw_payload.decode()
 
 
 def test_quality_gate_detects_duplicates_order_ohlc_volume_and_staleness() -> None:
@@ -170,6 +242,50 @@ def test_quality_gate_detects_duplicates_order_ohlc_volume_and_staleness() -> No
         "stale_history",
     } <= codes
     assert any(issue.severity == QualitySeverity.ERROR for issue in quality.issues)
+
+
+def test_quality_distinguishes_expected_sessions_suspension_and_adjustment() -> None:
+    bars = [
+        _market_bar(date(2026, 7, 27), 100),
+        MarketBar(
+            date=date(2026, 7, 29),
+            open=50,
+            high=52,
+            low=49,
+            close=50,
+            adjusted_close=100,
+            volume=1000,
+        ),
+    ]
+    quality = evaluate_market_quality(
+        bars,
+        as_of=date(2026, 7, 29),
+        expected_sessions=[date(2026, 7, 27), date(2026, 7, 28), date(2026, 7, 29)],
+        suspended_dates=[date(2026, 7, 28)],
+    )
+    codes = {item.code for item in quality.issues}
+    assert "missing_trading_sessions" not in codes
+    assert "corporate_action_adjustment_detected" in codes
+
+
+def test_cross_provider_comparison_reports_overlap_and_price_differences() -> None:
+    primary = [_market_bar(date(2026, 7, day), 100 + day) for day in range(1, 25)]
+    reference = [
+        _market_bar(date(2026, 7, day), (100 + day) * (1.03 if day == 24 else 1.0))
+        for day in range(1, 25)
+    ]
+    result = compare_market_histories(
+        "688019.SH",
+        "eodhd",
+        primary,
+        "tushare",
+        reference,
+        as_of_date=date(2026, 7, 24),
+        tolerance_pct=0.02,
+    )
+    assert result.overlap_count == 24
+    assert result.status == DataQualityStatus.WARN
+    assert {item.code for item in result.issues} == {"reference_close_difference"}
 
 
 def test_market_store_is_idempotent_and_preserves_adjustment_semantics(tmp_path) -> None:
@@ -373,6 +489,7 @@ def test_env_file_loader_status_never_exposes_token(tmp_path, monkeypatch) -> No
     assert public == {
         "configured_provider": "eodhd",
         "eodhd_token_configured": True,
+        "tushare_token_configured": False,
     }
     assert "private-token" not in repr(settings)
     assert "private-token" not in json.dumps(public)

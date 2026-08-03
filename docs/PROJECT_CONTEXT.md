@@ -51,12 +51,31 @@ The same durable run is available through:
 - **Candidate** — thesis, risks, invalidation, triggers, verdict, confidence.
 - **MarketBarSet / quality result** — provider-specific daily history with explicit price semantics,
   provenance, and deterministic acceptance state.
+- **ThemeDefinition / ThemeMembership / ThemeUniverseSnapshot** — bitemporal theme identity,
+  source lineage, recognition and industrial exposure, reconstructed without future knowledge.
+- **MainlineAssessment / MonitorJob / ThemeResearchProposal** — deterministic theme state,
+  idempotent monitoring execution, and human-gated next research actions.
 - **CorporateEventVersion** — immutable official-event observation with lifecycle, point-in-time
   availability, canonical entity, and source/Evidence lineage.
+- **DisclosureFactCandidate / FinancialFact** — a reviewed-source extraction proposal and the
+  separately accepted immutable fact with shared Evidence lineage.
+- **SignalObservation / LiveSignalVersion** — provider-channel arrival and reconciled secondary
+  live signal, kept outside the official Evidence trust boundary.
 - **Tracking record** — original call and benchmark baseline, later snapshots, alpha, events, stage.
 
 Runs are inspectable assets, not disposable prompt transcripts. JSON artifacts provide portability;
 SQLite provides durable local querying and execution state.
+
+The pre-v0.6 product loop is now:
+
+```text
+monitor point-in-time themes → inspect mainline state → discover official/live events
+  → capture and review Evidence → decide research proposal → run/track research
+```
+
+The first mainline policy is deliberately experimental. CapexGraph can automate collection,
+calculation, state recording, and proposal creation; a human remains responsible for promoting a
+policy, accepting research actions, and interpreting an investment decision.
 
 ## Shipped research modes
 

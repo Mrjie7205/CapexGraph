@@ -1,7 +1,7 @@
 # Market data foundation
 
-This document describes the v0.4 daily-history slice currently implemented in CapexGraph. It is a
-data and research-observability layer, not a trading feed.
+This document describes the completed v0.4 daily-history and quality layer consolidated in
+CapexGraph v0.5.1. It is a research-observability layer, not a trading feed.
 
 ## Provider selection
 
@@ -14,14 +14,20 @@ CAPEXGRAPH_MARKET_PROVIDER=eodhd
 
 # Or the no-key fallback
 CAPEXGRAPH_MARKET_PROVIDER=yahoo
+
+# Optional A-share specialist/validation path
+TUSHARE_API_TOKEN=your-token
+
+# Deterministic bundled demo/test path
+CAPEXGRAPH_MARKET_PROVIDER=fixture-market
 ```
 
 The repository-local `.env` is ignored by Git. Process environment variables take precedence over
 the file. `capexgraph market providers` and `GET /api/v1/market/providers` reveal only whether a
 token is configured; they never return its value.
 
-Selecting EODHD without `EODHD_API_TOKEN` is an error. CapexGraph does not silently fall back to
-Yahoo, because a hidden provider change would make quality and licensing claims misleading.
+Selecting EODHD or Tushare without its own token is an error. CapexGraph does not silently fall
+back, because a hidden provider change would make quality and licensing claims misleading.
 
 ## Canonical ticker mapping
 
@@ -90,9 +96,11 @@ Structural errors produce `fail`, persist a diagnostic quality report and raw re
 bar persistence. Missing adjusted close and staleness currently produce `warn`, so the issue remains
 visible without confusing a market holiday or suspension with corrupt OHLC.
 
-This first gate does not yet validate exchange calendars, split/dividend events, suspensions, price
-limits, delistings, or cross-provider price differences. Those frozen comparison fixtures and an
-A-share specialist validation adapter remain M1 work.
+The completed gate also checks expected sessions, declared suspensions, adjustment-factor changes,
+extreme adjusted returns, and missing observations. Tushare supplies A-share trading-calendar,
+adjustment-factor and suspension context; EODHD remains the optional cross-market path. Provider
+differences are stored as a comparison result with hashes and tolerances rather than collapsed into
+one unexplained price series.
 
 ## CLI
 
@@ -108,6 +116,9 @@ capexgraph market snapshot <run-id> 688019.SH --provider eodhd --days 400
 
 # Force the no-key route
 capexgraph market snapshot <run-id> 688019.SH --provider yahoo
+
+# Compare two already-normalized provider histories
+capexgraph market compare 688019.SH --primary eodhd --reference tushare --as-of 2026-08-03
 ```
 
 Live tracking accepts the same provider boundary:
@@ -124,6 +135,7 @@ Candidate and benchmark data must still share one market date before a tracking 
 ```text
 GET  /api/v1/market/providers
 POST /api/v1/market/sync
+POST /api/v1/market/compare
 POST /api/v1/runs/{run-id}/market
 ```
 
@@ -140,11 +152,12 @@ Example sync body:
 The API is intended to run server-side. Do not place `EODHD_API_TOKEN` in the React application,
 browser storage, query parameters, or request bodies.
 
-## Remaining v0.4 work
+## Completed v0.4 boundary
 
-- frozen US/CN/KR/KOSDAQ provider fixtures and independent comparison reports;
-- exchange-calendar, suspension, corporate-action, and price-discontinuity checks;
-- an A-share specialist enhancement/validation provider;
-- point-in-time theme registry and historical membership imports;
-- theme metrics and approved versioned mainline policy;
-- scheduled post-close jobs, linked re-evaluation, and Cockpit data-quality views.
+- frozen CN/US/KR theme and market histories provide the no-key acceptance path;
+- point-in-time theme registry, deterministic mainline metrics, externally schedulable jobs,
+  human-gated linked re-evaluation, and Cockpit observability are implemented;
+- the bundled mainline thresholds remain versioned and visibly `experimental` until a separate
+  product approval; and
+- provider coverage, credentials, licenses, raw-response retention and quality issues remain
+  explicit. A missing adapter or key never becomes a silent success.

@@ -6,7 +6,12 @@ from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 
-from capexgraph.domain import DataQualityResult, MarketBar, MarketBarSet
+from capexgraph.domain import (
+    DataQualityResult,
+    MarketBar,
+    MarketBarSet,
+    MarketComparisonResult,
+)
 from capexgraph.runtime.migrations import ensure_database
 from capexgraph.runtime.store import state_db_path
 
@@ -185,3 +190,50 @@ class MarketDataStore:
         with self._connect() as connection:
             row = connection.execute(query, parameters).fetchone()
         return DataQualityResult.model_validate_json(row["payload"]) if row else None
+
+    def save_comparison(
+        self,
+        result: MarketComparisonResult,
+    ) -> MarketComparisonResult:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO market_comparison_reports (
+                    id, ticker, primary_provider, reference_provider, as_of_date,
+                    status, comparison_hash, checked_at, payload
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET payload = excluded.payload
+                """,
+                (
+                    result.id,
+                    result.ticker,
+                    result.primary_provider,
+                    result.reference_provider,
+                    result.as_of_date.isoformat(),
+                    result.status.value,
+                    result.comparison_hash,
+                    result.checked_at.isoformat(),
+                    result.model_dump_json(),
+                ),
+            )
+        return result
+
+    def list_comparisons(
+        self,
+        ticker: str | None = None,
+        *,
+        limit: int = 200,
+    ) -> list[MarketComparisonResult]:
+        query = "SELECT payload FROM market_comparison_reports"
+        parameters: list[object] = []
+        if ticker is not None:
+            query += " WHERE ticker = ?"
+            parameters.append(ticker)
+        query += " ORDER BY as_of_date DESC, checked_at DESC LIMIT ?"
+        parameters.append(max(1, min(limit, 5000)))
+        with self._connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [
+            MarketComparisonResult.model_validate_json(row["payload"])
+            for row in rows
+        ]

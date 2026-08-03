@@ -36,6 +36,7 @@ async def test_market_provider_status_redacts_credentials(monkeypatch) -> None:
     assert payload["configuration"] == {
         "configured_provider": "eodhd",
         "eodhd_token_configured": True,
+        "tushare_token_configured": False,
     }
     assert token not in response.text
 

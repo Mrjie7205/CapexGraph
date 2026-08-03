@@ -6,31 +6,29 @@ which must also update `docs/DECISIONS.md` and `docs/CURRENT_STATUS.md`.
 
 ## Current release
 
-`v0.3.0` completes the trustworthy live-research vertical slice:
+`v0.5.1` is the consolidated pre-v0.6 baseline. It includes the earlier evidence-first research
+workspace plus:
 
-- versioned database upgrades and recovery;
-- official SEC source discovery and review queues;
-- evidence coverage, strict/partial execution, and source text in agent context;
-- immutable SEC filing facts with source locators and formula lineage;
-- provider/failure visibility and the complete create → source → review → facts → research → report
-  Cockpit path; and
-- preserved no-key fixtures, resumable runs, tracking, scorecards, and reports.
+- v0.4 cross-market daily data, Tushare A-share validation, point-in-time theme universes,
+  deterministic mainline metrics, idempotent monitor jobs, human-gated proposals, and Mainline
+  Desk;
+- v0.5 CN/US/KR official disclosure adapters, append-only event history, bounded SEC history,
+  OpenDART facts, reviewed disclosure-fact candidates, event triggers, and Cockpit source/event
+  workflows; and
+- v0.5.1 equal-priority Jin10 MCP/WebSocket live channels, deterministic reconciliation, optional
+  model analysis, SSE Live Desk, Connection Center, and Research Bridge.
 
-The user has explicitly advanced active development to the isolated v0.5 official-event foundation
-after the first v0.4 market-data slice. Point-in-time theme universes and mainline monitoring remain
-incomplete dependencies; starting event contracts does not waive them or make automatic
-re-evaluation production-ready. The user has also approved a scoped `v0.5.1` live-event gateway:
-Jin10 MCP polling and Open Platform WebSocket are equal-priority information channels with
-independent checkpoints and health. MCP is the first real-data runtime slice while the WebSocket
-adapter is developed in parallel; once credentials are available, both continue running and feed
-cross-channel observation matching. Frozen events preserve the no-key path. This extension may
-create research and re-evaluation proposals, but it does not complete the missing v0.4 mainline
-policy. The product sequence remains:
+The shipped mainline policy remains explicitly `experimental`; production threshold approval is a
+separate product decision. The WebSocket implementation and frozen soak are complete, while its
+real live soak remains `WAIT KEY` until an independent Jin10 Secret-Key exists. Neither boundary is
+misreported as a passing production investment policy or live connection.
 
-1. market history and historical theme membership;
-2. official disclosures, filing facts, and event calendars;
-3. point-in-time consensus revisions; and
-4. richer Catalyst and cross-run graph workflows.
+The product sequence is now:
+
+1. completed — market history and historical theme membership;
+2. completed — official disclosures, filing facts, and event calendars;
+3. next — point-in-time consensus revisions; and
+4. later — richer Catalyst and cross-run graph workflows.
 
 ## v0.3 — Trustworthy live research ✅
 
@@ -76,7 +74,7 @@ returning secrets. The official Codex app-server owns account/login/model discov
 explicit compatibility adapter, not a dependency for fixtures, evidence, market data, official
 events, or the OpenAI API path.
 
-## v0.4 — Cross-market data foundation and mainline monitoring
+## v0.4 — Cross-market data foundation and mainline monitoring ✅
 
 Detailed execution order, provider boundaries, data contracts, tests, and Definition of Done are in
 [`docs/V0_4_PLAN.md`](docs/V0_4_PLAN.md).
@@ -125,7 +123,7 @@ Detailed execution order, provider boundaries, data contracts, tests, and Defini
 - The Cockpit explains provider coverage, theme sources, calculation windows, benchmarks, missing
   observations, and why a theme changed state.
 
-## v0.5 — Cross-market disclosures, filing facts, and event calendar
+## v0.5 — Cross-market disclosures, filing facts, and event calendar ✅
 
 Detailed implementation order and the current SEC-first boundary are in
 [`docs/V0_5_PLAN.md`](docs/V0_5_PLAN.md).
@@ -152,7 +150,7 @@ Detailed implementation order and the current SEC-first boundary are in
 - Missing official coverage remains visible and cannot be silently filled with model prose.
 - Licensed aggregators remain optional accelerators; official captures remain the evidence anchor.
 
-### v0.5.1 development extension — live event gateway
+### v0.5.1 — live event gateway ✅ (credentialed WebSocket soak: WAIT KEY)
 
 The complete product, architecture, frontend, operation, delivery, and test plan is the standalone
 HTML artifact [`docs/V0_5_1_PLAN.html`](docs/V0_5_1_PLAN.html).
@@ -217,7 +215,7 @@ Acceptance criteria:
   exposes channel coverage, delivers matched updates through SSE, and requires an explicit human
   action before creating a linked run or research action.
 - The extension creates research priorities and conditional plans only. It does not place orders,
-  manage positions, or claim the unfinished v0.4 mainline policy is production-ready.
+  manage positions, or claim the experimental v0.4 mainline policy is production-approved.
 
 ## v0.6 — Consensus revisions and expectation-aware regime analysis
 
@@ -296,9 +294,8 @@ Acceptance criteria:
 
 GitHub Issues carrying the `roadmap` label are the executable queue. Within a release, complete
 `priority:P0` items before `priority:P1` unless the user explicitly changes the order. Each issue
-must link back to the relevant goal and repeat its measurable acceptance criteria. Until the v0.4
-milestone issues are created, the ordered milestones in `docs/V0_4_PLAN.md` are the approved local
-execution queue.
+must link back to the relevant goal and repeat its measurable acceptance criteria. The next local
+execution order is `docs/V0_6_PLAN.md`; its provider/licensing decision gate precedes adapter work.
 
 ### Active executable queue
 
@@ -306,21 +303,20 @@ execution queue.
 2. Completed in v0.3 — [#5 official-source discovery and evidence review queue](https://github.com/Mrjie7205/CapexGraph/issues/5)
 3. Completed in v0.3 — [#6 live non-fixture Theme/Anchor vertical slice](https://github.com/Mrjie7205/CapexGraph/issues/6)
 4. Completed in v0.3 — [#7 filing-derived financial facts with evidence lineage](https://github.com/Mrjie7205/CapexGraph/issues/7)
-5. Completed slice — v0.4 M0/M1: the first EODHD/quality/persistence vertical slice is implemented;
-   frozen comparisons, exchange/corporate-action checks, and an A-share validation adapter remain.
-6. Completed first slice — v0.5 M0 and the initial M1 SEC vertical: append-only event contracts,
-   official filing discovery, Evidence-linked versions, point-in-time queries, CLI/API, and
-   artifacts pass the local release gate; SEC history backfill and a contact-identified live smoke
-   remain.
-7. Paused dependency P0 — v0.4 M2: point-in-time theme registry and historical membership.
-8. Paused dependency P1 — v0.4 M3/M4/M5, including [#8 scheduled snapshots, trigger jobs, and re-evaluation links](https://github.com/Mrjie7205/CapexGraph/issues/8).
-9. Completed and locally acceptance-closed v0.5.1 M0-M7 — typed contracts, migrations 6/7/8,
+5. Completed — v0.4 M0-M5: market quality and comparison, point-in-time theme registry,
+   deterministic mainline engine, externally schedulable idempotent jobs, human-gated proposals,
+   and Mainline Desk. The bundled policy remains visibly experimental.
+6. Completed — v0.5 M0-M5: CN/US/KR official providers, append-only event history, bounded SEC
+   backfill, OpenDART facts, reviewed disclosure-fact candidates, event-triggered proposals, and
+   Cockpit source/event paths.
+7. Completed and locally acceptance-closed — v0.5.1 M0-M7: typed contracts, migrations 6/7/8,
    independent fixtures and real adapters, rules/reconciliation, optional AI analysis,
    supervisor/API/SSE, paged and cross-tab synchronized Live Desk/Research Bridge, plus Connection
    Center. MCP and Codex subscription live paths pass; missing WebSocket credentials block only
    its credentialed live smoke/soak. See `docs/V0_5_1_ACCEPTANCE.md`.
-10. External v0.5.1 acceptance gate — run the credentialed WebSocket/MCP provider soak when a
+8. External v0.5.1 acceptance gate — run the credentialed WebSocket/MCP provider soak when a
     Secret-Key is available; do not block or demote MCP and do not call WebSocket live before it
     passes.
-11. Next v0.5 P0 — CNINFO/SSE/SZSE/BSE, then OpenDART/KIND official disclosure adapters.
-12. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).
+9. Next — v0.6 point-in-time consensus revisions and expectation-aware regime analysis. Follow
+   `docs/V0_6_PLAN.md`; do not substitute current consensus for historical snapshots.
+10. Deferred to v0.7 — [#9 Catalyst Scan beyond the reserved scaffold](https://github.com/Mrjie7205/CapexGraph/issues/9).

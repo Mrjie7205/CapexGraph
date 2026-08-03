@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -37,6 +38,8 @@ class UnsupportedMarketError(MarketProviderError):
 class MarketFetchResult:
     bar_set: MarketBarSet
     raw_payload: bytes
+    expected_sessions: tuple[date, ...] = ()
+    suspended_dates: tuple[date, ...] = ()
 
 
 class MarketDataProvider(Protocol):
@@ -373,6 +376,228 @@ class EodhdProvider:
         )
 
 
+def tushare_symbol(ticker: str) -> str:
+    canonical = canonical_ticker(ticker)
+    if canonical.endswith((".SH", ".SZ", ".BJ")):
+        return canonical
+    raise UnsupportedMarketError(
+        f"Tushare validation is restricted to A-share symbols; received {canonical}."
+    )
+
+
+class TushareDailyProvider:
+    """Optional A-share specialist source used for semantics and cross-provider checks."""
+
+    provider_name = "tushare"
+    provider_version = "1"
+    endpoint = "https://api.tushare.pro"
+
+    def __init__(
+        self,
+        api_token: str,
+        *,
+        client: httpx.Client | None = None,
+    ) -> None:
+        if not api_token.strip():
+            raise MarketProviderConfigurationError(
+                "TUSHARE_API_TOKEN is required when the Tushare provider is selected."
+            )
+        self._api_token = api_token.strip()
+        self.client = client or httpx.Client(timeout=30, follow_redirects=True)
+
+    @classmethod
+    def capability(cls) -> ProviderCapability:
+        return ProviderCapability(
+            provider=cls.provider_name,
+            provider_version=cls.provider_version,
+            markets=["CN"],
+            exchanges=["SSE", "SZSE", "BSE"],
+            history=CoverageLevel.PARTIAL,
+            adjusted_close=True,
+            corporate_actions=CoverageLevel.PARTIAL,
+            delisted_securities=CoverageLevel.PARTIAL,
+            rate_limit="Depends on the user's Tushare points and API allowance.",
+            license="Personal account data; do not commit or redistribute raw responses.",
+            notes=[
+                "Daily OHLC is combined with adj_factor for a latest-date normalized series.",
+                "Volume keeps Tushare's published unit and is not silently converted.",
+                "Use as an explicit A-share validation source, never a silent fallback.",
+            ],
+        )
+
+    def source_url(self, ticker: str) -> str:
+        tushare_symbol(ticker)
+        return self.endpoint
+
+    def _call(
+        self,
+        api_name: str,
+        *,
+        params: dict[str, str],
+        fields: str,
+    ) -> dict[str, Any]:
+        try:
+            response = self.client.post(
+                self.endpoint,
+                json={
+                    "api_name": api_name,
+                    "token": self._api_token,
+                    "params": params,
+                    "fields": fields,
+                },
+                headers={"User-Agent": "CapexGraph/0.4"},
+            )
+        except httpx.HTTPError as error:
+            raise MarketProviderError(
+                f"Tushare request failed ({type(error).__name__})."
+            ) from None
+        if response.status_code >= 400:
+            raise MarketProviderError(
+                f"Tushare request failed with HTTP {response.status_code}."
+            )
+        try:
+            payload = response.json()
+        except ValueError:
+            raise MarketProviderError("Tushare returned invalid JSON.") from None
+        if not isinstance(payload, dict) or int(payload.get("code", -1)) != 0:
+            raise MarketProviderError(
+                "Tushare returned a provider error; check token permissions and rate limits."
+            )
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise MarketProviderError("Tushare response has no data object.")
+        return payload
+
+    @staticmethod
+    def _rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
+        data = payload.get("data", {})
+        fields = data.get("fields", [])
+        items = data.get("items", [])
+        if not isinstance(fields, list) or not isinstance(items, list):
+            return []
+        return [
+            dict(zip(fields, item, strict=False))
+            for item in items
+            if isinstance(item, list)
+        ]
+
+    def fetch_history(
+        self,
+        ticker: str,
+        *,
+        days: int = 400,
+        start_date: date | None = None,
+        end_date: date | None = None,
+    ) -> MarketFetchResult:
+        identity = TickerResolver().resolve(ticker)
+        symbol = tushare_symbol(identity.ticker)
+        effective_end = end_date or datetime.now(UTC).date()
+        effective_start = start_date or effective_end - timedelta(days=max(days, 1))
+        params = {
+            "ts_code": symbol,
+            "start_date": effective_start.strftime("%Y%m%d"),
+            "end_date": effective_end.strftime("%Y%m%d"),
+        }
+        daily = self._call(
+            "daily",
+            params=params,
+            fields="ts_code,trade_date,open,high,low,close,vol",
+        )
+        factors = self._call(
+            "adj_factor",
+            params=params,
+            fields="ts_code,trade_date,adj_factor",
+        )
+        calendar = self._call(
+            "trade_cal",
+            params={
+                "exchange": "SSE",
+                "start_date": params["start_date"],
+                "end_date": params["end_date"],
+                "is_open": "1",
+            },
+            fields="exchange,cal_date,is_open",
+        )
+        try:
+            suspensions = self._call(
+                "suspend_d",
+                params=params,
+                fields="ts_code,trade_date,suspend_timing,suspend_type",
+            )
+        except MarketProviderError:
+            suspensions = {"data": {"fields": [], "items": []}}
+        factor_by_date = {
+            str(item.get("trade_date")): float(item["adj_factor"])
+            for item in self._rows(factors)
+            if item.get("trade_date") and item.get("adj_factor") not in {None, ""}
+        }
+        raw_rows = self._rows(daily)
+        latest_factor = (
+            factor_by_date[max(factor_by_date)] if factor_by_date else 0.0
+        )
+        bars: list[MarketBar] = []
+        for item in raw_rows:
+            trade_date = str(item.get("trade_date") or "")
+            factor = factor_by_date.get(trade_date)
+            try:
+                close = float(item["close"])
+                bars.append(
+                    MarketBar(
+                        date=datetime.strptime(trade_date, "%Y%m%d").date(),
+                        open=float(item["open"]),
+                        high=float(item["high"]),
+                        low=float(item["low"]),
+                        close=close,
+                        adjusted_close=(
+                            close * factor / latest_factor
+                            if factor is not None and latest_factor > 0
+                            else None
+                        ),
+                        volume=(
+                            float(item["vol"])
+                            if item.get("vol") not in {None, ""}
+                            else None
+                        ),
+                    )
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        bars.sort(key=lambda item: item.date)
+        if not bars:
+            raise MarketProviderError(f"No valid Tushare daily bars returned for {symbol}.")
+        raw_payload = json.dumps(
+            {
+                "daily": daily,
+                "adj_factor": factors,
+                "trade_cal": calendar,
+                "suspend_d": suspensions,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode()
+        return MarketFetchResult(
+            bar_set=_build_bar_set(
+                identity=identity,
+                provider=self.provider_name,
+                provider_version=self.provider_version,
+                source_url=self.endpoint,
+                raw_payload=raw_payload,
+                bars=bars,
+            ),
+            raw_payload=raw_payload,
+            expected_sessions=tuple(
+                datetime.strptime(str(item["cal_date"]), "%Y%m%d").date()
+                for item in self._rows(calendar)
+                if item.get("cal_date") and str(item.get("is_open")) in {"1", "1.0"}
+            ),
+            suspended_dates=tuple(
+                datetime.strptime(str(item["trade_date"]), "%Y%m%d").date()
+                for item in self._rows(suspensions)
+                if item.get("trade_date")
+            ),
+        )
+
+
 def _sequence_value(values: Any, index: int) -> Any:
     if not isinstance(values, list) or index >= len(values):
         return None
@@ -391,6 +616,7 @@ def build_market_provider(
         "yahoo": "yahoo",
         "yahoo-chart": "yahoo",
         "eodhd": "eodhd",
+        "tushare": "tushare",
     }
     normalized = aliases.get(selected)
     if normalized == "yahoo":
@@ -401,10 +627,20 @@ def build_market_provider(
                 "EODHD_API_TOKEN is required when the EODHD provider is selected."
             )
         return EodhdProvider(active_settings.eodhd_api_token, client=client)
+    if normalized == "tushare":
+        if active_settings.tushare_api_token is None:
+            raise MarketProviderConfigurationError(
+                "TUSHARE_API_TOKEN is required when the Tushare provider is selected."
+            )
+        return TushareDailyProvider(active_settings.tushare_api_token, client=client)
     raise MarketProviderConfigurationError(
-        f"Unknown market provider '{selected}'. Choose 'yahoo' or 'eodhd'."
+        f"Unknown market provider '{selected}'. Choose 'yahoo', 'eodhd', or 'tushare'."
     )
 
 
 def provider_capabilities() -> list[ProviderCapability]:
-    return [EodhdProvider.capability(), YahooChartProvider.capability()]
+    return [
+        EodhdProvider.capability(),
+        TushareDailyProvider.capability(),
+        YahooChartProvider.capability(),
+    ]
