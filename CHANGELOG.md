@@ -12,6 +12,8 @@ All notable changes to CapexGraph are documented here.
   accepted official sources stop the graph checkpoint;
 - bound autonomous review to both the raw capture and its extracted review text, rejecting blank or
   inexact quotations and automatically re-capturing tampered material;
+- fixed live CNINFO discovery by resolving the official `orgId` before announcement queries, and
+  collapsed model-proposed bare ticker aliases onto the existing official company node;
 - added a Cockpit Agent-evidence progress rail, automatic-stage button copy, accepted/rejected
   counts, verified-company chips, failure guidance, and distinct Agent/human review labels;
 - added a human-readable Cockpit stage-detail panel with structured outputs, Agent and model

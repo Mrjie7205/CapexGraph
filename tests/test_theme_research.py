@@ -5,7 +5,14 @@ from types import SimpleNamespace
 
 import pytest
 
-from capexgraph.domain import Confidence, EvidenceMode, RunMode, RunStatus, StepStatus
+from capexgraph.domain import (
+    Confidence,
+    EvidenceMode,
+    RunMode,
+    RunStatus,
+    StepStatus,
+    SupplyChainNode,
+)
 from capexgraph.providers import EvidencePolicy, ProviderName
 from capexgraph.providers.fixture import FixtureResearchModel
 from capexgraph.providers.openai import OpenAIResearchModel
@@ -113,6 +120,82 @@ def test_agent_reviewed_sources_cap_high_relationships_at_medium(
 
     assert confidence == "medium"
     assert grounded is True
+
+
+def test_theme_graph_reuses_canonical_company_node_for_model_ticker_alias(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.THEME, "A股半导体硅片", "CN")
+    run.pipeline[0].status = StepStatus.COMPLETED
+    run.pipeline[1].status = StepStatus.COMPLETED
+    run.nodes = [
+        SupplyChainNode(
+            id="company-002230-sz",
+            label="科大讯飞",
+            node_type="company",
+            ticker="002230.SZ",
+            market="CN",
+            layer="垂直行业AI应用",
+        ),
+        SupplyChainNode(
+            id="segment-enterprise-ai",
+            label="企业级AI应用",
+            node_type="industry_segment",
+            market="CN",
+            layer="应用层",
+        ),
+    ]
+    run.manifest["agent_outputs"] = {
+        "intake": {"scope": "A股AI软件"},
+        "census": {"nodes": []},
+    }
+    save_run(run)
+
+    class AliasGraphModel(FixtureResearchModel):
+        def generate(self, output_model, *, system_prompt: str, user_prompt: str):
+            del system_prompt, user_prompt
+            assert output_model.__name__ == "ThemeGraphOutput"
+            return output_model.model_validate(
+                {
+                    "additional_nodes": [
+                        {
+                            "id": "company_002230_iflytek",
+                            "label": "科大讯飞股份有限公司",
+                            "node_type": "company",
+                            "ticker": "002230",
+                            "market": "CN",
+                            "layer": "垂直行业AI应用",
+                        }
+                    ],
+                    "evidence": [],
+                    "edges": [
+                        {
+                            "id": "edge-iflytek-enterprise-ai",
+                            "source": "company_002230_iflytek",
+                            "target": "segment-enterprise-ai",
+                            "relationship": "peer",
+                            "product": "企业级AI软件",
+                            "basis": "Model alias must resolve to the official company node.",
+                            "confidence": "low",
+                            "evidence_ids": [],
+                        }
+                    ],
+                    "graph_gaps": [],
+                }
+            )
+
+    model = AliasGraphModel(run.subject)
+    completed = WorkflowExecutor(
+        handlers=build_theme_handlers(model),
+        max_attempts=1,
+    ).execute(run.id, until="graph")
+
+    matching_nodes = [node for node in completed.nodes if node.ticker == "002230.SZ"]
+    assert [node.id for node in matching_nodes] == ["company-002230-sz"]
+    assert all(node.id != "company_002230_iflytek" for node in completed.nodes)
+    assert completed.edges[0].source == "company-002230-sz"
 
 
 def test_live_theme_graph_runs_evidence_bootstrap_before_graph_model(

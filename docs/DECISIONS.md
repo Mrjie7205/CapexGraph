@@ -430,3 +430,7 @@ produces or impersonates
 human `reviewed`. Fully Agent-reviewed support may ground a relationship only up to medium
 confidence; curated or unchanged human-reviewed support may retain high. Fixture runs remain the
 no-key deterministic path and skip the bootstrap.
+
+Official company identity remains authoritative after bootstrap. If the graph model returns a
+different node ID or a bare six-digit ticker for the same company, deterministic canonicalization
+must reuse the verified node and remap relationship endpoints rather than creating a duplicate.

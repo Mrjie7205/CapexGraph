@@ -44,6 +44,7 @@ from capexgraph.research.theme_schemas import (
 from capexgraph.runtime import WorkflowExecutor
 from capexgraph.runtime.artifacts import atomic_write_json
 from capexgraph.runtime.store import runs_dir
+from capexgraph.tools.identity import canonical_ticker
 from capexgraph.workflows import load_run
 
 SYSTEM_PROMPT = """You are a specialist agent inside CapexGraph, an evidence-first
@@ -101,15 +102,35 @@ def _write_run_artifact(run: ResearchRun, filename: str, payload: Any) -> None:
     atomic_write_json(runs_dir() / run.id / filename, payload)
 
 
-def _merge_nodes(run: ResearchRun, proposals: list[Any]) -> None:
+def _merge_nodes(
+    run: ResearchRun,
+    proposals: list[Any],
+    *,
+    match_ticker_aliases: bool = False,
+) -> dict[str, str]:
     nodes = {node.id: node for node in run.nodes}
+    ticker_ids = {
+        canonical_ticker(node.ticker): node.id
+        for node in run.nodes
+        if match_ticker_aliases and node.ticker
+    }
+    aliases: dict[str, str] = {}
     for proposal in proposals:
         node = SupplyChainNode(**proposal.model_dump())
+        if match_ticker_aliases and node.ticker:
+            node.ticker = canonical_ticker(node.ticker)
+            existing_id = ticker_ids.get(node.ticker)
+            if existing_id is not None and existing_id != node.id:
+                aliases[node.id] = existing_id
+                continue
         existing = nodes.get(node.id)
         if existing is not None and existing != node:
             raise ValueError(f"Conflicting node definition: {node.id}")
         nodes[node.id] = node
+        if match_ticker_aliases and node.ticker:
+            ticker_ids.setdefault(node.ticker, node.id)
     run.nodes = list(nodes.values())
+    return aliases
 
 
 def _evidence_identity_matches(existing: Evidence, proposal: Any) -> bool:
@@ -253,7 +274,13 @@ def build_theme_handlers(
                 },
             ),
         )
-        _merge_nodes(run, output.additional_nodes)
+        node_aliases = _merge_nodes(
+            run,
+            output.additional_nodes,
+            match_ticker_aliases=True,
+        )
+        if node_aliases:
+            run.manifest["graph_node_aliases"] = node_aliases
 
         evidence = {item.id: item for item in run.evidence}
         for proposal in output.evidence:
@@ -269,6 +296,8 @@ def build_theme_handlers(
         evidence_by_id = {item.id: item for item in run.evidence}
         for proposal in output.edges:
             payload = proposal.model_dump()
+            payload["source"] = node_aliases.get(payload["source"], payload["source"])
+            payload["target"] = node_aliases.get(payload["target"], payload["target"])
             payload["as_of_date"] = run.as_of_date
             human_reviewed_sources = bool(proposal.evidence_ids) and all(
                 evidence_is_reviewed_and_unchanged(

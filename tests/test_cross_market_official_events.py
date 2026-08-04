@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from urllib.parse import parse_qs
 
 import httpx
 import pytest
@@ -36,6 +37,66 @@ def _public_resolver(*_args):
     return [(2, 1, 6, "", ("93.184.216.34", 443))]
 
 
+def test_cninfo_resolves_official_org_id_before_announcement_query(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.ANCHOR, "科大讯飞", "CN", date(2026, 8, 4))
+    requests: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/information/topSearch/query"):
+            requests.append(("identity", request.url.params["keyWord"]))
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "code": "002230",
+                        "orgId": "9900004565",
+                        "zwjc": "科大讯飞",
+                        "category": "A股",
+                        "delisted": "false",
+                    }
+                ],
+                request=request,
+            )
+        form = parse_qs(request.content.decode("utf-8"))
+        stock = form.get("stock", [""])[0]
+        requests.append(("announcements", stock))
+        announcements = (
+            [
+                {
+                    "announcementId": "1225000001",
+                    "secCode": "002230",
+                    "secName": "科大讯飞",
+                    "announcementTitle": "2026年半年度报告",
+                    "announcementTime": 1785686400000,
+                    "adjunctUrl": "finalpage/2026-08-04/1225000001.PDF",
+                    "announcementTypeName": "半年度报告",
+                }
+            ]
+            if stock == "002230,9900004565"
+            else None
+        )
+        return httpx.Response(
+            200,
+            json={"announcements": announcements},
+            request=request,
+        )
+
+    provider = CninfoSourceProvider(
+        client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    suggestions = provider.discover(run, identifier="002230.SZ", limit=1)
+
+    assert requests == [
+        ("identity", "002230"),
+        ("announcements", "002230,9900004565"),
+    ]
+    assert suggestions[0].metadata["company_name"] == "科大讯飞"
+
+
 def test_cninfo_disclosure_maps_to_versioned_event_and_shared_evidence(
     tmp_path,
     monkeypatch,
@@ -44,6 +105,20 @@ def test_cninfo_disclosure_maps_to_versioned_event_and_shared_evidence(
     run = create_run(RunMode.ANCHOR, "安集科技", "CN", date(2026, 8, 3))
 
     def discover_handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/information/topSearch/query"):
+            return httpx.Response(
+                200,
+                json=[
+                    {
+                        "code": "688019",
+                        "orgId": "gssh0602973",
+                        "zwjc": "安集科技",
+                        "category": "A股",
+                        "delisted": "false",
+                    }
+                ],
+                request=request,
+            )
         return httpx.Response(
             200,
             json={

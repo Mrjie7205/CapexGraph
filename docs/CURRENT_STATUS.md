@@ -22,6 +22,8 @@ change. `ROADMAP.md` defines future scope; `docs/DECISIONS.md` preserves accepte
   and independently reviews every capture with exact quotations before the graph stage. The new
   `agent_reviewed` state records model/prompt/hash provenance and is capped at medium confidence;
   `reviewed` remains explicitly human. Zero accepted sources fail the graph checkpoint visibly.
+  CNINFO discovery resolves the platform's official `orgId` before querying announcements, and the
+  graph merge reuses verified company nodes when a model returns the same ticker without a suffix.
 - Financial facts, reports, tracking snapshots, scorecards, triggers, and research stages remain
   available from the earlier releases.
 - The Cockpit now opens completed/failed stages as readable structured sections with Agent,
@@ -127,11 +129,15 @@ Local working-tree gate on 2026-08-04 for autonomous Theme evidence bootstrap an
 controls:
 
 - Ruff: passed;
-- Python: 170 tests passed;
-- React/Vite production build: passed at Web version 0.5.1; and
+- Python: 172 tests passed;
+- React/Vite production build: passed at Web version 0.5.1;
 - browser: the retained Codex Theme run showed the pending automatic-evidence action; temporary
   browser-only responses verified running/completed/failed bootstrap states without mutating the
-  run; desktop and 375px layouts had no horizontal overflow, and the fresh console had zero errors.
+  run; desktop and 375px layouts had no horizontal overflow, and the fresh console had zero errors;
+  and
+- isolated live Codex/CNINFO spot check: 40 official suggestions discovered, four selected and
+  captured, three marked `agent_reviewed`, one rejected, and Theme `graph` completed. This is a
+  dated integration check, not a guarantee that future themes will always find acceptable evidence.
 
 Previous consolidated release record:
 

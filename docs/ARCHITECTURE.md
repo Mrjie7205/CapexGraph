@@ -222,6 +222,10 @@ Evidence Review Agent, provider/model/transport, source and prompt hashes, times
 exact quotations, and warnings. It never impersonates human review. None of these states makes
 every possible interpretation of the source true. Curated fixtures and claims backed entirely by
 human-reviewed captures may preserve high confidence; Agent-reviewed support stops at medium.
+CNINFO discovery first resolves its official code-to-`orgId` identity before requesting company
+announcements. During Theme graph merge, deterministic ticker canonicalization maps model node
+aliases back to an existing official company node and rewrites edge endpoints, preventing duplicate
+company identities from bypassing the verified node.
 
 ### Forward tracking
 

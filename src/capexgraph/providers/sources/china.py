@@ -137,6 +137,7 @@ class CninfoSourceProvider(_ChinaAnnouncementProvider):
     provider_version = "1"
     publisher = "巨潮资讯网"
     endpoint = "https://www.cninfo.com.cn/new/hisAnnouncement/query"
+    identity_endpoint = "https://www.cninfo.com.cn/new/information/topSearch/query"
 
     @classmethod
     def capability(cls) -> OfficialSourceCapability:
@@ -161,7 +162,31 @@ class CninfoSourceProvider(_ChinaAnnouncementProvider):
         column = {"SSE": "sse", "SZSE": "szse", "BSE": "bj"}[exchange]
         end = datetime.now(SHANGHAI).date()
         start = end - timedelta(days=365)
+        headers = {
+            "User-Agent": "Mozilla/5.0 CapexGraph/0.5",
+            "Referer": "https://www.cninfo.com.cn/",
+        }
         try:
+            identity_response = self.client.post(
+                self.identity_endpoint,
+                params={"keyWord": code, "maxNum": "10"},
+                headers=headers,
+            )
+            identity_response.raise_for_status()
+            identities = identity_response.json()
+            official_identity = next(
+                (
+                    item
+                    for item in identities
+                    if isinstance(item, dict)
+                    and str(item.get("code") or "").strip() == code
+                    and str(item.get("orgId") or "").strip()
+                ),
+                None,
+            )
+            if official_identity is None:
+                raise RuntimeError(f"CNINFO did not resolve an official orgId for {code}.")
+            org_id = str(official_identity["orgId"]).strip()
             response = self.client.post(
                 self.endpoint,
                 data={
@@ -170,7 +195,7 @@ class CninfoSourceProvider(_ChinaAnnouncementProvider):
                     "column": column,
                     "tabName": "fulltext",
                     "plate": "",
-                    "stock": code,
+                    "stock": f"{code},{org_id}",
                     "searchkey": "",
                     "secid": "",
                     "category": "",
@@ -180,10 +205,7 @@ class CninfoSourceProvider(_ChinaAnnouncementProvider):
                     "sortType": "",
                     "isHLtitle": "true",
                 },
-                headers={
-                    "User-Agent": "Mozilla/5.0 CapexGraph/0.5",
-                    "Referer": "https://www.cninfo.com.cn/",
-                },
+                headers=headers,
             )
         except httpx.HTTPError as error:
             raise RuntimeError(f"CNINFO request failed ({type(error).__name__}).") from None
