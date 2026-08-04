@@ -8,6 +8,20 @@ intake → census → graph → audit → score → debate → decision
 
 Each stage receives typed state, returns one Pydantic model, and is checkpointed before the next stage begins. A failed run can resume without repeating completed model calls.
 
+## Cockpit stage inspection and empty-run cleanup
+
+In **研究任务 / 工作流**, select a run and use **查看详情** beside any completed, blocked, or
+failed stage. The Cockpit opens the latest finished stage automatically and renders its typed output
+as named sections and lists together with Agent, attempts, timestamps, provider/model lineage,
+message, and error state. This is a view of the persisted checkpoint/`manifest.agent_outputs`; it
+does not re-run or reinterpret the stage.
+
+An untouched duplicate run shows **删除空任务**. The first click opens an inline explanation and
+the second moves the workspace to the local `runs/.trash` recovery area. The backend performs the
+authoritative check again and refuses deletion when the run has started or has checkpoints,
+nodes/edges, Evidence, candidates, sources/facts, tracking, live context, or a mainline proposal.
+Research assets must be preserved rather than cleaned up through this convenience action.
+
 ## No-key golden run
 
 ```powershell
@@ -23,6 +37,20 @@ The run produces:
 - `candidates.json` — research priorities, risks, invalidation, triggers;
 - `decision.json` — ranking, limitations, next actions, disclaimer;
 - `checkpoints/*.json` — one durable output per agent stage.
+
+## Automatic company evidence before graph mapping
+
+For non-fixture Theme runs, pressing **运行下一阶段** when `graph` is pending authorizes one bounded
+automatic evidence pass. The Agent proposes up to four listed-company seeds from the completed
+boundary and census, discovers ticker-matched official disclosures through CNINFO (CN), SEC (US),
+or KIND (KR), selects and captures up to four sources, then independently reviews every captured
+text with exact quotations. The operator is not asked to know which companies or reports to pick.
+
+Accepted material is recorded as `agent_reviewed` with provider, model, transport, prompt hash,
+source hash, rationale, quotes, warnings, and review time. It is visibly distinct from human
+`reviewed` material and caps a fully Agent-grounded edge at medium confidence. The five phases and
+counts appear in the Cockpit, while `evidence-bootstrap.json` preserves restart/failure detail.
+Zero accepted sources stop `graph`; fixtures bypass the automatic pass.
 
 ## Provider behavior
 
@@ -67,17 +95,18 @@ $env:OPENAI_API_KEY = "..."
 $env:CAPEXGRAPH_OPENAI_MODEL = "your-model"
 ```
 
-The OpenAI adapter does not search or fetch sources on its own. Model-proposed evidence remains a
-research queue and resulting claims are forced to low confidence. A user can capture HTML/PDF
-sources with the live evidence tools, verify their hashes, and explicitly review them. A claim may
-preserve medium/high confidence only when all of its cited captured sources are reviewed and
-unchanged; review still does not guarantee the interpretation is correct.
+The OpenAI adapter itself does not fetch sources. For Theme Scan, the workflow now surrounds it
+with the deterministic automatic evidence service above: model judgment proposes/selects/reviews,
+while official-provider identity, guarded downloads, hashes, exact quotations, limits, and
+confidence caps are enforced by code. Human Source Queue review remains available; human-reviewed
+unchanged sources may preserve high confidence, while Agent-reviewed sources stop at medium.
 
 Before the first live stage, the workflow records model/provider version and evaluates evidence
 coverage. Every stage receives bounded extracted text from captured/reviewed sources and bounded
 versioned financial facts; the prompt does not receive only titles or URLs. `partial` mode can
-continue with explicit low-confidence gaps. `strict` mode checkpoints a failure until at least one
-reviewed, hash-valid source exists and blocks unsupported medium/high relationship proposals.
+continue with explicit low-confidence gaps. For live Theme runs, `strict` defers its initial
+evidence gate until the automatic graph bootstrap, then requires at least one unchanged human- or
+Agent-reviewed source and still caps Agent-only support at medium confidence.
 
 The selected provider and model are locked when execution starts. Resume may retry the same
 channel, but switching a partially executed run to another authentication or billing channel is

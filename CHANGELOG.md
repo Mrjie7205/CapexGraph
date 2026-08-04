@@ -4,7 +4,22 @@ All notable changes to CapexGraph are documented here.
 
 ## Unreleased
 
-- No unreleased changes.
+- added a fully automatic Theme Scan evidence bootstrap before graph mapping: bounded seed-company
+  hypotheses, ticker-matched official discovery, guarded capture, independent exact-quote review,
+  durable phase/failure artifacts, tamper-aware re-capture, and idempotent resume;
+- added the explicit `agent_reviewed` Evidence lifecycle and provenance record without relabeling it
+  human `reviewed`; Agent-grounded relationships are capped at medium confidence, while zero
+  accepted official sources stop the graph checkpoint;
+- bound autonomous review to both the raw capture and its extracted review text, rejecting blank or
+  inexact quotations and automatically re-capturing tampered material;
+- added a Cockpit Agent-evidence progress rail, automatic-stage button copy, accepted/rejected
+  counts, verified-company chips, failure guidance, and distinct Agent/human review labels;
+- added a human-readable Cockpit stage-detail panel with structured outputs, Agent and model
+  lineage, attempts, timestamps, messages, errors, defensive secret-field filtering, and automatic
+  selection of the latest completed/failed checkpoint; and
+- added two-step deletion for accidental untouched research runs, with stale-state protection,
+  locked backend eligibility checks across checkpoint/domain/source/fact/tracking/live/mainline
+  references, and recoverable workspace archival under `runs/.trash` instead of hard file removal.
 
 ## 0.5.1 — 2026-08-03
 

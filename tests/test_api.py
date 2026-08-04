@@ -1,3 +1,5 @@
+import sqlite3
+
 import pytest
 from httpx import ASGITransport, AsyncClient
 
@@ -82,6 +84,134 @@ async def test_create_theme_run(tmp_path, monkeypatch) -> None:
         assert payload["mode"] == "theme"
         assert payload["subject"] == "A股半导体硅片"
         assert (tmp_path / payload["id"] / "state.json").is_file()
+
+
+@pytest.mark.anyio
+async def test_delete_empty_run_requires_confirmation_and_archives_workspace(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        created = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={"subject": "Accidental duplicate", "market": "CN"},
+            )
+        ).json()
+
+        unconfirmed = await client.request(
+            "DELETE",
+            f"/api/v1/runs/{created['id']}",
+            json={"confirmed": False, "expected_updated_at": created["updated_at"]},
+        )
+        assert unconfirmed.status_code == 409
+        assert (tmp_path / created["id"] / "state.json").is_file()
+
+        deleted = await client.request(
+            "DELETE",
+            f"/api/v1/runs/{created['id']}",
+            json={"confirmed": True, "expected_updated_at": created["updated_at"]},
+        )
+
+        assert deleted.status_code == 200
+        payload = deleted.json()
+        assert payload["deleted"] is True
+        assert payload["run_id"] == created["id"]
+        archived = tmp_path / payload["archived_path"]
+        assert archived.parent.parent == tmp_path / ".trash"
+        assert (archived / "state.json").is_file()
+        assert not (tmp_path / created["id"]).exists()
+        assert (await client.get(f"/api/v1/runs/{created['id']}")).status_code == 404
+
+
+@pytest.mark.anyio
+async def test_delete_run_rejects_checkpointed_research(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        created = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={
+                    "subject": "A股半导体硅片",
+                    "market": "CN",
+                    "as_of_date": "2025-04-29",
+                    "provider": "fixture",
+                },
+            )
+        ).json()
+        started = await client.post(
+            f"/api/v1/runs/{created['id']}/execute",
+            json={"provider": "fixture", "until": "intake", "max_attempts": 1},
+        )
+        assert started.status_code == 200
+
+        rejected = await client.request(
+            "DELETE",
+            f"/api/v1/runs/{created['id']}",
+            json={
+                "confirmed": True,
+                "expected_updated_at": started.json()["updated_at"],
+            },
+        )
+
+        assert rejected.status_code == 409
+        assert "checkpoint" in rejected.json()["detail"].lower()
+        assert (await client.get(f"/api/v1/runs/{created['id']}")).status_code == 200
+        assert (tmp_path / created["id"] / "checkpoints" / "intake.json").is_file()
+
+
+@pytest.mark.anyio
+async def test_delete_run_rejects_external_tracking_reference(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        created = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={"subject": "Tracked empty shell", "market": "CN"},
+            )
+        ).json()
+
+        with sqlite3.connect(tmp_path / "capexgraph.db") as connection:
+            connection.execute(
+                """
+                INSERT INTO tracked_candidates (
+                    id, run_id, node_id, ticker, label, benchmark_ticker,
+                    call_date, stage, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "tracked-delete-guard",
+                    created["id"],
+                    "node-1",
+                    "TEST.US",
+                    "Guarded candidate",
+                    "SPY.US",
+                    "2026-08-03",
+                    "research",
+                    created["updated_at"],
+                    created["updated_at"],
+                ),
+            )
+
+        rejected = await client.request(
+            "DELETE",
+            f"/api/v1/runs/{created['id']}",
+            json={"confirmed": True, "expected_updated_at": created["updated_at"]},
+        )
+
+        assert rejected.status_code == 409
+        assert "tracked_candidates" in rejected.json()["detail"]
+        assert (await client.get(f"/api/v1/runs/{created['id']}")).status_code == 200
 
 
 @pytest.mark.anyio
@@ -287,6 +417,36 @@ async def test_background_execute_is_pollable(tmp_path, monkeypatch) -> None:
         assert queued.status_code == 200
         polled = await client.get(f"/api/v1/runs/{created['id']}")
         assert polled.json()["status"] == "needs_review"
+
+
+@pytest.mark.anyio
+async def test_evidence_bootstrap_artifact_is_exposed(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        run = (
+            await client.post(
+                "/api/v1/runs/theme",
+                json={
+                    "subject": "Autonomous evidence test",
+                    "market": "CN",
+                    "provider": "openai",
+                },
+            )
+        ).json()
+        (tmp_path / run["id"] / "evidence-bootstrap.json").write_text(
+            '{"status":"completed","accepted_sources":1}',
+            encoding="utf-8",
+        )
+
+        artifact = await client.get(
+            f"/api/v1/runs/{run['id']}/artifacts/evidence-bootstrap.json"
+        )
+
+    assert artifact.status_code == 200
+    assert artifact.json()["accepted_sources"] == 1
 
 
 @pytest.mark.anyio

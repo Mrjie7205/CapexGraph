@@ -122,6 +122,7 @@ export function ResearchReadiness({
       ? run.manifest.financial_fact_errors
       : []),
   ] as Array<Record<string, unknown>>;
+  const usableReviewed = (coverage?.reviewed ?? 0) + (coverage?.agent_reviewed ?? 0);
 
   return (
     <section className="readiness panel" id="readiness">
@@ -139,16 +140,16 @@ export function ResearchReadiness({
           <div className="readiness-grid">
             <article className={`coverage-orbit ${coverage?.strict_ready ? "ready" : ""}`}>
               <div className="coverage-ring">
-                <strong>{coverage?.reviewed ?? 0}</strong>
-                <span>已审核<small>reviewed</small></span>
+                <strong>{usableReviewed}</strong>
+                <span>可用审核<small>grounded</small></span>
               </div>
               <div>
                 <BilingualText zh="证据模式" en="Evidence mode" compact />
                 <h3>{coverage?.mode === "strict" ? "严格模式" : "部分模式"}<small>{coverage?.mode ?? "partial"}</small></h3>
                 <p>
-                  已捕获 {coverage?.captured ?? 0} · 待审核 {coverage?.pending_reviews ?? 0} ·{" "}
-                  失败 {coverage?.source_failures ?? 0}
-                  <small>captured · pending · failed</small>
+                  人工审核 {coverage?.reviewed ?? 0} · Agent 审核 {coverage?.agent_reviewed ?? 0}<br />
+                  已捕获 {coverage?.captured ?? 0} · 待审核 {coverage?.pending_reviews ?? 0} · 失败 {coverage?.source_failures ?? 0}
+                  <small>human · agent · captured · pending · failed</small>
                 </p>
               </div>
             </article>

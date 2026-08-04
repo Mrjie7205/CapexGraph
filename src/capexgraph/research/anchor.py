@@ -21,6 +21,7 @@ from capexgraph.research.anchor_schemas import (
 from capexgraph.research.context import (
     apply_relationship_confidence_gate,
     enforce_evidence_preflight,
+    evidence_is_agent_reviewed_and_unchanged,
     evidence_is_reviewed_and_unchanged,
     refresh_evidence_coverage,
 )
@@ -136,17 +137,33 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         for proposal in output.edges:
             payload = proposal.model_dump()
             payload["as_of_date"] = run.as_of_date
-            reviewed = bool(proposal.evidence_ids) and all(
+            human_reviewed = bool(proposal.evidence_ids) and all(
                 evidence_is_reviewed_and_unchanged(
                     run,
                     evidence_by_id.get(item_id),
                 )
                 for item_id in proposal.evidence_ids
             )
+            agent_reviewed = (
+                bool(proposal.evidence_ids)
+                and not human_reviewed
+                and all(
+                    evidence_is_reviewed_and_unchanged(
+                        run,
+                        evidence_by_id.get(item_id),
+                    )
+                    or evidence_is_agent_reviewed_and_unchanged(
+                        run,
+                        evidence_by_id.get(item_id),
+                    )
+                    for item_id in proposal.evidence_ids
+                )
+            )
             gated_confidence, grounded = apply_relationship_confidence_gate(
                 run,
                 requested_confidence=proposal.confidence.value,
-                reviewed_sources=reviewed,
+                human_reviewed_sources=human_reviewed,
+                agent_reviewed_sources=agent_reviewed,
                 curated=model.evidence_policy == EvidencePolicy.CURATED,
                 claim_label=f"relationship {proposal.id}",
             )
@@ -154,7 +171,11 @@ def build_anchor_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
             payload["metadata"] = {
                 "evidence_policy": model.evidence_policy.value,
                 "verification_required": not grounded,
-                "reviewed_sources": reviewed,
+                "reviewed_sources": human_reviewed,
+                "agent_reviewed_sources": agent_reviewed,
+                "review_actor": (
+                    "human" if human_reviewed else "agent" if agent_reviewed else None
+                ),
             }
             edges.append(SupplyChainEdge(**payload))
         run.edges = edges

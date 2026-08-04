@@ -168,7 +168,12 @@ class SourceDiscoveryService:
             SourceSuggestionStatus.CAPTURE_FAILED,
         }
         if retry:
-            allowed.add(SourceSuggestionStatus.DUPLICATE)
+            allowed.update(
+                {
+                    SourceSuggestionStatus.DUPLICATE,
+                    SourceSuggestionStatus.CAPTURED,
+                }
+            )
         if suggestion.status not in allowed:
             raise ValueError(
                 f"Source suggestion cannot be captured from status {suggestion.status.value}"
@@ -213,6 +218,7 @@ class SourceDiscoveryService:
                         evidence
                         for evidence in run.evidence
                         if evidence.source_hash == document.evidence.source_hash
+                        and evidence.id != suggestion.evidence_id
                     ),
                     None,
                 )

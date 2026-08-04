@@ -8,6 +8,7 @@ from capexgraph.domain import (
     Candidate,
     Confidence,
     Evidence,
+    EvidenceKind,
     PipelineStep,
     ResearchRun,
     RunMode,
@@ -20,9 +21,11 @@ from capexgraph.research.context import (
     apply_relationship_confidence_gate,
     build_research_context,
     enforce_evidence_preflight,
+    evidence_is_agent_reviewed_and_unchanged,
     evidence_is_reviewed_and_unchanged,
     refresh_evidence_coverage,
 )
+from capexgraph.research.evidence_bootstrap import AutonomousEvidenceBootstrapService
 from capexgraph.research.model_runtime import (
     bind_model_identity,
     provider_setup_error,
@@ -41,6 +44,7 @@ from capexgraph.research.theme_schemas import (
 from capexgraph.runtime import WorkflowExecutor
 from capexgraph.runtime.artifacts import atomic_write_json
 from capexgraph.runtime.store import runs_dir
+from capexgraph.workflows import load_run
 
 SYSTEM_PROMPT = """You are a specialist agent inside CapexGraph, an evidence-first
 supply-chain research system. Return only the requested structured output. Separate facts from
@@ -48,6 +52,10 @@ inference, do not invent tickers, relationships, customers, dates, or sources, a
 evidence. This is research for human review, not investment advice."""
 
 ThemeHandler = Callable[[ResearchRun, PipelineStep], dict[str, Any]]
+EvidenceBootstrapFactory = Callable[
+    [ResearchModel],
+    AutonomousEvidenceBootstrapService,
+]
 
 
 def _prompt(run: ResearchRun, task: str, context: dict[str, Any]) -> str:
@@ -136,13 +144,40 @@ def _validate_graph(run: ResearchRun) -> None:
             raise ValueError(f"Edge {edge.id} references missing evidence: {missing}")
 
 
-def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
+def _has_grounded_company_evidence(run: ResearchRun) -> bool:
+    company_kinds = {EvidenceKind.FILING, EvidenceKind.COMPANY_DISCLOSURE}
+    return any(
+        item.kind in company_kinds
+        and (
+            evidence_is_reviewed_and_unchanged(run, item)
+            or evidence_is_agent_reviewed_and_unchanged(run, item)
+        )
+        for item in run.evidence
+    )
+
+
+def build_theme_handlers(
+    model: ResearchModel,
+    *,
+    evidence_bootstrap_factory: EvidenceBootstrapFactory | None = None,
+) -> dict[str, ThemeHandler]:
+    autonomous_bootstrap_enabled = evidence_bootstrap_factory is not None or (
+        model.provider_name
+        in {
+            ProviderName.CODEX_SUBSCRIPTION.value,
+            ProviderName.OPENAI.value,
+        }
+    )
+
     def intake(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
         bind_model_identity(run, model)
-        enforce_evidence_preflight(
-            run,
-            curated=model.evidence_policy == EvidencePolicy.CURATED,
-        )
+        if autonomous_bootstrap_enabled and model.evidence_policy != EvidencePolicy.CURATED:
+            refresh_evidence_coverage(run)
+        else:
+            enforce_evidence_preflight(
+                run,
+                curated=model.evidence_policy == EvidencePolicy.CURATED,
+            )
         output = _generate_model(
             model,
             run,
@@ -174,6 +209,34 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         return {"message": "Player census built", "node_count": len(run.nodes)}
 
     def graph(run: ResearchRun, _step: PipelineStep) -> dict[str, Any]:
+        if (
+            model.evidence_policy != EvidencePolicy.CURATED
+            and not _has_grounded_company_evidence(run)
+            and autonomous_bootstrap_enabled
+        ):
+            factory = evidence_bootstrap_factory or (
+                lambda active_model: AutonomousEvidenceBootstrapService(
+                    model=active_model
+                )
+            )
+            try:
+                factory(model).run(run.id)
+            except Exception:
+                refreshed = load_run(run.id)
+                if refreshed is not None:
+                    run.nodes = refreshed.nodes
+                    run.evidence = refreshed.evidence
+                    run.manifest = refreshed.manifest
+                    run.updated_at = refreshed.updated_at
+                raise
+            refreshed = load_run(run.id)
+            if refreshed is None:
+                raise KeyError(f"Research run not found after evidence bootstrap: {run.id}")
+            run.nodes = refreshed.nodes
+            run.evidence = refreshed.evidence
+            run.manifest = refreshed.manifest
+            run.updated_at = refreshed.updated_at
+
         output = _generate_model(
             model,
             run,
@@ -207,24 +270,48 @@ def build_theme_handlers(model: ResearchModel) -> dict[str, ThemeHandler]:
         for proposal in output.edges:
             payload = proposal.model_dump()
             payload["as_of_date"] = run.as_of_date
-            reviewed_sources = bool(proposal.evidence_ids) and all(
+            human_reviewed_sources = bool(proposal.evidence_ids) and all(
                 evidence_is_reviewed_and_unchanged(
                     run,
                     evidence_by_id.get(evidence_id),
                 )
                 for evidence_id in proposal.evidence_ids
             )
+            agent_reviewed_sources = (
+                bool(proposal.evidence_ids)
+                and not human_reviewed_sources
+                and all(
+                    evidence_is_reviewed_and_unchanged(
+                        run,
+                        evidence_by_id.get(evidence_id),
+                    )
+                    or evidence_is_agent_reviewed_and_unchanged(
+                        run,
+                        evidence_by_id.get(evidence_id),
+                    )
+                    for evidence_id in proposal.evidence_ids
+                )
+            )
             gated_confidence, claim_is_grounded = apply_relationship_confidence_gate(
                 run,
                 requested_confidence=proposal.confidence.value,
-                reviewed_sources=reviewed_sources,
+                human_reviewed_sources=human_reviewed_sources,
+                agent_reviewed_sources=agent_reviewed_sources,
                 curated=model.evidence_policy == EvidencePolicy.CURATED,
                 claim_label=f"relationship {proposal.id}",
             )
             payload["metadata"] = {
                 "evidence_policy": model.evidence_policy.value,
                 "verification_required": not claim_is_grounded,
-                "reviewed_sources": reviewed_sources,
+                "reviewed_sources": human_reviewed_sources,
+                "agent_reviewed_sources": agent_reviewed_sources,
+                "review_actor": (
+                    "human"
+                    if human_reviewed_sources
+                    else "agent"
+                    if agent_reviewed_sources
+                    else None
+                ),
             }
             payload["confidence"] = gated_confidence
             edges.append(SupplyChainEdge(**payload))

@@ -29,6 +29,7 @@ class EvidenceCoverage(BaseModel):
     mode: EvidenceMode
     evidence_total: int = 0
     captured: int = 0
+    agent_reviewed: int = 0
     reviewed: int = 0
     proposed: int = 0
     rejected: int = 0
@@ -39,6 +40,7 @@ class EvidenceCoverage(BaseModel):
     discovery_failures: int = 0
     status: str = "empty"
     strict_ready: bool = False
+    autonomous_ready: bool = False
     gaps: list[str] = Field(default_factory=list)
 
 
@@ -59,7 +61,12 @@ def evaluate_evidence_coverage(run: ResearchRun) -> EvidenceCoverage:
     for item in run.evidence:
         counts[item.status] += 1
         if (
-            item.status in {EvidenceStatus.CAPTURED, EvidenceStatus.REVIEWED}
+            item.status
+            in {
+                EvidenceStatus.CAPTURED,
+                EvidenceStatus.AGENT_REVIEWED,
+                EvidenceStatus.REVIEWED,
+            }
             and item.local_path
             and not verify_evidence_hash(run, item)
         ):
@@ -84,6 +91,11 @@ def evaluate_evidence_coverage(run: ResearchRun) -> EvidenceCoverage:
         and item.kind != EvidenceKind.MARKET_DATA
         for item in run.evidence
     )
+    agent_reviewed_claim_sources = sum(
+        evidence_is_agent_reviewed_and_unchanged(run, item)
+        and item.kind != EvidenceKind.MARKET_DATA
+        for item in run.evidence
+    )
     pending_reviews = reviewable_captured + sum(
         1
         for suggestion in suggestions
@@ -95,6 +107,7 @@ def evaluate_evidence_coverage(run: ResearchRun) -> EvidenceCoverage:
     )
     discovery_failures = len(run.manifest.get("source_discovery_errors", []))
     reviewed = counts[EvidenceStatus.REVIEWED]
+    agent_reviewed = counts[EvidenceStatus.AGENT_REVIEWED]
     captured = counts[EvidenceStatus.CAPTURED]
 
     gaps: list[str] = []
@@ -111,6 +124,8 @@ def evaluate_evidence_coverage(run: ResearchRun) -> EvidenceCoverage:
 
     if reviewed_claim_sources and not hash_mismatches:
         status = "reviewed"
+    elif agent_reviewed_claim_sources and not hash_mismatches:
+        status = "agent_reviewed"
     elif run.evidence:
         status = "partial"
     elif suggestions:
@@ -121,6 +136,7 @@ def evaluate_evidence_coverage(run: ResearchRun) -> EvidenceCoverage:
         mode=mode,
         evidence_total=len(run.evidence),
         captured=captured,
+        agent_reviewed=agent_reviewed,
         reviewed=reviewed,
         proposed=counts[EvidenceStatus.PROPOSED],
         rejected=counts[EvidenceStatus.REJECTED],
@@ -130,7 +146,11 @@ def evaluate_evidence_coverage(run: ResearchRun) -> EvidenceCoverage:
         source_failures=source_failures,
         discovery_failures=discovery_failures,
         status=status,
-        strict_ready=reviewed_claim_sources > 0 and hash_mismatches == 0,
+        strict_ready=(
+            reviewed_claim_sources > 0 or agent_reviewed_claim_sources > 0
+        )
+        and hash_mismatches == 0,
+        autonomous_ready=agent_reviewed_claim_sources > 0 and hash_mismatches == 0,
         gaps=gaps,
     )
 
@@ -163,11 +183,27 @@ def evidence_is_reviewed_and_unchanged(run: ResearchRun, item: Any) -> bool:
     )
 
 
+def evidence_is_agent_reviewed_and_unchanged(run: ResearchRun, item: Any) -> bool:
+    return bool(
+        item
+        and item.status == EvidenceStatus.AGENT_REVIEWED
+        and item.review
+        and item.review.source_hash == item.source_hash
+        and item.source_hash
+        and item.local_path
+        and verify_evidence_hash(run, item)
+    )
+
+
 def _evidence_context(run: ResearchRun) -> list[dict[str, Any]]:
     included: list[dict[str, Any]] = []
     used = 0
     for item in run.evidence:
-        if item.status not in {EvidenceStatus.CAPTURED, EvidenceStatus.REVIEWED}:
+        if item.status not in {
+            EvidenceStatus.CAPTURED,
+            EvidenceStatus.AGENT_REVIEWED,
+            EvidenceStatus.REVIEWED,
+        }:
             continue
         text = item.excerpt
         if item.local_path:
@@ -175,6 +211,9 @@ def _evidence_context(run: ResearchRun) -> list[dict[str, Any]]:
                 text = read_run_evidence_text(run.id, item.id)
             except (KeyError, OSError, ValueError):
                 text = item.excerpt
+        if item.review and item.review.supporting_quotes:
+            reviewed_text = "\n\n".join(item.review.supporting_quotes)
+            text = f"{reviewed_text}\n\n{text}"
         remaining = MAX_EVIDENCE_CHARACTERS - used
         if remaining <= 0:
             break
@@ -189,6 +228,7 @@ def _evidence_context(run: ResearchRun) -> list[dict[str, Any]]:
                 "source_url": str(item.source_url) if item.source_url else None,
                 "source_hash": item.source_hash,
                 "published_at": item.published_at,
+                "review": item.review.model_dump(mode="json") if item.review else None,
                 "text": excerpt,
                 "truncated": len(text) > len(excerpt),
             }
@@ -273,13 +313,18 @@ def apply_relationship_confidence_gate(
     run: ResearchRun,
     *,
     requested_confidence: str,
-    reviewed_sources: bool,
     curated: bool,
     claim_label: str,
+    human_reviewed_sources: bool | None = None,
+    agent_reviewed_sources: bool = False,
+    reviewed_sources: bool | None = None,
 ) -> tuple[str, bool]:
-    grounded = curated or reviewed_sources
-    if grounded:
+    if human_reviewed_sources is None:
+        human_reviewed_sources = bool(reviewed_sources)
+    if curated or human_reviewed_sources:
         return requested_confidence, True
+    if agent_reviewed_sources:
+        return ("medium" if requested_confidence == "high" else requested_confidence), True
     mode = EvidenceMode(run.manifest.get("evidence_mode", EvidenceMode.PARTIAL))
     if mode == EvidenceMode.STRICT and requested_confidence in {"medium", "high"}:
         raise ValueError(

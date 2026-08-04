@@ -143,7 +143,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-    allow_methods=["GET", "POST", "PATCH"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -167,6 +167,17 @@ class ExecuteRequest(BaseModel):
     provider: ProviderName | None = None
     background: bool = False
     evidence_mode: EvidenceMode | None = None
+
+
+class RunDeleteRequest(BaseModel):
+    confirmed: bool = False
+    expected_updated_at: datetime
+
+
+class RunDeleteResponse(BaseModel):
+    deleted: bool
+    run_id: str
+    archived_path: str
 
 
 class EvidenceCollectRequest(BaseModel):
@@ -493,6 +504,26 @@ def get_run(run_id: str) -> ResearchRun:
     return run
 
 
+@app.delete("/api/v1/runs/{run_id}", response_model=RunDeleteResponse)
+def delete_run(run_id: str, request: RunDeleteRequest) -> RunDeleteResponse:
+    if not request.confirmed:
+        raise HTTPException(status_code=409, detail="Explicit confirmation is required.")
+    try:
+        archived_path = RunStore().delete_empty_run(
+            run_id,
+            expected_updated_at=request.expected_updated_at,
+        )
+    except KeyError as error:
+        raise HTTPException(status_code=404, detail=str(error)) from error
+    except (ValueError, RuntimeError) as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return RunDeleteResponse(
+        deleted=True,
+        run_id=run_id,
+        archived_path=archived_path.as_posix(),
+    )
+
+
 @app.get("/api/v1/runs/{run_id}/checkpoints", response_model=list[StepCheckpoint])
 def get_checkpoints(run_id: str) -> list[StepCheckpoint]:
     if load_run(run_id) is None:
@@ -509,6 +540,7 @@ ARTIFACT_ALLOWLIST = {
     "manifest.json",
     "sources.json",
     "coverage.json",
+    "evidence-bootstrap.json",
 }
 
 

@@ -5,14 +5,15 @@ from types import SimpleNamespace
 
 import pytest
 
-from capexgraph.domain import Confidence, RunMode, RunStatus
+from capexgraph.domain import Confidence, EvidenceMode, RunMode, RunStatus, StepStatus
 from capexgraph.providers import EvidencePolicy, ProviderName
 from capexgraph.providers.fixture import FixtureResearchModel
 from capexgraph.providers.openai import OpenAIResearchModel
 from capexgraph.research import build_executor_for_run, build_theme_handlers
+from capexgraph.research.context import apply_relationship_confidence_gate
 from capexgraph.research.theme_schemas import ThemeBoundaryOutput
 from capexgraph.runtime import WorkflowExecutor
-from capexgraph.workflows import create_run
+from capexgraph.workflows import create_run, load_run, save_run
 
 
 def test_golden_theme_scan_produces_auditable_artifacts(tmp_path, monkeypatch) -> None:
@@ -92,6 +93,160 @@ def test_unverified_model_edges_and_candidates_are_downgraded(tmp_path, monkeypa
     assert all(edge.confidence == Confidence.LOW for edge in completed.edges)
     assert all(edge.metadata["verification_required"] is True for edge in completed.edges)
     assert all(candidate.confidence == Confidence.LOW for candidate in completed.candidates)
+
+
+def test_agent_reviewed_sources_cap_high_relationships_at_medium(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.THEME, "Enterprise AI", "CN")
+
+    confidence, grounded = apply_relationship_confidence_gate(
+        run,
+        requested_confidence="high",
+        human_reviewed_sources=False,
+        agent_reviewed_sources=True,
+        curated=False,
+        claim_label="relationship edge-company-demand",
+    )
+
+    assert confidence == "medium"
+    assert grounded is True
+
+
+def test_live_theme_graph_runs_evidence_bootstrap_before_graph_model(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(
+        RunMode.THEME,
+        "Alphabet Q2 2026 AI capex transmission",
+        "US",
+    )
+
+    class BootstrapAwareModel(FixtureResearchModel):
+        provider_name = "test-live-model"
+        model_name = "test-live-model-v1"
+        evidence_policy = EvidencePolicy.UNVERIFIED_MODEL
+
+        def generate(self, output_model, *, system_prompt: str, user_prompt: str):
+            if output_model.__name__ == "ThemeGraphOutput":
+                current = load_run(run.id)
+                assert current is not None
+                assert current.manifest["evidence_bootstrap"]["status"] == "completed"
+            return super().generate(
+                output_model,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
+
+    class RecordingBootstrap:
+        def run(self, run_id: str):
+            current = load_run(run_id)
+            assert current is not None
+            current.manifest["evidence_bootstrap"] = {
+                "status": "completed",
+                "phase": "completed",
+                "attempt": 1,
+                "accepted_sources": 1,
+            }
+            save_run(current)
+            return SimpleNamespace(status="completed")
+
+    model = BootstrapAwareModel(run.subject)
+    executor = WorkflowExecutor(
+        handlers=build_theme_handlers(
+            model,
+            evidence_bootstrap_factory=lambda _model: RecordingBootstrap(),
+        )
+    )
+
+    paused = executor.execute(run.id, until="census")
+    assert paused.pipeline[1].status == StepStatus.COMPLETED
+    completed = executor.execute(run.id, until="graph")
+
+    assert completed.pipeline[2].status == StepStatus.COMPLETED
+    assert completed.manifest["evidence_bootstrap"]["status"] == "completed"
+
+
+def test_live_theme_graph_preserves_durable_bootstrap_failure_state(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(
+        RunMode.THEME,
+        "Alphabet Q2 2026 AI capex transmission",
+        "US",
+    )
+    model = FixtureResearchModel(run.subject)
+    model.provider_name = "test-live-model"
+    model.model_name = "test-live-model-v1"
+    model.evidence_policy = EvidencePolicy.UNVERIFIED_MODEL
+
+    class FailingBootstrap:
+        def run(self, run_id: str):
+            current = load_run(run_id)
+            assert current is not None
+            current.manifest["evidence_bootstrap"] = {
+                "status": "failed",
+                "phase": "reviewing_evidence",
+                "attempt": 1,
+                "accepted_sources": 0,
+                "error": "No captured source passed independent Agent review.",
+            }
+            current.manifest["bootstrap_failure_marker"] = "durable"
+            save_run(current)
+            raise RuntimeError("bootstrap failed")
+
+    executor = WorkflowExecutor(
+        handlers=build_theme_handlers(
+            model,
+            evidence_bootstrap_factory=lambda _model: FailingBootstrap(),
+        ),
+        max_attempts=1,
+    )
+
+    executor.execute(run.id, until="census")
+    failed = executor.execute(run.id, until="graph")
+
+    assert failed.status == RunStatus.FAILED
+    assert failed.pipeline[2].status == StepStatus.FAILED
+    assert failed.manifest["evidence_bootstrap"]["status"] == "failed"
+    assert failed.manifest["evidence_bootstrap"]["accepted_sources"] == 0
+    assert failed.manifest["bootstrap_failure_marker"] == "durable"
+
+
+def test_strict_live_theme_defers_initial_evidence_gate_to_automatic_graph_bootstrap(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(
+        RunMode.THEME,
+        "Alphabet Q2 2026 AI capex transmission",
+        "US",
+        evidence_mode=EvidenceMode.STRICT,
+    )
+    model = FixtureResearchModel(run.subject)
+    model.provider_name = "openai"
+    model.model_name = "test-openai-model"
+    model.evidence_policy = EvidencePolicy.UNVERIFIED_MODEL
+
+    paused = WorkflowExecutor(
+        handlers=build_theme_handlers(
+            model,
+            evidence_bootstrap_factory=lambda _model: SimpleNamespace(),
+        ),
+        max_attempts=1,
+    ).execute(run.id, until="census")
+
+    assert paused.status == RunStatus.NEEDS_REVIEW
+    assert paused.pipeline[0].status == StepStatus.COMPLETED
+    assert paused.pipeline[1].status == StepStatus.COMPLETED
+    assert paused.manifest["evidence_coverage"]["strict_ready"] is False
 
 
 def test_openai_provider_uses_responses_parse_with_pydantic() -> None:

@@ -78,9 +78,13 @@ limits.
 Source discovery has its own trust boundary. `SourceSuggestion` records a provider result, official
 domain classification, reason, and queue state. It is not Evidence. Only a successful guarded
 capture creates `Evidence(status=captured)`; explicit human approval is still required for
-`reviewed`. SEC discovery uses official EDGAR JSON and document URLs. User-supplied URLs enter the
-same queue and are labeled issuer/regulator only when their domains match deterministic policy.
-Canonical URLs and content hashes are deduplicated independently.
+`reviewed`. The Theme graph bootstrap may instead create distinct `agent_reviewed` Evidence only
+after ticker-matched regulator/issuer discovery, guarded capture, independent model review, and
+literal verification of quotations bound to separate raw-source and extracted-text hashes. SEC
+discovery uses official EDGAR JSON and document
+URLs. User-supplied URLs enter the same queue and are labeled issuer/regulator only when their
+domains match deterministic policy. Canonical URLs and content hashes are deduplicated
+independently.
 
 ### Live signal gateway
 
@@ -184,8 +188,9 @@ the database remains authoritative.
 Before live research, a deterministic context builder measures evidence coverage, verifies captured
 hashes, loads bounded extracted source text, and loads bounded financial facts. The same context is
 added to every Theme and Anchor prompt. Partial mode allows explicit gaps and downgrades unsupported
-relationships. Strict mode fails at a durable checkpoint until reviewed evidence exists and rejects
-unsupported medium/high relationship proposals.
+relationships. For a live Theme run, strict mode defers its first evidence gate until the automatic
+graph bootstrap; other paths still fail early without reviewed Evidence. Both paths reject
+unsupported medium/high relationship proposals, and Agent-only support remains capped at medium.
 
 ### Filing facts
 
@@ -206,13 +211,17 @@ periods. Human acceptance creates the immutable fact; rejection remains durable 
 curated fixture       → schema validation → medium/high confidence allowed
 model proposal        → schema validation → forced low confidence
 captured source       → hash verification → explicit human review
-reviewed model claim  → medium/high confidence may be preserved
+human reviewed claim  → medium/high confidence may be preserved
+Agent reviewed claim  → model/prompt/hash/exact-quote lineage → at most medium confidence
 ```
 
-An evidence ID proves provenance inside a run. `captured` means bytes were downloaded and hashed;
-`reviewed` means a human approved that unchanged capture. It still does not make every possible
-interpretation of the source true. Curated fixtures and claims backed entirely by reviewed captures
-may preserve medium/high confidence.
+An evidence ID proves provenance inside a run. `captured` means raw bytes and extracted review text
+were separately hashed; `reviewed` means a human approved that unchanged material. `agent_reviewed`
+records an independent
+Evidence Review Agent, provider/model/transport, source and prompt hashes, timestamp, rationale,
+exact quotations, and warnings. It never impersonates human review. None of these states makes
+every possible interpretation of the source true. Curated fixtures and claims backed entirely by
+human-reviewed captures may preserve high confidence; Agent-reviewed support stops at medium.
 
 ### Forward tracking
 

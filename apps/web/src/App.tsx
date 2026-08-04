@@ -3,6 +3,7 @@ import {
   createRun,
   captureTrackingSnapshot,
   decideDisclosureFactCandidate,
+  deleteRun as deleteResearchRun,
   evidenceTextUrl,
   executeRun,
   getDecision,
@@ -26,6 +27,8 @@ import {
   type Scorecard,
   type TrackingStage,
 } from "./api";
+import { StageDetailPanel } from "./StageDetailPanel";
+import { AutonomousEvidencePanel } from "./AutonomousEvidencePanel";
 import { ResearchReadiness } from "./ResearchReadiness";
 import { SourceQueue } from "./SourceQueue";
 import { LiveDesk } from "./LiveDesk";
@@ -139,6 +142,10 @@ function App() {
   const [polling, setPolling] = useState(false);
   const [error, setError] = useState("");
   const [connectionsOpen, setConnectionsOpen] = useState(false);
+  const [selectedStageKey, setSelectedStageKey] = useState<string | null>(null);
+  const [deleteArmed, setDeleteArmed] = useState(false);
+  const [runNotice, setRunNotice] = useState("");
+  const decisionStep = selected?.pipeline.find((step) => step.key === "decision");
 
   async function refreshModelProviders() {
     const providers = await listModelProviders(true);
@@ -190,9 +197,13 @@ function App() {
 
   useEffect(() => {
     setDecision(null);
-    if (!selected || selected.status !== "needs_review") return;
+    if (
+      !selected
+      || selected.status !== "needs_review"
+      || decisionStep?.status !== "completed"
+    ) return;
     getDecision(selected.id).then(setDecision).catch(() => undefined);
-  }, [selected?.id, selected?.status]);
+  }, [selected?.id, selected?.status, decisionStep?.status]);
 
   useEffect(() => {
     if (!selected) {
@@ -201,6 +212,19 @@ function App() {
     }
     listDisclosureFactCandidates(selected.id).then(setFactCandidates).catch(() => setFactCandidates([]));
   }, [selected?.id]);
+
+  useEffect(() => {
+    setDeleteArmed(false);
+    if (!selected) {
+      setSelectedStageKey(null);
+      return;
+    }
+    setSelectedStageKey(
+      [...selected.pipeline]
+        .reverse()
+        .find((step) => ["completed", "failed", "blocked"].includes(step.status))?.key ?? null,
+    );
+  }, [selected?.id, selected?.updated_at]);
 
   async function startRun(run: ResearchRun, resume = false, until?: string) {
     const persistedProvider = run.manifest.model_provider;
@@ -292,6 +316,26 @@ function App() {
     }
   }
 
+  async function deleteSelectedRun() {
+    if (!selected) return;
+    setBusy(true);
+    setError("");
+    setRunNotice("");
+    try {
+      const result = await deleteResearchRun(selected.id, selected.updated_at);
+      const latest = await listRuns();
+      setRuns(latest);
+      setSelected(latest[0] ?? null);
+      setDeleteArmed(false);
+      setRunNotice(`空任务已移入本地回收区：${result.archived_path}`);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "任务删除失败");
+      setDeleteArmed(false);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function review(evidenceId: string, approved: boolean) {
     if (!selected) return;
     try {
@@ -372,6 +416,31 @@ function App() {
 
   const completedSteps = selected?.pipeline.filter((step) => step.status === "completed").length ?? 0;
   const hasPending = selected?.pipeline.some((step) => ["pending", "failed"].includes(step.status)) ?? false;
+  const nextPendingStep = selected?.pipeline.find((step) => ["pending", "failed"].includes(step.status));
+  const hasGroundedCompanyEvidence = selected?.evidence.some(
+    (item) => (item.kind === "filing" || item.kind === "company_disclosure")
+      && (item.status === "reviewed" || item.status === "agent_reviewed"),
+  ) ?? false;
+  const willBootstrapEvidence = Boolean(
+    selected?.mode === "theme"
+      && nextPendingStep?.key === "graph"
+      && selected.manifest.model_provider !== "fixture"
+      && !hasGroundedCompanyEvidence,
+  );
+  const hasAgentOutputs = Boolean(
+    selected?.manifest.agent_outputs
+      && Object.keys(selected.manifest.agent_outputs).length > 0,
+  );
+  const canDeleteSelected = Boolean(
+    selected
+      && selected.status === "created"
+      && selected.pipeline.every((step) => step.status === "pending" && !step.attempts)
+      && selected.nodes.length === 0
+      && selected.edges.length === 0
+      && selected.evidence.length === 0
+      && selected.candidates.length === 0
+      && !hasAgentOutputs,
+  );
   const nodes = new Map(selected?.nodes.map((node) => [node.id, node]) ?? []);
   const trackedNodeIds = new Set(
     tracking.filter((card) => card.tracked.run_id === selected?.id).map((card) => card.tracked.node_id),
@@ -435,7 +504,7 @@ function App() {
             </div>
             <div className="composer-options">
               <label><BilingualText zh="模型通道" en="Model channel" compact /><select value={provider} onChange={(event) => { if (isProvider(event.target.value)) setProvider(event.target.value); }}><option value="fixture">冻结样例 · Fixture（无需模型）</option><option value="codex_subscription">Codex 订阅 · 本机调用</option><option value="openai">OpenAI API · 按量计费</option></select></label>
-              <label><BilingualText zh="证据策略" en="Evidence policy" compact /><select value={evidenceMode} onChange={(event) => setEvidenceMode(event.target.value as EvidenceMode)}><option value="partial">部分模式 · 允许带缺口继续</option><option value="strict">严格模式 · 先完成人工审核</option></select></label>
+              <label><BilingualText zh="证据策略" en="Evidence policy" compact /><select value={evidenceMode} onChange={(event) => setEvidenceMode(event.target.value as EvidenceMode)}><option value="partial">部分模式 · 允许带缺口继续</option><option value="strict">严格模式 · 自动补证并执行置信度门槛</option></select></label>
               <label>
                 <BilingualText zh="市场" en="Market" compact />
                 <select value={market} onChange={(event) => setMarket(event.target.value)}>
@@ -496,7 +565,7 @@ function App() {
           <div className="run-strip">
             {runs.length === 0 && <p className="empty-state">还没有持久化研究任务。<small>No persisted runs yet.</small></p>}
             {runs.slice(0, 5).map((run) => (
-              <button key={run.id} className={selected?.id === run.id ? "active" : ""} onClick={() => setSelected(run)}>
+              <button key={run.id} className={selected?.id === run.id ? "active" : ""} onClick={() => { setSelected(run); setRunNotice(""); }}>
                 <span>{translateUiValue(run.mode)}<small>{humanizeUiValue(run.mode)}</small></span>
                 <strong>{run.subject}</strong>
                 <small>{translateUiValue(run.status)} · {humanizeUiValue(run.status)}</small>
@@ -508,8 +577,35 @@ function App() {
               <small>{selected ? `${translateUiValue(selected.mode)} · ${selected.mode.toUpperCase()}` : "暂无研究 · NO RUN"}</small>
               <h2>{selected?.subject ?? "请先创建研究任务"}</h2>
             </div>
-            <span className="run-id">{selected?.id ?? "—"}</span>
+            <div className="run-title-tools">
+              <span className="run-id">{selected?.id ?? "—"}</span>
+              {selected && (
+                <button
+                  className="delete-run-trigger"
+                  type="button"
+                  disabled={!canDeleteSelected || busy || polling}
+                  title={canDeleteSelected ? "删除未运行、无研究产物的空任务" : "已有阶段、证据、关系或跟踪内容的任务受到保护"}
+                  onClick={() => setDeleteArmed(true)}
+                >
+                  删除空任务
+                </button>
+              )}
+            </div>
           </div>
+          {runNotice && <p className="run-notice">{runNotice}</p>}
+          {selected && !canDeleteSelected && (
+            <p className="run-protection-note">该任务已经包含研究内容或状态记录，不能直接删除；这样可以保留检查点、证据和后续跟踪。</p>
+          )}
+          {selected && deleteArmed && canDeleteSelected && (
+            <div className="delete-confirmation" role="alert">
+              <div>
+                <strong>确认删除“{selected.subject}”？</strong>
+                <small>只会移除这个尚未运行的空任务，并将文件移入本机 runs/.trash 回收区。</small>
+              </div>
+              <button type="button" className="secondary" onClick={() => setDeleteArmed(false)}>取消</button>
+              <button type="button" disabled={busy} onClick={deleteSelectedRun}>确认移入回收区</button>
+            </div>
+          )}
           {selected && hasPending && <div className="run-action">
             {selected.status === "failed" ? (
               <button disabled={busy || polling} onClick={continueRun}>
@@ -518,14 +614,23 @@ function App() {
             ) : (
               <>
                 <button disabled={busy || polling} onClick={runNextStage}>
-                  <BilingualText zh="运行下一阶段 · 检查点后暂停" en="Run next stage" compact align="center" />
+                  <BilingualText
+                    zh={willBootstrapEvidence ? "自动选公司并审核官方材料" : "运行下一阶段 · 检查点后暂停"}
+                    en={willBootstrapEvidence ? "Auto-source evidence, then map graph" : "Run next stage"}
+                    compact
+                    align="center"
+                  />
                 </button>
                 <button className="secondary" disabled={busy || polling} onClick={continueRun}>
                   <BilingualText zh="运行全部剩余阶段" en="Run all remaining stages" compact align="center" />
                 </button>
               </>
             )}
-            <small>{selected.status === "created" ? "先采集和审核材料，再执行研究；部分模式允许带缺口继续。" : "恢复执行时，已经完成的检查点会被保留。"}</small>
+            <small>{willBootstrapEvidence
+              ? "这一次会自动提出种子公司、抓取监管/公司官方披露并独立审核；没有材料通过时图谱会停止。"
+              : selected.status === "created"
+                ? "先采集和审核材料，再执行研究；部分模式允许带缺口继续。"
+                : "恢复执行时，已经完成的检查点会被保留。"}</small>
           </div>}
           <ol className="steps">
             {selected?.pipeline.map((step, index) => (
@@ -540,7 +645,18 @@ function App() {
                   />
                   {step.error && <small className="step-error">{step.error}</small>}
                 </div>
-                <i><LocalizedValue value={step.status} /></i>
+                <div className="step-tools">
+                  <i><LocalizedValue value={step.status} /></i>
+                  {["completed", "failed", "blocked"].includes(step.status) && (
+                    <button
+                      type="button"
+                      aria-expanded={selectedStageKey === step.key}
+                      onClick={() => setSelectedStageKey(selectedStageKey === step.key ? null : step.key)}
+                    >
+                      {selectedStageKey === step.key ? "收起详情" : "查看详情"}
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ol>
@@ -551,6 +667,10 @@ function App() {
           <div className="graph-canvas"><GraphView run={selected} /><div className="graph-key"><span><i className="key-high" /> 有证据<small>grounded</small></span><span><i className="key-med" /> 待审核<small>review</small></span></div></div>
           {decision && <div className="decision-note"><BilingualText zh="研究经理" en="Research manager" compact /><p>{decision.summary}</p><small>{decision.disclaimer}</small></div>}
         </article>
+        {selected && (
+          <AutonomousEvidencePanel run={selected} upcoming={willBootstrapEvidence} />
+        )}
+        {selected && <StageDetailPanel run={selected} stageKey={selectedStageKey} />}
       </section>
 
       <SourceQueue
@@ -571,7 +691,15 @@ function App() {
           {selected?.evidence.map((item) => (
             <div className="source-row" key={item.id}>
               <span className={`source-status ${item.status}`}>{translateUiValue(item.status)}<small>{humanizeUiValue(item.status)}</small></span>
-              <div><strong>{item.title}</strong><small>{item.publisher ?? item.id}</small></div>
+              <div>
+                <strong>{item.title}</strong>
+                <small>{item.publisher ?? item.id}</small>
+                {item.review?.actor === "agent" && (
+                  <small className="agent-review-note">
+                    Evidence Review Agent · {item.review.supporting_quotes.length} 条原文引用 · {item.review.model ?? "模型未记录"}
+                  </small>
+                )}
+              </div>
               <div className="review-actions">
                 {item.source_url && <a href={item.source_url} target="_blank" rel="noreferrer">查看来源<small>Source ↗</small></a>}
                 {item.local_path?.startsWith("sources/") && <a href={evidenceTextUrl(selected.id, item.id)} target="_blank" rel="noreferrer">查看正文<small>Text ↗</small></a>}

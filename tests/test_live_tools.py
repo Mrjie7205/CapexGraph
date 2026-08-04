@@ -5,7 +5,15 @@ from datetime import date, timedelta
 import httpx
 import pytest
 
-from capexgraph.domain import EvidenceKind, EvidenceStatus, FinancialMetric, MarketBar, RunMode
+from capexgraph.domain import (
+    EvidenceKind,
+    EvidenceReviewActor,
+    EvidenceReviewRecord,
+    EvidenceStatus,
+    FinancialMetric,
+    MarketBar,
+    RunMode,
+)
 from capexgraph.tools.evidence import (
     EvidenceCollector,
     EvidenceSourceRequest,
@@ -55,9 +63,16 @@ def test_evidence_capture_hash_and_review(tmp_path, monkeypatch) -> None:
     assert "Fact A" in document.text
     assert "ignore" not in document.text
     assert len(document.evidence.source_hash or "") == 64
+    assert len(document.evidence.text_hash or "") == 64
     assert (tmp_path / run.id / "sources" / "filing-1.html").is_file()
     reviewed = review_run_evidence(run.id, "filing-1", approved=True)
     assert reviewed.status == EvidenceStatus.REVIEWED
+    assert reviewed.review is not None
+    assert reviewed.review.decision == "approved"
+    rejected = review_run_evidence(run.id, "filing-1", approved=False)
+    assert rejected.status == EvidenceStatus.REJECTED
+    assert rejected.review is not None
+    assert rejected.review.decision == "rejected"
 
 
 def test_evidence_review_detects_tampering(tmp_path, monkeypatch) -> None:
@@ -87,6 +102,118 @@ def test_evidence_review_detects_tampering(tmp_path, monkeypatch) -> None:
 
     with pytest.raises(ValueError, match="hash does not match"):
         review_run_evidence(run.id, "source-1", approved=True)
+
+
+def test_agent_review_is_hash_bound_and_distinct_from_human_review(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.THEME, "Enterprise AI", "US")
+    collector = EvidenceCollector(
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/html"},
+                    text="<html><body>Official AI product disclosure</body></html>",
+                    request=request,
+                )
+            )
+        ),
+        resolver=public_resolver,
+    )
+    evidence = collect_evidence_for_run(
+        run.id,
+        EvidenceSourceRequest(
+            id="official-ai-product",
+            title="Official AI product",
+            kind=EvidenceKind.COMPANY_DISCLOSURE,
+            url="https://issuer.example/ai",
+        ),
+        collector=collector,
+    ).evidence
+    assert evidence.source_hash is not None
+
+    reviewed = review_run_evidence(
+        run.id,
+        evidence.id,
+        approved=True,
+        review=EvidenceReviewRecord(
+            actor=EvidenceReviewActor.AGENT,
+            reviewer="Evidence Review Agent",
+            provider="test-model",
+            model="test-model-v1",
+            source_hash=evidence.source_hash,
+            prompt_hash="a" * 64,
+            rationale="The official filing directly supports the product claim.",
+            supporting_quotes=["Official AI product disclosure"],
+        ),
+    )
+
+    assert reviewed.status == EvidenceStatus.AGENT_REVIEWED
+    assert reviewed.review is not None
+    assert reviewed.review.actor == EvidenceReviewActor.AGENT
+    assert reviewed.review.source_hash == reviewed.source_hash
+
+
+def test_agent_review_record_rejects_blank_supporting_quotes() -> None:
+    with pytest.raises(ValueError, match="blank"):
+        EvidenceReviewRecord(
+            actor=EvidenceReviewActor.AGENT,
+            reviewer="Evidence Review Agent",
+            provider="test-model",
+            model="test-model-v1",
+            source_hash="a" * 64,
+            prompt_hash="b" * 64,
+            rationale="The source appears relevant.",
+            supporting_quotes=["   "],
+        )
+
+
+def test_agent_review_rejects_a_stale_source_hash(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("CAPEXGRAPH_RUNS_DIR", str(tmp_path))
+    run = create_run(RunMode.THEME, "Enterprise AI", "US")
+    collector = EvidenceCollector(
+        client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/html"},
+                    text="<html><body>Official source</body></html>",
+                    request=request,
+                )
+            )
+        ),
+        resolver=public_resolver,
+    )
+    evidence = collect_evidence_for_run(
+        run.id,
+        EvidenceSourceRequest(
+            id="official-source",
+            title="Official source",
+            kind=EvidenceKind.FILING,
+            url="https://issuer.example/source",
+        ),
+        collector=collector,
+    ).evidence
+
+    with pytest.raises(ValueError, match="review source hash"):
+        review_run_evidence(
+            run.id,
+            evidence.id,
+            approved=True,
+            review=EvidenceReviewRecord(
+                actor=EvidenceReviewActor.AGENT,
+                reviewer="Evidence Review Agent",
+                provider="test-model",
+                model="test-model-v1",
+                source_hash="0" * 64,
+                prompt_hash="b" * 64,
+                rationale="Stale review",
+                supporting_quotes=["Official source"],
+            ),
+        )
 
 
 def test_evidence_collector_blocks_private_urls() -> None:

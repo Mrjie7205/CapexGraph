@@ -32,7 +32,8 @@ CapexGraph `0.5.1` is a local-first **alpha research workspace** with:
   subscription, and the
   separately billed OpenAI Responses API;
 - resumable foreground or background execution with SQLite checkpoints;
-- SSRF-safe HTML/PDF evidence capture, hashing, and explicit review;
+- SSRF-safe HTML/PDF evidence capture, hashing, explicit human review, and a bounded autonomous
+  Theme evidence path with independently verified Agent review;
 - deterministic ticker identity, no-key market snapshots, and legacy financial imports;
 - a React/Vite Cockpit with run history, polling, dynamic graphs, and evidence review;
 - candidate/benchmark tracking, alpha scorecards, triggers, and stage boards;
@@ -192,10 +193,16 @@ $env:CAPEXGRAPH_OPENAI_MODEL = "your-structured-output-capable-model"
 `CAPEXGRAPH_MODEL` remains a legacy OpenAI-only fallback. It is never reused by the Codex
 subscription channel.
 
-Model-proposed sources remain `low` confidence until the source is captured, hash-verified, and
-explicitly reviewed. The model cannot promote an unreviewed claim by wording it confidently.
-Use `--evidence-mode strict` to block execution until a reviewed, unchanged capture exists; the
-default `partial` mode may continue but preserves unsupported relationships at low confidence.
+Before the graph stage of a non-fixture Theme Scan, CapexGraph can automatically propose up to four
+seed companies, verify their tickers against the market's official provider, select and capture up
+to four regulator/issuer disclosures, then send every bounded capture to an independent Evidence
+Review Agent. Exact supporting quotations are checked literally against the captured text and the
+review is bound to both the raw-source hash and extracted-text hash, plus model/prompt provenance.
+
+Accepted automatic material is labeled `agent_reviewed`, never human `reviewed`, and can support at
+most medium-confidence relationships. A human-reviewed unchanged capture may still preserve high
+confidence. Model-only or unreviewed claims remain low, and a Theme graph attempt with zero accepted
+official sources fails visibly instead of silently continuing. Fixture demos bypass this path.
 
 ### SEC disclosure access (no API key)
 

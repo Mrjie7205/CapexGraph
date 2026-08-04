@@ -1,10 +1,10 @@
 # Current status
 
-- Last updated: 2026-08-03
+- Last updated: 2026-08-04
 - Consolidated release: `v0.5.1`
 - Schema version: `12`
 - Next product milestone: `v0.6` — point-in-time consensus revisions and expectation-aware regime analysis
-- Release branch: `codex/pre-v0-6-completion`
+- Active branch: `codex/research-run-controls-stage-details`
 
 This is the short handoff for a new session. Verify it against code and tests before a substantial
 change. `ROADMAP.md` defines future scope; `docs/DECISIONS.md` preserves accepted boundaries.
@@ -17,10 +17,23 @@ change. `ROADMAP.md` defines future scope; `docs/DECISIONS.md` preserves accepte
 - Frozen no-key golden cases remain available for repeatable demos.
 - Model execution is explicit and non-fallback: fixture, official local Codex subscription, or
   separately billed OpenAI API.
-- Evidence capture is SSRF guarded, hashed, and human reviewed. Unreviewed/model-only claims cannot
-  become medium/high-confidence relationships.
+- Evidence capture is SSRF guarded and hashed. Non-fixture Theme Scan now automatically proposes
+  up to four seed companies, resolves ticker-matched regulator/issuer disclosures, captures them,
+  and independently reviews every capture with exact quotations before the graph stage. The new
+  `agent_reviewed` state records model/prompt/hash provenance and is capped at medium confidence;
+  `reviewed` remains explicitly human. Zero accepted sources fail the graph checkpoint visibly.
 - Financial facts, reports, tracking snapshots, scorecards, triggers, and research stages remain
   available from the earlier releases.
+- The Cockpit now opens completed/failed stages as readable structured sections with Agent,
+  provider/model lineage, attempts, timestamps, messages, and errors; operators no longer need to
+  inspect raw checkpoint or manifest JSON to understand a stage result.
+- The Cockpit previews the automatic evidence work before Theme graph execution, then shows its
+  five phases, accepted/rejected counts, verified companies, failure reason, and distinct Agent
+  review badges in the Evidence ledger.
+- Accidental untouched runs can be removed through a two-step confirmation. Eligibility is
+  re-checked under a database write lock, any checkpoint/domain output/source/fact/tracking/live or
+  mainline reference blocks deletion, and the local workspace is moved recoverably under
+  `runs/.trash/<timestamp>/<run-id>` before its run row is removed.
 
 ### v0.4 market, themes, and mainline monitoring
 
@@ -109,6 +122,18 @@ The Cockpit provides equivalent product paths through **主线雷达**, **实时
 - Consensus history and revision breadth do not exist yet; those are the v0.6 scope.
 
 ## Verification record
+
+Local working-tree gate on 2026-08-04 for autonomous Theme evidence bootstrap and Cockpit run
+controls:
+
+- Ruff: passed;
+- Python: 170 tests passed;
+- React/Vite production build: passed at Web version 0.5.1; and
+- browser: the retained Codex Theme run showed the pending automatic-evidence action; temporary
+  browser-only responses verified running/completed/failed bootstrap states without mutating the
+  run; desktop and 375px layouts had no horizontal overflow, and the fresh console had zero errors.
+
+Previous consolidated release record:
 
 Local release gate on 2026-08-03:
 

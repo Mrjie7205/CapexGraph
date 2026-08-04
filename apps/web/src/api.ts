@@ -85,8 +85,53 @@ export interface PipelineStep {
   label: string;
   status: "pending" | "running" | "completed" | "blocked" | "failed";
   agent?: string;
+  started_at?: string;
+  completed_at?: string;
+  attempts: number;
   message: string;
   error?: string;
+}
+
+export interface RunManifest extends Record<string, unknown> {
+  agent_outputs?: Record<string, unknown>;
+  model_provider?: string;
+  model?: string;
+  evidence_mode?: string;
+  model_provider_details?: Record<string, unknown>;
+  model_usage?: Record<string, unknown>;
+  evidence_bootstrap?: EvidenceBootstrapState;
+}
+
+export interface EvidenceBootstrapReview {
+  evidence_id: string;
+  company_id: string;
+  verdict: "accept" | "reject" | "insufficient";
+  rationale: string;
+  supporting_quotes: string[];
+  warnings: string[];
+  accepted: boolean;
+  source_authority: string;
+}
+
+export interface EvidenceBootstrapState {
+  status: "idle" | "running" | "completed" | "failed";
+  phase: string;
+  attempt: number;
+  started_at?: string;
+  completed_at?: string;
+  provider?: string;
+  model?: string;
+  transport?: string;
+  proposed_companies: number;
+  discovered_sources: number;
+  selected_sources: number;
+  captured_sources: number;
+  accepted_sources: number;
+  rejected_sources: number;
+  accepted_companies: Array<Record<string, unknown>>;
+  reviews: EvidenceBootstrapReview[];
+  warnings: string[];
+  error: string;
 }
 
 export interface SupplyChainNode {
@@ -110,17 +155,35 @@ export interface SupplyChainEdge {
 export interface EvidenceItem {
   id: string;
   title: string;
+  kind: string;
   publisher?: string;
   source_url?: string;
   local_path?: string;
   excerpt: string;
-  status: "proposed" | "captured" | "reviewed" | "rejected";
+  source_hash?: string;
+  text_hash?: string;
+  status: "proposed" | "captured" | "agent_reviewed" | "reviewed" | "rejected";
+  review?: {
+    actor: "human" | "agent";
+    decision: string;
+    reviewer: string;
+    provider?: string;
+    model?: string;
+    transport?: string;
+    source_hash: string;
+    prompt_hash?: string;
+    reviewed_at: string;
+    rationale: string;
+    supporting_quotes: string[];
+    warnings: string[];
+  };
 }
 
 export interface EvidenceCoverage {
   mode: EvidenceMode;
   evidence_total: number;
   captured: number;
+  agent_reviewed: number;
   reviewed: number;
   proposed: number;
   rejected: number;
@@ -129,8 +192,9 @@ export interface EvidenceCoverage {
   pending_reviews: number;
   source_failures: number;
   discovery_failures: number;
-  status: "empty" | "suggestions_only" | "partial" | "reviewed";
+  status: "empty" | "suggestions_only" | "partial" | "agent_reviewed" | "reviewed";
   strict_ready: boolean;
+  autonomous_ready: boolean;
   gaps: string[];
 }
 
@@ -389,8 +453,14 @@ export interface ResearchRun {
   edges: SupplyChainEdge[];
   evidence: EvidenceItem[];
   candidates: Candidate[];
-  manifest: Record<string, unknown>;
+  manifest: RunManifest;
   updated_at: string;
+}
+
+export interface RunDeleteResult {
+  deleted: boolean;
+  run_id: string;
+  archived_path: string;
 }
 
 export interface DecisionArtifact {
@@ -781,6 +851,14 @@ export function saveCodexModel(model: string): Promise<CodexConnection> {
 
 export function getRun(runId: string): Promise<ResearchRun> {
   return request(`/api/v1/runs/${runId}`);
+}
+
+export function deleteRun(runId: string, updatedAt: string): Promise<RunDeleteResult> {
+  return request(`/api/v1/runs/${encodeURIComponent(runId)}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ confirmed: true, expected_updated_at: updatedAt }),
+  });
 }
 
 export function createRun(

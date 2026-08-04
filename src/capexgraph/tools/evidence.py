@@ -16,7 +16,14 @@ import httpx
 from pydantic import BaseModel, Field, HttpUrl
 from pypdf import PdfReader
 
-from capexgraph.domain import Evidence, EvidenceKind, EvidenceStatus, ResearchRun
+from capexgraph.domain import (
+    Evidence,
+    EvidenceKind,
+    EvidenceReviewActor,
+    EvidenceReviewRecord,
+    EvidenceStatus,
+    ResearchRun,
+)
 from capexgraph.runtime.artifacts import atomic_write_bytes, atomic_write_text
 from capexgraph.runtime.store import runs_dir
 from capexgraph.workflows import load_run, save_run
@@ -210,6 +217,7 @@ class EvidenceCollector:
         run_dir = runs_dir() / run_id
         atomic_write_bytes(run_dir / relative_raw, raw)
         atomic_write_text(run_dir / relative_text, text)
+        text_digest = hashlib.sha256((run_dir / relative_text).read_bytes()).hexdigest()
 
         evidence = Evidence(
             id=evidence_id,
@@ -219,6 +227,7 @@ class EvidenceCollector:
             published_at=source.published_at,
             excerpt=text[:600],
             source_hash=digest,
+            text_hash=text_digest,
             publisher=source.publisher,
             content_type=content_type.split(";", 1)[0].strip(),
             local_path=relative_raw.as_posix(),
@@ -293,14 +302,48 @@ def _evidence_file(run: ResearchRun, evidence: Evidence) -> Path:
     return path
 
 
+def _evidence_text_file(run: ResearchRun, evidence: Evidence) -> Path:
+    run_dir = (runs_dir() / run.id).resolve()
+    path = (run_dir / "sources" / f"{_safe_evidence_id(evidence.id)}.txt").resolve()
+    if not path.is_relative_to(run_dir):
+        raise ValueError("Evidence text path escapes the run directory")
+    return path
+
+
+def verify_evidence_text_hash(run: ResearchRun, evidence: Evidence) -> bool:
+    """Validate derived review text when the capture records a text hash.
+
+    Older evidence records predate ``text_hash``. They retain their prior raw-source
+    verification behavior until they are recaptured.
+    """
+
+    if evidence.text_hash is None:
+        return True
+    path = _evidence_text_file(run, evidence)
+    return (
+        path.is_file()
+        and hashlib.sha256(path.read_bytes()).hexdigest() == evidence.text_hash
+    )
+
+
 def verify_evidence_hash(run: ResearchRun, evidence: Evidence) -> bool:
     if not evidence.source_hash:
         return False
     path = _evidence_file(run, evidence)
-    return path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest() == evidence.source_hash
+    return bool(
+        path.is_file()
+        and hashlib.sha256(path.read_bytes()).hexdigest() == evidence.source_hash
+        and verify_evidence_text_hash(run, evidence)
+    )
 
 
-def review_run_evidence(run_id: str, evidence_id: str, *, approved: bool) -> Evidence:
+def review_run_evidence(
+    run_id: str,
+    evidence_id: str,
+    *,
+    approved: bool,
+    review: EvidenceReviewRecord | None = None,
+) -> Evidence:
     run = load_run(run_id)
     if run is None:
         raise KeyError(f"Research run not found: {run_id}")
@@ -309,7 +352,27 @@ def review_run_evidence(run_id: str, evidence_id: str, *, approved: bool) -> Evi
         raise KeyError(f"Evidence not found: {evidence_id}")
     if approved and not verify_evidence_hash(run, evidence):
         raise ValueError("Evidence file hash does not match the captured source")
-    evidence.status = EvidenceStatus.REVIEWED if approved else EvidenceStatus.REJECTED
+    if review is not None and review.source_hash != evidence.source_hash:
+        raise ValueError("Evidence review source hash does not match the captured source")
+    if review is None:
+        if not evidence.source_hash:
+            raise ValueError("Evidence has no captured source hash")
+        review = EvidenceReviewRecord(
+            actor=EvidenceReviewActor.HUMAN,
+            decision="approved" if approved else "rejected",
+            reviewer="CapexGraph user",
+            source_hash=evidence.source_hash,
+            rationale=(
+                "User approved the unchanged captured source."
+                if approved
+                else "User rejected the captured source."
+            ),
+        )
+    evidence.review = review
+    if approved and review.actor == EvidenceReviewActor.AGENT:
+        evidence.status = EvidenceStatus.AGENT_REVIEWED
+    else:
+        evidence.status = EvidenceStatus.REVIEWED if approved else EvidenceStatus.REJECTED
     save_run(run)
     return evidence
 
@@ -321,9 +384,9 @@ def read_run_evidence_text(run_id: str, evidence_id: str) -> str:
     evidence = next((item for item in run.evidence if item.id == evidence_id), None)
     if evidence is None:
         raise KeyError(f"Evidence not found: {evidence_id}")
-    _evidence_file(run, evidence)
-    run_dir = (runs_dir() / run.id).resolve()
-    path = (run_dir / "sources" / f"{_safe_evidence_id(evidence.id)}.txt").resolve()
-    if not path.is_relative_to(run_dir) or not path.is_file():
+    if not verify_evidence_hash(run, evidence):
+        raise ValueError("Evidence source or extracted text hash does not match the capture")
+    path = _evidence_text_file(run, evidence)
+    if not path.is_file():
         raise KeyError(f"Extracted evidence text not found: {evidence_id}")
     return path.read_text(encoding="utf-8")

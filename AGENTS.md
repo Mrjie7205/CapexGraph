@@ -41,8 +41,12 @@ in the same change, and record material design changes in `docs/DECISIONS.md`.
 - Agents judge; deterministic code verifies tickers, dates, prices, calculations, references, and
   schema integrity.
 - A relationship is not a fact without provenance. Medium/high-confidence edges require evidence.
-- `captured` means bytes were downloaded and hashed. `reviewed` means a human approved the same
-  unchanged capture. Neither status makes every interpretation of a source true.
+- `captured` means source bytes and derived review text were downloaded/extracted and separately
+  hashed. `reviewed` means a human approved the same
+  unchanged capture. `agent_reviewed` means an independent Evidence Review Agent approved the
+  unchanged capture with model/prompt provenance and deterministically verified exact quotations;
+  it never impersonates human review and can support at most medium-confidence relationships.
+  None of these statuses makes every interpretation of a source true.
 - Product overlap is a `peer` relationship. Never promote it into a customer, supplier, or
   beneficiary claim without direct evidence.
 - Golden fixtures are frozen, dated product demos. Never describe them as current research.

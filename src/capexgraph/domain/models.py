@@ -51,8 +51,14 @@ class EvidenceKind(StrEnum):
 class EvidenceStatus(StrEnum):
     PROPOSED = "proposed"
     CAPTURED = "captured"
+    AGENT_REVIEWED = "agent_reviewed"
     REVIEWED = "reviewed"
     REJECTED = "rejected"
+
+
+class EvidenceReviewActor(StrEnum):
+    HUMAN = "human"
+    AGENT = "agent"
 
 
 class EvidenceMode(StrEnum):
@@ -265,6 +271,32 @@ class Verdict(StrEnum):
     UNRATED = "unrated"
 
 
+class EvidenceReviewRecord(BaseModel):
+    actor: EvidenceReviewActor
+    decision: str = "approved"
+    reviewer: str = Field(min_length=1)
+    provider: str | None = None
+    model: str | None = None
+    transport: str | None = None
+    source_hash: str = Field(pattern=r"^[a-fA-F0-9]{64}$")
+    prompt_hash: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
+    reviewed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    rationale: str = Field(min_length=1)
+    supporting_quotes: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_agent_provenance(self) -> EvidenceReviewRecord:
+        if any(not quote.strip() for quote in self.supporting_quotes):
+            raise ValueError("Evidence review supporting quotes cannot be blank")
+        if self.actor == EvidenceReviewActor.AGENT:
+            if not self.provider or not self.model or not self.prompt_hash:
+                raise ValueError("Agent review requires provider, model, and prompt hash")
+            if self.decision == "approved" and not self.supporting_quotes:
+                raise ValueError("Agent review requires at least one exact supporting quote")
+        return self
+
+
 class Evidence(BaseModel):
     id: str = Field(min_length=1)
     title: str = Field(min_length=1)
@@ -274,10 +306,12 @@ class Evidence(BaseModel):
     retrieved_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     excerpt: str = ""
     source_hash: str | None = None
+    text_hash: str | None = Field(default=None, pattern=r"^[a-fA-F0-9]{64}$")
     publisher: str | None = None
     content_type: str | None = None
     local_path: str | None = None
     status: EvidenceStatus = EvidenceStatus.PROPOSED
+    review: EvidenceReviewRecord | None = None
 
 
 class SourceSuggestion(BaseModel):

@@ -30,17 +30,44 @@ capexgraph sources add <run-id> "https://issuer.example/report" `
 The queue records provider/version, discovery reason, authority classification, canonical URL,
 status, errors, duplicate identity, and any resulting evidence ID. URL duplicates and identical
 downloaded bytes are handled separately. SEC suggestions are prioritized as regulator sources but
-still require capture and human review. Discovery-provider errors and capture failures remain
-visible after restart.
+still require capture and review. Ordinary Source Queue and live-event bridge flows retain explicit
+human review. A non-fixture Theme Scan may instead invoke the bounded autonomous lifecycle below.
+Discovery-provider errors and capture failures remain visible after restart.
 
 ## Evidence lifecycle
 
 ```text
-proposed → captured → reviewed
+proposed → captured → reviewed (human)
+                    ↘ agent_reviewed (independent Agent + exact quotes)
                     ↘ rejected
 ```
 
-`captured` means CapexGraph downloaded the source, stored the raw file and extracted text, and recorded a SHA-256 hash. `reviewed` additionally means a human approved the unchanged capture for use in grounded claims. A hash proves file integrity, not that a claim is economically correct.
+`captured` means CapexGraph downloaded the source, stored the raw file and extracted text, and
+recorded separate SHA-256 hashes for both. `reviewed` additionally means a human approved the
+unchanged material.
+`agent_reviewed` means an independent Evidence Review Agent returned decision provenance and exact
+supporting quotations that deterministic code found in the hash-bound captured text. It is not
+human review and is capped at medium relationship confidence. A hash or review status proves
+integrity and process, not that every economic interpretation is correct.
+
+## Autonomous Theme evidence bootstrap
+
+When a live Theme run reaches `graph`, the workflow can perform the entire first evidence pass
+without asking the operator to choose companies or reports:
+
+```text
+company hypotheses → official ticker match → source selection → guarded capture
+                   → independent exact-quote review → verified company nodes → graph
+```
+
+The attempt is capped at four company hypotheses and four official captures. Company names and
+tickers remain hypotheses until CNINFO, SEC, or KIND returns matching official metadata. Only
+regulator or issuer sources are eligible. Every captured source must receive a review outcome;
+omissions and fabricated/inexact quotations become `insufficient` and are rejected. State is saved
+after every phase in `manifest.evidence_bootstrap` and `evidence-bootstrap.json`. A completed result
+is reused only while accepted raw-source and extracted-text hashes still match; tampered material
+is re-captured and
+re-reviewed. If no source passes, the graph checkpoint fails and can be retried.
 
 ```powershell
 capexgraph evidence collect <run-id> "https://example.com/report.pdf" `
@@ -169,8 +196,11 @@ guarded manual issuer-source path, and content-level interpretation remains cons
 `partial` is the default. It permits research with incomplete coverage, but unreviewed/model-only
 relationships are forced to low confidence and the report exposes the gap.
 
-`strict` requires at least one reviewed, hash-valid capture before a non-fixture workflow begins and
-blocks any medium/high relationship proposal whose citations are not all reviewed:
+`strict` requires grounded, hash-valid capture before stronger relationships are created. For a
+live Theme run, the initial gate is deferred until the automatic graph bootstrap has had a chance
+to capture and Agent-review official material; zero accepted sources then fail `graph`. Other
+non-fixture paths still require human-reviewed material before execution. Strict confidence gates
+accept unchanged human or Agent review but retain the medium cap for Agent-only support:
 
 ```powershell
 capexgraph theme "AI data-center power" --market US --provider openai `

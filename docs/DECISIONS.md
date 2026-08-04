@@ -411,3 +411,22 @@ market/metric coverage, and timestamps before implementation.
 The public repository may include only synthetic licensed-shaped fixtures. Theme aggregates must
 show contributors, coverage, weighting, stale values, and normalization failures. Official actuals
 remain Evidence-linked facts, and models cannot synthesize missing analyst estimates.
+
+## D028 — Autonomous evidence review is a distinct, capped trust state
+
+- **Status:** accepted
+- **Date:** 2026-08-04
+
+Starting the non-fixture Theme `graph` checkpoint authorizes a bounded automatic evidence pass. An
+Agent may propose seed companies, select official sources, and independently review captures, but
+deterministic code must verify market/ticker identity, regulator or issuer authority, guarded
+downloads, raw-source and extracted-text hashes, limits, and literal supporting quotations. Every
+capture receives an
+outcome, and zero accepted sources stop graph execution visibly.
+
+Automatic approval is stored as `agent_reviewed` with reviewer/provider/model/transport,
+raw-source/text and prompt integrity, timestamp, rationale, quotations, and warnings. It never
+produces or impersonates
+human `reviewed`. Fully Agent-reviewed support may ground a relationship only up to medium
+confidence; curated or unchanged human-reviewed support may retain high. Fixture runs remain the
+no-key deterministic path and skip the bootstrap.
